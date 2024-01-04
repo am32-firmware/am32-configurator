@@ -1,5 +1,5 @@
 # Nuxt dev/build outputs
-.output
+#.output
 .data
 .nuxt
 .nitro
@@ -22,3 +22,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# Local Netlify folder
+.netlify
