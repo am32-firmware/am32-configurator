@@ -1,0 +1,10 @@
+{
+  // https://nuxt.com/docs/guide/concepts/typescript
+  "extends": "./.nuxt/tsconfig.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "types": [
+      "@types/w3c-web-serial"
+    ]
+  },
+}

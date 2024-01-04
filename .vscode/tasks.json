@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "bun",
+			"script": "nuxt dev",
+			"problemMatcher": [],
+			"label": "bun: dev",
+			"detail": "bun run nuxt dev - package.json"
+		}
+	]
+}
