@@ -2,7 +2,7 @@
 [build]
   command = "bun run generate"
   functions = "netlify/functions"
-  publish = ".output/public"
+  publish = "dist"
 
   ## Uncomment to use this redirect for Single Page Applications like create-react-app.
   ## Not needed for static site generators.
