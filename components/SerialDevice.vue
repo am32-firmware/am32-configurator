@@ -9,23 +9,30 @@
                 <UButton v-if="!serialStore.hasConnection" :disabled="!serialStore.selectedDevice" size="2xs" @click="connectToDevice">Connect</UButton>
                 <UButton v-else size="2xs" @click="disconnectFromDevice" color="red">Disconnect</UButton>
             </div>
-            <div class="flex gap-2 pt-2">
-                <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']"></UIcon>
-                <UIcon name="i-ion-hardware-chip-sharp" dynamic :class="serialStore.mspData.api_version ? 'text-green-500' : 'text-red-500'"></UIcon>
-                <UChip text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'red'">
-                    <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-red-500'"></UIcon>
-                </UChip>
-                <UChip text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'red'">
-                    <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 1 ? 'text-green-500' : 'text-red-500'"></UIcon>
-                </UChip>
-                <UChip text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'red'">
-                    <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 2 ? 'text-green-500' : 'text-red-500'"></UIcon>
-                </UChip>
-                <UChip text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'red'">
-                    <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 3 ? 'text-green-500' : 'text-red-500'"></UIcon>
-                </UChip>
+            <div class="flex gap-4 pt-2">
+                <div class="flex gap-2 items-center">
+                    <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']"></UIcon>
+                    <UIcon name="i-ion-hardware-chip-sharp" dynamic :class="serialStore.hasConnection && serialStore.mspData.api_version ? 'text-green-500' : 'text-red-500'"></UIcon>
+                </div>
+                <div v-if="serialStore.hasConnection && serialStore.mspData.motorCount > 0" class="flex gap-2">
+                    <UChip v-if="serialStore.mspData.motorCount > 0" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
+                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                    </UChip>
+                    <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
+                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                    </UChip>
+                    <UChip v-if="serialStore.mspData.motorCount > 2" text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'yellow'">
+                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                    </UChip>
+                    <UChip v-if="serialStore.mspData.motorCount > 3" text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'yellow'">
+                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                    </UChip>
+                    <UButton size="xs" class="ml-2" @click="connectToEsc">
+                        <UIcon name="i-material-symbols-bigtop-updates" dynamic></UIcon>
+                    </UButton>
+                </div>
             </div>
-            <div v-if="serialStore.mspData.type" class="flex gap-1">
+            <div v-if="serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
                 <UKbd>
                     {{ serialStore.mspData.type }}
                 </UKbd>
@@ -35,25 +42,26 @@
                 <UKbd v-if="serialStore.isFourWay">
                     4way
                 </UKbd>
-                <UKbd>
-                    {{ serialStore.mspData.batteryData?.voltage }} V
-                </UKbd>
             </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { MSP_COMMANDS, Msp } from '~/src/communication/msp';
+import commandsQueue from '~/src/communication/commands.queue';
+import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
+import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
+import serial from '~/src/communication/serial';
+import Serial from '~/src/communication/serial'
 
 const serialStore = useSerialStore()
 const escStore = useEscStore();
-const logStore = useLogStore();
-const usbVendorId = 0x0483;
+const { log, logWarning, logError } = useLogStore();
+const usbVendorIds = [ 0x0483, 0x2e3c ];
 
 const requestSerialDevices = async () => {
     await navigator.serial.requestPort({
-        filters: [{ usbVendorId }]
+        filters: usbVendorIds.map(id => ({ usbVendorId: id }))
     })
     await fetchPairedDevices();
 }
@@ -66,7 +74,7 @@ const fetchPairedDevices = async () => {
         serialStore.selectLastDevice();
     }
 
-    logStore.log(`got ${pairedDevices.length} device(s)`);
+    log(`got ${pairedDevices.length} device(s)`);
 }
 
 fetchPairedDevices();
@@ -82,39 +90,75 @@ const connectToDevice = async () => {
             }
         }
         if (!serialStore.deviceHandles.port) {
-            logStore.addLogEntry('Serial port not found', 'error');
+            logError('Serial port not found');
         } else {
             await serialStore.deviceHandles.port.open({
                 baudRate: 115200
             })
-            serialStore.hasConnection = true;
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
                 serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
                 serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
-                serialStore.deviceHandles.msp = new Msp(serialStore.deviceHandles.reader, serialStore.deviceHandles.writer, logStore.log, logStore.logError);
+                Serial.init(log, logError, logWarning, serialStore.deviceHandles.reader, serialStore.deviceHandles.writer);
 
-                useIntervalFn(() => {
-                    serialStore.deviceHandles.msp?.read();
-                }, 100);
+                log('Connected to device');
 
-                logStore.addLogEntry('Connected to device');
+                const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
+                    logError(`${err.message}, trying to exit fourway and try again.`);
+                    serialStore.isFourWay = true;
+                    await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+                    serialStore.isFourWay = false;
+                    return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
+                        logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
+                        return null;
+                    });
+                });
+                if (result === null) {
+                    await disconnectFromDevice();
 
-                await serialStore.deviceHandles.msp.send(MSP_COMMANDS.MSP_API_VERSION);
-                await serialStore.deviceHandles.msp.send(MSP_COMMANDS.MSP_FC_VARIANT);
-                await serialStore.deviceHandles.msp.send(MSP_COMMANDS.MSP_BATTERY_STATE);
-                await serialStore.deviceHandles.msp.send(MSP_COMMANDS.MSP_MOTOR_CONFIG);
-                //await serialStore.deviceHandles.msp.send(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
-                
+                    throw new Error('Cant read or write to device!');
+                }
+                commandsQueue.processMspResponse(MSP_COMMANDS.MSP_API_VERSION, result);
+                await Msp.getInstance().send(MSP_COMMANDS.MSP_FC_VARIANT);
+                await Msp.getInstance().send(MSP_COMMANDS.MSP_BATTERY_STATE);
+                await Msp.getInstance().send(MSP_COMMANDS.MSP_MOTOR_CONFIG);
+
+                serialStore.hasConnection = true;
                 
             } else {
-                logStore.addLogEntry('Something went wrong!', 'error');
+                logError('Something went wrong!');
             }
         }
     }
 }
 
+const connectToEsc = async () => {
+    if (!serialStore.isFourWay) {
+        const data = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+
+        serialStore.isFourWay = true;
+
+        escStore.count = data.getUint8(0);
+    }
+
+    escStore.escData = [];
+    escStore.escInfo = [];
+
+    for(let i = 0; i < escStore.count; ++i) {
+        const escData = {
+            isLoading: true
+        } as EscData;
+        escStore.escData.push(escData);
+
+        const result = await FourWay.getInstance().getInfo(i);
+
+        escStore.escInfo.push(result);
+
+        escData.isLoading = false;
+    }
+}
+
 const disconnectFromDevice = async () => {
-    if (serialStore.hasConnection && serialStore.deviceHandles.port) {
+    if (serialStore.deviceHandles.port) {
         serialStore.deviceHandles.reader?.releaseLock();
         serialStore.deviceHandles.writer?.releaseLock();
         await serialStore.deviceHandles.port.close();
@@ -125,7 +169,7 @@ const disconnectFromDevice = async () => {
 
         serialStore.hasConnection = false;
 
-        logStore.addLogEntry('Connection to device closed');
+        log('Connection to device closed');
     }
 }
 </script>

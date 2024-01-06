@@ -1,12 +1,27 @@
 <template>
   <div class="dark">
-    <NuxtLayout>
+    <NuxtLayout v-if="serialStore.hasSerial">
       <NuxtPage />
     </NuxtLayout>
+    <div v-else>
+      No WebSerial
+    </div>
   </div>
 </template>
 <script setup>
-const { log } = useLogStore();
+import { FourWay } from './src/communication/four_way';
+import Msp from './src/communication/msp';
+const serialStore = useSerialStore();
 
-log('initializing...');
+if ('serial' in navigator) {
+  const { log, logWarning, logError } = useLogStore();
+
+  serialStore.hasSerial = true;
+  Msp.init(log, logWarning, logError);
+  FourWay.init(log, logWarning, logError);
+  
+  log('initializing...');
+} else {
+  logError("WebSerial not supported, use other browser!")
+}
 </script>

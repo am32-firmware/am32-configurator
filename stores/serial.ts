@@ -1,5 +1,6 @@
 import { Msp } from '~/src/communication/msp';
 import { defineStore, acceptHMRUpdate } from 'pinia'
+import type { FourWay } from '~/src/communication/four_way';
 
 export const useSerialStore = defineStore('serial', () => {
     const hasConnection = ref(false)
@@ -15,11 +16,13 @@ export const useSerialStore = defineStore('serial', () => {
         reader: ReadableStreamDefaultReader | null,
         writer: WritableStreamDefaultWriter | null,
         msp: Msp | null,
+        fourWay: FourWay | null
     }>({
         port: null,
         reader: null,
         writer: null,
         msp: null,
+        fourWay: null
     });
 
     const mspData = ref<MspData>({} as MspData);
