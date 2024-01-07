@@ -117,6 +117,7 @@ const connectToDevice = async () => {
 
                     throw new Error('Cant read or write to device!');
                 }
+
                 commandsQueue.processMspResponse(result!.commandName, result!.data);
                 await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
                     commandsQueue.processMspResponse(result!.commandName, result!.data);
@@ -149,7 +150,7 @@ const connectToEsc = async () => {
     escStore.escData = [];
     escStore.escInfo = [];
 
-    await FourWay.getInstance().getInfo(0);
+    // await FourWay.getInstance().getInfo(0);
 
     for(let i = 0; i < escStore.count; ++i) {
         const escData = {
@@ -158,6 +159,7 @@ const connectToEsc = async () => {
         escStore.escData.push(escData);
 
         const result = await FourWay.getInstance().getInfo(i);
+        console.log(result);
 
         escStore.escInfo.push(result);
 
