@@ -22,13 +22,30 @@ class Serial {
         this.writer = writer;
     }
 
-    public write(data: ArrayBuffer) {
+    public deinit()
+    {
+        this.reader = null;
+        this.writer = null;
+    }
+
+    public async write(data: ArrayBuffer) {
         if (this.writer) {
+            if (this.reader) {
+                await this.writer.write(data);
+                const result = await this.read<Uint8Array>();
+                console.log(result.value);
+                return result.value;
+            }
             return this.writer.write(data);
         }
 
         this.logError('Serial not initiated!');
         throw new Error('Serial not initiated!');
+    }
+
+    public canRead(): boolean
+    {
+        return this.reader !== null;
     }
 
     public read<T = any>(): Promise<ReadableStreamReadResult<T>> {

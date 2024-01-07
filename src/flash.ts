@@ -14,6 +14,13 @@ class Flash {
             displayName: 'UNKNOWN',
             firmwareName: 'UNKNOWN',
             supported: true,
+            bootloader: {
+                input: 0,
+                valid: false,
+                pin: '',
+                version: ''
+            },
+            layoutSize: 0
         };
     
         return info;

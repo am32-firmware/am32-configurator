@@ -12,10 +12,9 @@
 import { FourWay } from './src/communication/four_way';
 import Msp from './src/communication/msp';
 const serialStore = useSerialStore();
+const { log, logWarning, logError } = useLogStore();
 
 if ('serial' in navigator) {
-  const { log, logWarning, logError } = useLogStore();
-
   serialStore.hasSerial = true;
   Msp.init(log, logWarning, logError);
   FourWay.init(log, logWarning, logError);

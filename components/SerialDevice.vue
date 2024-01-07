@@ -102,7 +102,7 @@ const connectToDevice = async () => {
 
                 log('Connected to device');
 
-                const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
+                let result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
                     logError(`${err.message}, trying to exit fourway and try again.`);
                     serialStore.isFourWay = true;
                     await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
@@ -117,10 +117,16 @@ const connectToDevice = async () => {
 
                     throw new Error('Cant read or write to device!');
                 }
-                commandsQueue.processMspResponse(MSP_COMMANDS.MSP_API_VERSION, result);
-                await Msp.getInstance().send(MSP_COMMANDS.MSP_FC_VARIANT);
-                await Msp.getInstance().send(MSP_COMMANDS.MSP_BATTERY_STATE);
-                await Msp.getInstance().send(MSP_COMMANDS.MSP_MOTOR_CONFIG);
+                commandsQueue.processMspResponse(result!.commandName, result!.data);
+                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
+                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                });
+                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
+                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                });
+                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
+                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                });
 
                 serialStore.hasConnection = true;
                 
@@ -133,15 +139,17 @@ const connectToDevice = async () => {
 
 const connectToEsc = async () => {
     if (!serialStore.isFourWay) {
-        const data = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+        const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
         serialStore.isFourWay = true;
 
-        escStore.count = data.getUint8(0);
+        escStore.count = result?.data.getUint8(0) ?? 0;
     }
 
     escStore.escData = [];
     escStore.escInfo = [];
+
+    await FourWay.getInstance().getInfo(0);
 
     for(let i = 0; i < escStore.count; ++i) {
         const escData = {
@@ -159,15 +167,23 @@ const connectToEsc = async () => {
 
 const disconnectFromDevice = async () => {
     if (serialStore.deviceHandles.port) {
+
+        if (serialStore.isFourWay) {
+            await FourWay.getInstance().send(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+        }
+
+        Msp.getInstance().commandCount = 0;
+        FourWay.getInstance().commandCount = 0;
+
+        Serial.deinit();
+
         serialStore.deviceHandles.reader?.releaseLock();
         serialStore.deviceHandles.writer?.releaseLock();
         await serialStore.deviceHandles.port.close();
         
-        serialStore.deviceHandles.port = null;
-        serialStore.deviceHandles.reader = null;
-        serialStore.deviceHandles.writer = null;
+        serialStore.$reset();
 
-        serialStore.hasConnection = false;
+        escStore.$reset();
 
         log('Connection to device closed');
     }

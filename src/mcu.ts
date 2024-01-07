@@ -22,6 +22,17 @@ class Mcu {
         },
     };
 
+    static BOOT_LOADER_PINS = {
+        PA2: 0x02,
+        PB4: 0x14,
+    };
+
+    static RESET_DELAY_MS = 5000;
+    static LAYOUT_SIZE = 0xB0;
+
+    static BOOT_LOADER_VERSION_OFFSET = 0x00C0;
+    static BOOT_LOADER_VERSION_SIZE = 1;
+
     static getVariant(signature: number) {
         return Mcu.variants[signature.toString(16).toUpperCase()];
     }

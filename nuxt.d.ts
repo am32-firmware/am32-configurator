@@ -59,4 +59,11 @@ interface McuInfo {
     displayName: string;
     firmwareName: string;
     supported: boolean;
+    bootloader: {
+        input: number;
+        valid: boolean;
+        pin: string;
+        version: string;
+    },
+    layoutSize: number;
 }

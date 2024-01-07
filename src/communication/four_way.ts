@@ -138,6 +138,7 @@ export class FourWay {
     async getInfo(target: number) {
         const flash = await this.initFlash(target, 5);
         const info = Flash.getInfo(flash!);
+        console.log(info);
         const mcu = new Mcu(info.meta.signature);
         
         const eepromOffset = mcu.getEepromOffset();
@@ -151,6 +152,25 @@ export class FourWay {
                 info.meta.am32.fileName = fileName;
                 info.meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
             }
+
+            if(info.meta.input) {
+                info.bootloader.input = info.meta.input;
+                info.bootloader.valid = false;
+            }
+
+            for(let [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
+                if(value === info.bootloader.input) {
+                  info.bootloader.valid = true;
+                  info.bootloader.pin = key;
+                  info.bootloader.version = '';//info.settings.BOOT_LOADER_REVISION;
+                }
+            }
+
+            info.layoutSize = Mcu!.LAYOUT_SIZE;
+
+            const settingsArray = (await this.readAddress(eepromOffset, info.layoutSize))!.params;
+            console.log(Array.from(settingsArray));
+            //info.settings = Convert.arrayToSettingsObject(Array.from(settingsArray), info.layout);
         } catch(e) {
             // Failed reading filename - could be old version of AM32
         }
@@ -290,7 +310,7 @@ export class FourWay {
                 this.parseMessage(readerData.value);
             }
         } catch (err) {
-            this.logError(`error reading data: ${err}`);
+            console.error(`error reading data: ${err}`);
         }
     }
 
@@ -320,30 +340,12 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    sendWithPromise(command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
-        return new Promise(async (resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('FOUR WAY timeout reached'));
-            }, 1000);
-
-            if (command === FOUR_WAY_COMMANDS.cmd_InterfaceExit) {
-                clearTimeout(timeout);
-                await this.send(command, params, address);
-                setTimeout(() => {
-                    resolve(null);
-                }, 200);
-            } else {
-                    await this.sendWithCallback(command, (response: FourWayResponse) => {
-                        clearTimeout(timeout);
-                        if (response.ack === FOUR_WAY_ACK.ACK_OK) {
-                            resolve(response);
-                            r = 0;
-                        } else if (r <= 1) {
-                            reject(new Error(enumToString(response.ack, FOUR_WAY_ACK)));
-                        }
-                    }, params, address);
-            }
-      });
+    async sendWithPromise(command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
+        const result = await this.send(command, params, address);
+        if (result) {
+          return this.parseMessage(result.buffer).data;
+        }
+        return null;
     }
 
     /**
@@ -397,9 +399,9 @@ export class FourWay {
     }
 
     this.commandCount--;
-    CommandQueue.addCommand({
+    return {
         commandName: message.command,
         data: message
-    })
+    }
   }
 }

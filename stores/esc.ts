@@ -1,11 +1,17 @@
 export const useEscStore = defineStore('esc', () => {
     const count = ref(0);
 
-    const escData = reactive<EscData[]>([]);
+    const escData = ref<EscData[]>([]);
 
-    const escInfo = reactive<McuInfo[]>([]);
+    const escInfo = ref<McuInfo[]>([]);
 
-    return { count, escData, escInfo }
+    const $reset = () => {
+        count.value = 0;
+        escData.value = [];
+        escInfo.value = [];
+    }
+
+    return { count, escData, escInfo, $reset }
 });
 
 if (import.meta.hot) {

@@ -27,10 +27,6 @@ export const useSerialStore = defineStore('serial', () => {
 
     const mspData = ref<MspData>({} as MspData);
 
-    function setHasSerial(has: boolean) {
-        hasSerial.value = has;
-    }
-
     function addSerialDevices(devices: SerialPort[]) {
         pairedDevices.value = [
             ...devices
@@ -40,8 +36,21 @@ export const useSerialStore = defineStore('serial', () => {
     function selectLastDevice() {
         selectedDevice.value = pairedDevicesOptions.value[pairedDevicesOptions.value.length - 1];
     }
+
+    function $reset() {
+        hasConnection.value = false;
+        isFourWay.value = false;
+        deviceHandles.value = {
+            port: null,
+            reader: null,
+            writer: null,
+            msp: null,
+            fourWay: null
+        };
+        mspData.value = {} as MspData;
+    }
  
-    return { mspData, isFourWay, hasConnection, setHasSerial, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles }
+    return { mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset }
 })
 
 export type SerialStore = ReturnType<typeof useSerialStore>

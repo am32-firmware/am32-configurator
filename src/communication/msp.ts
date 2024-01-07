@@ -152,7 +152,7 @@ export class Msp {
     return bufferOut;
   }
 
-  async send(command: MSP_COMMANDS, data?: Uint8Array) {
+  async send(command: MSP_COMMANDS, data?: Uint8Array, resolve?: PromiseFn, reject?: PromiseFn) {
     this.log(`Sending ${enumToString(command, MSP_COMMANDS)}...`);
     let bufferOut: ArrayBuffer;
 
@@ -178,110 +178,108 @@ export class Msp {
     return this.send(command, data);
   }
 
-  sendWithPromise(command: MSP_COMMANDS, data?: Uint8Array): Promise<DataView> {
-    return new Promise((resolve, reject) => {
+  sendWithPromise(command: MSP_COMMANDS, data?: Uint8Array): Promise<{ commandName: MSP_COMMANDS, data: DataView } | undefined> {
+    return new Promise(async (resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('MSP timeout reached'));
       }, 200);
 
-      this.sendWithCallback(command, (response) => {
-        clearTimeout(timeout);
-        resolve(response);
-      }, data);
+      const result = await this.send(command);
+      if (result) {
+          clearTimeout(timeout);
+          console.log(result);
+          resolve(this.processResponse(result));
+      }
     });
   }
 
-  private state = 0;
-  private messageBuffer: ArrayBuffer = new ArrayBuffer(0);
-  private messageChecksum = 0;
-  private messageLengthExpected = 0;
-  private messageLengthReceived = 0;
-  private command: MSP_COMMANDS | null = null;
-  private messageBufferUint8View = new Uint8Array();
-
   async read(): Promise<void> {
+    if (!Serial.canRead()) {
+      return;
+    }
     try {
       const readerData: ReadableStreamReadResult<Uint8Array> = await Serial.read<Uint8Array>();
       if (readerData.value) {
         this.processResponse(readerData.value);
       }
     } catch (err) {
-      this.logError(`error reading data: ${err}`);
+      console.error(`error reading data: ${err}`);
     }
   }
 
   processResponse(data: Uint8Array) {
+    let state = 0;
+    let messageBuffer = new ArrayBuffer(0);
+    let messageChecksum = 0;
+    let messageLengthExpected = 0;
+    let messageLengthReceived = 0;
+    let command: number | null = null;
+    let messageBufferUint8View = new Uint8Array();
+
     for(let char of data) {
-      switch(this.state) {
+      switch(state) {
         case 0:
           if (char === ascii('$')) {
-            ++this.state;
+            ++state;
           }
           break;
         case 1:
           if (char === ascii('M')) {
-            ++this.state;
+            ++state;
           } else {
-            this.state = 0;
+            state = 0;
           }
           break;
         case 2:
           if ([ascii('<'), ascii('>')].includes(char)) {
-            ++this.state
+            ++state
           } else {
-            this.state = 0;
+            state = 0;
             this.logError(`Unknown msp command direction '${char}'`);
           }
           break;
         case 3:
-          this.messageLengthExpected = char;
-          this.messageChecksum = char;
+          messageLengthExpected = char;
+          messageChecksum = char;
 
-          this.messageBuffer = new ArrayBuffer(this.messageLengthExpected);
-          this.messageBufferUint8View = new Uint8Array(this.messageBuffer);
+          messageBuffer = new ArrayBuffer(messageLengthExpected);
+          messageBufferUint8View = new Uint8Array(messageBuffer);
 
-          ++this.state;
+          ++state;
           break;
         case 4:
-          this.command = char;
-          this.messageChecksum ^= char;
+          command = char;
+          messageChecksum ^= char;
 
           // Process payload
-          if (this.messageLengthExpected > 0) {
-            this.state += 1;
+          if (messageLengthExpected > 0) {
+            state += 1;
           } else {
             // No payload
-            this.state += 2;
+            state += 2;
           }
           break;
         case 5:
-          this.messageBufferUint8View[this.messageLengthReceived] = char;
-          this.messageChecksum ^= char;
-          this.messageLengthReceived += 1;
+          messageBufferUint8View[messageLengthReceived] = char;
+          messageChecksum ^= char;
+          messageLengthReceived += 1;
 
-          if (this.messageLengthReceived >= this.messageLengthExpected) {
-            this.state += 1;
+          if (messageLengthReceived >= messageLengthExpected) {
+            state += 1;
           }
           break;
         case 6:
-          console.log(enumToString(this.command as number, MSP_COMMANDS), this.messageBuffer);
-          if (this.messageChecksum === char) {
+          console.log(enumToString(command as number, MSP_COMMANDS), messageBuffer);
+          if (messageChecksum === char) {
             this.commandCount--;
-            CommandQueue.addCommand({
-              commandName: this.command!,
+            return {
+              commandName: command!,
               data: new DataView(
-                this.messageBuffer,
+                messageBuffer,
                 0
               )
-            })
+            };
           }
-          this.state = 0;
-          this.messageBuffer = new ArrayBuffer(0);
-          this.messageChecksum = 0;
-          this.messageLengthExpected = 0;
-          this.messageLengthReceived = 0;
-          this.command = null;
-          this.messageBufferUint8View = new Uint8Array();
           break;
       }
     }

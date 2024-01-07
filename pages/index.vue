@@ -17,21 +17,9 @@
     </div>
 </template>
 <script setup lang="ts">
-import { FourWay } from '~/src/communication/four_way';
-import Msp from '~/src/communication/msp';
 
 const serialStore = useSerialStore();
-const logStore = useLogStore();
 const escStore = useEscStore();
-
-useIntervalFn(() => {
-    if (Msp.getInstance().commandCount > 0) {
-        Msp.getInstance().read();
-    }
-    if (FourWay.getInstance().commandCount > 0) {
-        FourWay.getInstance().read();
-    }
-}, 10);
 
 const hasEsc = (n: number) => {
     return !!escStore.escData[n] && !!escStore.escInfo[n];
