@@ -16,6 +16,7 @@
 </template>
 <script setup lang="ts">
 const logStore = useLogStore();
+const lastLogLength = ref(0);
 const wrapper = ref<HTMLDivElement>();
 
 const getTextColor = (type: LogMessageType) => {
@@ -39,6 +40,9 @@ const scrollToBottom = () => {
 }
 
 useIntervalFn(() => {
-    scrollToBottom();
+    if (logStore.entries.length > lastLogLength.value) {
+        scrollToBottom();
+        lastLogLength.value = logStore.entries.length;
+    }
 }, 200)
 </script>

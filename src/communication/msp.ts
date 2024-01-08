@@ -164,6 +164,8 @@ export class Msp {
 
     try {
       this.commandCount++;
+
+      console.log("msp: Serial.write");
       const result = await Serial.write(bufferOut);
       return result;
     } catch(e: any) {
@@ -178,19 +180,16 @@ export class Msp {
     return this.send(command, data);
   }
 
-  sendWithPromise(command: MSP_COMMANDS, data?: Uint8Array): Promise<{ commandName: MSP_COMMANDS, data: DataView } | undefined> {
-    return new Promise(async (resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('MSP timeout reached'));
-      }, 200);
+  async sendWithPromise(command: MSP_COMMANDS, data?: Uint8Array) {
+    console.log('sendWithPromise');
 
-      const result = await this.send(command);
-      if (result) {
-          clearTimeout(timeout);
-          console.log(result);
-          resolve(this.processResponse(result));
-      }
-    });
+    const result = await this.send(command);
+    console.log(result);
+    if (result) {
+        return this.processResponse(result);
+    } else {
+        throw new Error();
+    }
   }
 
   async read(): Promise<void> {

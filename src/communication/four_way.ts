@@ -146,7 +146,10 @@ export class FourWay {
             //Attempt reading filename
         try {
             const fileNameRead = await this.readAddress(eepromOffset - 32, 16);
-            const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead!.params.indexOf(0x00)));
+            console.log(fileNameRead);
+            const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.length));
+
+            console.log(fileName);
 
             if (/[A-Z0-9_]+/.test(fileName)) {
                 info.meta.am32.fileName = fileName;
@@ -340,13 +343,47 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    async sendWithPromise(command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
-        const result = await this.send(command, params, address);
-        if (result) {
-          return this.parseMessage(result.buffer).data;
+    sendWithPromise(command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
+      let currentTry = 0;
+      /*const { ready, start, stop } = useTimeout(1000, {
+        controls: true,
+        callback: () => {
+          if (currentTry >= retries) {
+            throw new Error('four way timeout');
+          }
         }
-        return null;
-    }
+      });*/
+
+      const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
+        while(currentTry++ < retries) {
+          console.log(currentTry);
+          const result = await this.send(command, params, address).catch(err => {
+            console.log(err);
+            return null;
+          });
+          if (command === FOUR_WAY_COMMANDS.cmd_InterfaceExit) {
+            resolve(null);
+            break;
+          }
+
+          if (result) {
+            try {
+              const response = this.parseMessage(result.buffer);
+              resolve(response.data);
+              break;
+            } catch(e) {
+              console.error(e);
+            }
+          }
+          await delay(250);
+        }
+
+        if (currentTry < retries) {
+          reject(new Error('max retries, please check connection'));
+        }
+      }
+      return new Promise(callback);
+  }
 
     /**
    * Parse a message and invoke either resolve or reject callback

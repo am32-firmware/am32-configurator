@@ -3,22 +3,22 @@ class Mcu {
         [key: string]: McuVariant;
     } = {
         "1F06": {
-            "name": "STM32F051",
-            "signature": "0x1f06",
-            "page_size": 1024,
-            "flash_size": 65536,
-            "flash_offset": "0x08000000",
-            "firmware_start": "0x1000",
-            "eeprom_offset": "0x7c00",
+            name: "STM32F051",
+            signature: "0x1f06",
+            page_size: 1024,
+            flash_size: 65536,
+            flash_offset: "0x08000000",
+            firmware_start: "0x1000",
+            eeprom_offset: "0x7c00",
         },
         "3506": {
-            "name": "ARM64K",
-            "signature": "0x3506",
-            "page_size": 1024,
-            "flash_size": 65536,
-            "flash_offset": "0x08000000",
-            "firmware_start": "0x1000",
-            "eeprom_offset": "0xF800",
+            name: "ARM64K",
+            signature: "0x3506",
+            page_size: 1024,
+            flash_size: 65536,
+            flash_offset: "0x08000000",
+            firmware_start: "0x1000",
+            eeprom_offset: "0xF800",
         },
     };
 
@@ -34,7 +34,11 @@ class Mcu {
     static BOOT_LOADER_VERSION_SIZE = 1;
 
     static getVariant(signature: number) {
-        return Mcu.variants[signature.toString(16).toUpperCase()];
+        const mcu = Mcu.variants[signature.toString(16).toUpperCase()];
+        if (!mcu) {
+            throw new Error(`mcu signature ${signature.toString(16).toUpperCase()} unknown!`);
+        }
+        return mcu;
     }
 
     private mcu: McuVariant;

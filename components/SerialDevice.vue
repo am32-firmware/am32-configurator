@@ -6,7 +6,7 @@
             </div>
             <div class="flex justify-between gap-2">
                 <UButton @click="requestSerialDevices" size="2xs">Port select</UButton>
-                <UButton v-if="!serialStore.hasConnection" :disabled="!serialStore.selectedDevice" size="2xs" @click="connectToDevice">Connect</UButton>
+                <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">Connect</UButton>
                 <UButton v-else size="2xs" @click="disconnectFromDevice" color="red">Disconnect</UButton>
             </div>
             <div class="flex gap-4 pt-2">
@@ -72,12 +72,17 @@ const fetchPairedDevices = async () => {
 
     if (pairedDevices.length > 0) {
         serialStore.selectLastDevice();
+    } else {
+        serialStore.selectedDevice = {
+            id: '-1',
+            label: 'Select device'
+        };
     }
-
-    log(`got ${pairedDevices.length} device(s)`);
 }
 
-fetchPairedDevices();
+useIntervalFn(() => {
+    fetchPairedDevices();
+}, 1000);
 
 const connectToDevice = async () => {
     const portTmp: string[] | undefined = serialStore.selectedDevice?.id.split(':');
@@ -112,6 +117,7 @@ const connectToDevice = async () => {
                         return null;
                     });
                 });
+                console.log(result);
                 if (result === null) {
                     await disconnectFromDevice();
 
@@ -119,6 +125,7 @@ const connectToDevice = async () => {
                 }
 
                 commandsQueue.processMspResponse(result!.commandName, result!.data);
+                
                 await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
                     commandsQueue.processMspResponse(result!.commandName, result!.data);
                 });
@@ -152,14 +159,13 @@ const connectToEsc = async () => {
 
     // await FourWay.getInstance().getInfo(0);
 
-    for(let i = 0; i < escStore.count; ++i) {
+    for(let i = 0; i < 1; ++i) {
         const escData = {
             isLoading: true
         } as EscData;
         escStore.escData.push(escData);
 
         const result = await FourWay.getInstance().getInfo(i);
-        console.log(result);
 
         escStore.escInfo.push(result);
 

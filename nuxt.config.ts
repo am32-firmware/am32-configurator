@@ -11,7 +11,13 @@ export default defineNuxtConfig({
     shim: false
   },
   ssr: false,
-  modules: ['dayjs-nuxt', '@nuxt/ui', '@pinia/nuxt', '@vueuse/nuxt', ['@nuxtjs/google-fonts', {
+  modules: [
+    'nuxt-svgo',
+    'dayjs-nuxt',
+    '@nuxt/ui',
+    '@pinia/nuxt',
+    '@vueuse/nuxt',
+    ['@nuxtjs/google-fonts', {
       families: {
         Roboto: true,
         "Nunito Sans": true,

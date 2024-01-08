@@ -10,7 +10,10 @@ export const useSerialStore = defineStore('serial', () => {
     const pairedDevicesOptions = computed(() => pairedDevices.value.map(d =>
         ({ id: `${d.getInfo().usbVendorId}:${d.getInfo().usbProductId}`, label: `0x${padStr(d.getInfo().usbVendorId?.toString(16) ?? '', 4, '0')}:0x${padStr(d.getInfo().usbProductId?.toString(16) ?? '', 4, '0')}` }))
     );
-    const selectedDevice = ref<{ id: string, label: string }>();
+    const selectedDevice = ref<{ id: string, label: string }>({
+        id: '-1',
+        label: 'Select device'
+    });
     const deviceHandles = ref<{
         port: SerialPort | null,
         reader: ReadableStreamDefaultReader | null,
