@@ -14,7 +14,7 @@ export default {
     iconsPlugin({
       // Select the icon collections you want to use
       // You can also ignore this option to automatically discover all icon collections you have installed
-      collections: getIconCollections(["heroicons", "material-symbols", "svg-spinners"]),
+      collections: getIconCollections(["heroicons", "material-symbols"]),
     }),
   ],
 } satisfies Config

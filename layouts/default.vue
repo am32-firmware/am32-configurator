@@ -1,7 +1,7 @@
 <template>
     <div class="grid grid-cols-12 text-white">
         <div class="col-span-2 flex justify-center items-center">
-            <svgo-logo-full class="text-white text-[150px]" />
+            <svgo-logo-full class="text-white text-[150px]"></svgo-logo-full>
         </div>
         <div class="col-span-8">
             <div class="h-full font-bold text-3xl text-red-800 flex flex-col">

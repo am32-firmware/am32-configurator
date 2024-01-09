@@ -30,7 +30,7 @@ const hasEsc = (n: number) => {
     return !!escStore.escData[n] && !!escStore.escInfo[n];
 }
 
-const allLoaded = computed(() => escStore.escInfo.length === escStore.count && !escStore.escData.find((e) => e.isLoading === true));
+const allLoaded = computed(() => escStore.escInfo.length > 0 && escStore.escInfo.length === escStore.count && !escStore.escData.find((e) => e.isLoading === true));
 
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
     escStore.escInfo[payload.index].settingsDirty = escStore.escInfo[payload.index].settings[payload.field] !== (payload.value ? 1 : 0)
