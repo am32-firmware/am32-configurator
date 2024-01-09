@@ -47,8 +47,8 @@ import type { McuInfo } from '~/src/mcu';
 const props = defineProps<{
     isLoading: boolean,
     index: number,
-    esc: EscData | null,
-    mcu: McuInfo | null
+    esc: EscData | null | undefined,
+    mcu: McuInfo | null | undefined
 }>()
 
 const emit = defineEmits<{
@@ -70,7 +70,6 @@ const badgeColor = computed(() => {
 const isReversed = computed({
     get: () => (getSettingValue<number>('MOTOR_DIRECTION') ?? 0) === 1,
     set (value) {
-        console.log(value);
         emit('change', {
             index: props.index,
             field: 'MOTOR_DIRECTION',
@@ -79,10 +78,18 @@ const isReversed = computed({
     }
 });
 
-const is3DMode = computed(() => (getSettingValue<number>('BIDIRECTIONAL_MODE') ?? 0) === 1);
+const is3DMode = computed({
+    get: () => (getSettingValue<number>('BIDIRECTIONAL_MODE') ?? 0) === 1,
+    set (value) {
+        emit('change', {
+            index: props.index,
+            field: 'BIDIRECTIONAL_MODE',
+            value
+        })
+    }
+});
 
 function getSettingValue<T>(name: EepromLayoutKeys): T | null {
-    console.log(name, props.mcu?.settings[name]);
     return props.mcu?.settings[name] as T ?? null;
 }
 </script>

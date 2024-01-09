@@ -23,6 +23,7 @@ class Flash {
                 version: 0
             },
             layoutSize: 0,
+            settingsDirty: false,
             settings: {}
         };
     

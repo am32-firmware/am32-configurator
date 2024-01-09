@@ -1,3 +1,5 @@
+import type { McuInfo } from "~/src/mcu";
+
 export const useEscStore = defineStore('esc', () => {
     const count = ref(0);
 
@@ -5,13 +7,15 @@ export const useEscStore = defineStore('esc', () => {
 
     const escInfo = ref<McuInfo[]>([]);
 
+    const settingsDirty = ref(false);
+
     const $reset = () => {
         count.value = 0;
         escData.value = [];
         escInfo.value = [];
     }
 
-    return { count, escData, escInfo, $reset }
+    return { settingsDirty, count, escData, escInfo, $reset }
 });
 
 if (import.meta.hot) {

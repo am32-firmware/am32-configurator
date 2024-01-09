@@ -30,6 +30,7 @@ export interface McuInfo {
         version: number;
     },
     layoutSize: number;
+    settingsDirty: boolean;
     settings: McuSettings;
 }
 

@@ -20,7 +20,7 @@
                         <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark-20-solid" class="-my-1" @click="logModal = false" />
                     </div>
                 </template>
-                <LogView class="w-full max-h-[1000px]"></LogView>
+                <LogView class="w-full max-h-[1000px] overflow-auto"></LogView>
             </UCard>
         </UModal>
     </div>

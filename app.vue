@@ -1,5 +1,6 @@
 <template>
-  <div class="dark min-h-screen">
+  <NuxtPwaManifest />
+  <div class="min-h-screen">
     <NuxtLayout v-if="serialStore.hasSerial">
       <NuxtPage />
     </NuxtLayout>
@@ -15,11 +16,40 @@
         <div class="text-center">v0.0.1</div>
       </div>
     </footer>
+    <UNotifications />
   </div>
 </template>
 <script setup>
 import { FourWay } from './src/communication/four_way';
 import Msp from './src/communication/msp';
+const { $pwa } = useNuxtApp()
+
+const toast = useToast()
+
+onMounted(() => {
+  if ($pwa.offlineReady) {
+    toast.add({
+      icon: 'i-material-symbols-install-desktop',
+      color: 'green',
+      title: 'Installation',
+      description: 'App successfully installed. Offline work available.'
+    });
+  }
+
+  if ($pwa.needRefresh) {
+    toast.add({
+      icon: 'i-material-symbols-cloud-sync',
+      color: 'green',
+      title: 'Update',
+      description: 'Update avaiable, please reload.',
+      timeout: 3,
+      callback: () => {
+        window.location.reload();
+      }
+    })
+  }
+})
+
 const serialStore = useSerialStore();
 const { log, logWarning, logError } = useLogStore();
 

@@ -1,8 +1,9 @@
 <template>
     <div>
         <div class="p-4 grid grid-cols-1 gap-2">
-            <div>
-                <USelectMenu v-model="serialStore.selectedDevice" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device"></USelectMenu>
+            <div class="flex flex-column gap-2">
+                <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device"></USelectMenu>
+                <USelectMenu v-model="baudrate" class="flex-grow" :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection" :options="baudrateOptions"></USelectMenu>
             </div>
             <div class="flex justify-between gap-2">
                 <UButton @click="requestSerialDevices" size="2xs">Port select</UButton>
@@ -14,22 +15,29 @@
                     <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']"></UIcon>
                     <UIcon name="i-ion-hardware-chip-sharp" dynamic :class="serialStore.hasConnection && serialStore.mspData.api_version ? 'text-green-500' : 'text-red-500'"></UIcon>
                 </div>
-                <div v-if="serialStore.hasConnection && serialStore.mspData.motorCount > 0" class="flex gap-2">
-                    <UChip v-if="serialStore.mspData.motorCount > 0" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
-                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
-                    </UChip>
-                    <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
-                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
-                    </UChip>
-                    <UChip v-if="serialStore.mspData.motorCount > 2" text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'yellow'">
-                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
-                    </UChip>
-                    <UChip v-if="serialStore.mspData.motorCount > 3" text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'yellow'">
-                        <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
-                    </UChip>
-                    <UButton size="xs" class="ml-2" @click="connectToEsc">
-                        <UIcon name="i-material-symbols-bigtop-updates" dynamic></UIcon>
-                    </UButton>
+                <div v-if="serialStore.hasConnection && serialStore.mspData.motorCount > 0" class="w-full flex justify-between">
+                    <div class="flex gap-2">
+                        <UChip v-if="serialStore.mspData.motorCount > 0" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
+                            <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                        </UChip>
+                        <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
+                            <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                        </UChip>
+                        <UChip v-if="serialStore.mspData.motorCount > 2" text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'yellow'">
+                            <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                        </UChip>
+                        <UChip v-if="serialStore.mspData.motorCount > 3" text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'yellow'">
+                            <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'"></UIcon>
+                        </UChip>
+                    </div>
+                    <div class="flex gap-2">
+                        <UButton size="xs" @click="connectToEsc">
+                            <UIcon name="i-material-symbols-find-in-page-outline"></UIcon>
+                        </UButton>
+                        <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty">
+                            <UIcon name="i-material-symbols-save"></UIcon>
+                        </UButton>
+                    </div>
                 </div>
             </div>
             <div v-if="serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
@@ -51,13 +59,29 @@
 import commandsQueue from '~/src/communication/commands.queue';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
-import serial from '~/src/communication/serial';
 import Serial from '~/src/communication/serial'
 
+const toast = useToast();
 const serialStore = useSerialStore()
 const escStore = useEscStore();
 const { log, logWarning, logError } = useLogStore();
 const usbVendorIds = [ 0x0483, 0x2e3c ];
+
+const isAnySettingsDirty = computed(() => !!escStore.escInfo.find(e => e.settingsDirty) || escStore.settingsDirty);
+
+const baudrateOptions = ref([
+    '1000000',
+    '500000',
+    '256000',
+    '115200',
+    '57600',
+    '38400',
+    '19200',
+    '14400',
+    '9600'
+]);
+
+const baudrate = ref('115200');
 
 const requestSerialDevices = async () => {
     await navigator.serial.requestPort({
@@ -103,9 +127,20 @@ const connectToDevice = async () => {
             logError('Serial port not found');
         } else {
             if (!serialStore.deviceHandles.port.readable) {
-                await serialStore.deviceHandles.port.open({
-                    baudRate: 115200
-                });
+                try {
+                    await serialStore.deviceHandles.port.open({
+                        baudRate: +baudrate.value
+                    });
+                } catch (e: any) {
+                    logError('Port already in use!');
+                    toast.add({
+                        icon: 'i-material-symbols-mimo-disconnect-outline',
+                        title: 'Error',
+                        color: 'red',
+                        description: 'Port already in use, please free device and try again!'
+                    });
+                    throw new Error(`${e.message}`);
+                }
             }
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
                 if (!serialStore.deviceHandles.reader) {

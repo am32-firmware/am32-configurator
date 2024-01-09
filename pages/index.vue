@@ -33,6 +33,7 @@ const hasEsc = (n: number) => {
 const allLoaded = computed(() => escStore.escInfo.length === escStore.count && !escStore.escData.find((e) => e.isLoading === true));
 
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
-    FourWay.getInstance()
+    escStore.escInfo[payload.index].settingsDirty = escStore.escInfo[payload.index].settings[payload.field] !== (payload.value ? 1 : 0)
+    escStore.escInfo[payload.index].settings[payload.field] = (payload.value ? 1 : 0);
 }
 </script>
