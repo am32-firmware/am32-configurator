@@ -1,4 +1,3 @@
-import { darkMode } from './.nuxt/tailwind.config.d';
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({  
   devtools: {
@@ -29,6 +28,6 @@ export default defineNuxtConfig({
     storesDirs: ['./stores/**'],
   },
   colorMode: {
-    preference: 'darkMode'
+    preference: 'dark'
   }
 });
