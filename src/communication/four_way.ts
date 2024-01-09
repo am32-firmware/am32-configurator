@@ -136,46 +136,42 @@ export class FourWay {
     }*/
 
     async getInfo(target: number) {
-        const flash = await this.initFlash(target, 5);
+        const flash = await this.initFlash(target, 10);
         const info = Flash.getInfo(flash!);
-        console.log(info);
         const mcu = new Mcu(info.meta.signature);
+        mcu.setInfo(info);
         
         const eepromOffset = mcu.getEepromOffset();
     
-            //Attempt reading filename
         try {
             const fileNameRead = await this.readAddress(eepromOffset - 32, 16);
-            console.log(fileNameRead);
-            const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.length));
-
-            console.log(fileName);
+            const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
-                info.meta.am32.fileName = fileName;
-                info.meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
+                mcu.getInfo().meta.am32.fileName = fileName;
+                mcu.getInfo().meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
             }
 
-            if(info.meta.input) {
-                info.bootloader.input = info.meta.input;
-                info.bootloader.valid = false;
+            if(mcu.getInfo().meta.input) {
+                mcu.getInfo().bootloader.input = info.meta.input;
+                mcu.getInfo().bootloader.valid = false;
             }
+
+            mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
+
+            const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
+            mcu.getInfo().settings = bufferToSettings(settingsArray);
 
             for(let [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                if(value === info.bootloader.input) {
-                  info.bootloader.valid = true;
-                  info.bootloader.pin = key;
-                  info.bootloader.version = '';//info.settings.BOOT_LOADER_REVISION;
+                if(value === mcu.getInfo().bootloader.input) {
+                  mcu.getInfo().bootloader.valid = true;
+                  mcu.getInfo().bootloader.pin = key;
+                  mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
                 }
             }
-
-            info.layoutSize = Mcu!.LAYOUT_SIZE;
-
-            const settingsArray = (await this.readAddress(eepromOffset, info.layoutSize))!.params;
-            console.log(Array.from(settingsArray));
-            //info.settings = Convert.arrayToSettingsObject(Array.from(settingsArray), info.layout);
         } catch(e) {
-            // Failed reading filename - could be old version of AM32
+            console.error(e);
+            throw new Error();
         }
 
         //info.displayName = am32Source.buildDisplayName(info, info.meta.am32.fileName ? info.meta.am32.fileName.slice(0, info.meta.am32.fileName.lastIndexOf('_')) : 'UNKNOWN');
@@ -328,9 +324,7 @@ export class FourWay {
         }
 
         try {
-            this.commandCount++;
-            const result = await Serial.write(message);
-            return result;
+            return await Serial.write(message, 500);
         } catch(e: any) {
             this.logError(`MSP command failed: ${e.message}`);
             return null;
@@ -356,7 +350,6 @@ export class FourWay {
 
       const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
         while(currentTry++ < retries) {
-          console.log(currentTry);
           const result = await this.send(command, params, address).catch(err => {
             console.log(err);
             return null;
@@ -369,8 +362,10 @@ export class FourWay {
           if (result) {
             try {
               const response = this.parseMessage(result.buffer);
-              resolve(response.data);
-              break;
+              if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
+                  resolve(response.data);
+                  break;
+              }
             } catch(e) {
               console.error(e);
             }
@@ -397,7 +392,6 @@ export class FourWay {
     const fourWayIf = 0x2e;
 
     let view = new Uint8Array(buffer);
-    console.log(view);
     if (view[0] !== fourWayIf) {
       const error = `invalid message start: ${view[0]}`;
       throw new Error(error);
@@ -440,5 +434,10 @@ export class FourWay {
         commandName: message.command,
         data: message
     }
+  }
+
+  writeAddress(address: number, data: Uint8Array) {
+    //const message = this.makePackage(FOUR_WAY_COMMANDS.cmd_DeviceWrite, data, address);
+    //return Serial.write(data, address);
   }
 }

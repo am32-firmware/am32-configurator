@@ -1,5 +1,3 @@
-import mergeUint8Arrays from "~/utils/mergeUint8Arrays";
-
 class Serial {
     private log: LogFn = (s: string) => {};
     private logError: LogFn  = (s: string) => {};
@@ -30,33 +28,23 @@ class Serial {
         this.writer = null;
     }
 
-    public async write(data: ArrayBuffer) {
+    public async write(data: ArrayBuffer, ms = 100) {
         if (this.writer) {
             if (this.reader) {
                 await this.writer.write(data);
-                console.log("serial: wait for read response");
-                let ret = new Uint8Array();
-                let result = await this.readWithTimeout<Uint8Array>().catch(err => {
+                let ret: Uint8Array | null = null;
+                let result: ReadableStreamReadResult<Uint8Array> | null  = await this.readWithTimeout<Uint8Array>(ms).catch(err => {
+                    console.log(err);
                     return null
-                });
-                console.log(result);
-                if (result && result.value) {
-                    ret = mergeUint8Arrays(ret, result.value);
-                }
-                console.log(ret);
-                while(result && !result.done && result.value.length > 0) {
-                    try {
-                        result = await this.readWithTimeout<Uint8Array>().catch(err => {
-                            return null;
-                        });
-                        if (result && result.value) {
-                            ret = mergeUint8Arrays(ret, result.value);
-                        }
-                    } catch(e) {
-                        console.log(e);
+                }) as ReadableStreamReadResult<Uint8Array> | null;
+                while (result && !result.done) {
+                    if (result && result.value) {
+                        ret = mergeUint8Arrays(ret ?? new Uint8Array(), result.value);
                     }
+                    result = await this.readWithTimeout<Uint8Array>(ms).catch(err => {
+                        return null
+                    }) as ReadableStreamReadResult<Uint8Array> | null;
                 }
-                console.log(ret);
                 return ret;
             }
             return this.writer.write(data);
@@ -80,24 +68,23 @@ class Serial {
         throw new Error('Serial not initiated!');
     }
 
-    public async readWithTimeout<T = any>(ms = 500): Promise<ReadableStreamReadResult<T> | null> {
+    public async readWithTimeout<T = any>(ms = 100): Promise<ReadableStreamReadResult<T> | Error | null> {
         if (this.reader) {
-            let timeoutObj: NodeJS.Timeout;
-            const timeout = new Promise((_, reject) => {
-                timeoutObj = setTimeout(() => {
-                    reject(new Error('serial read timeout reached'));
+            return new Promise<ReadableStreamReadResult<T>>(async (resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    console.log('serial timeout hit', ms);
+                    this.reader!.releaseLock();
+                    const serialStore = useSerialStore();
+                    this.reader = serialStore.refreshReader();
                 }, ms);
+                try {
+                    const result = await this.read<T>();
+                    clearTimeout(timeout);
+                    resolve(result);
+                } catch(e) {
+                    reject(e)
+                }
             });
-
-            const res = new Promise<ReadableStreamReadResult<T>>(async (resolve) => {
-                const result = await this.read<T>();
-                resolve(result);
-            });
-            const ret = await Promise.race([timeout, res])
-                .finally(() => {
-                    clearTimeout(timeoutObj);
-                }) as ReadableStreamReadResult<T> | null;
-            return ret;
         }
 
         this.logError('Serial not initiated!');

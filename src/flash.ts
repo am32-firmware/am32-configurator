@@ -1,3 +1,5 @@
+import type { McuInfo } from "./mcu";
+
 class Flash {
     static getInfo(flash: FourWayResponse) {
         const info: McuInfo = {
@@ -18,9 +20,10 @@ class Flash {
                 input: 0,
                 valid: false,
                 pin: '',
-                version: ''
+                version: 0
             },
-            layoutSize: 0
+            layoutSize: 0,
+            settings: {}
         };
     
         return info;
