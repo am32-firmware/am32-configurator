@@ -163,11 +163,7 @@ export class Msp {
     }
 
     try {
-      this.commandCount++;
-
-      console.log("msp: Serial.write");
-      const result = await Serial.write(bufferOut);
-      return result;
+      return await Serial.write(bufferOut);
     } catch(e: any) {
       this.logError(`MSP command failed: ${e.message}`);
       return null;
@@ -181,10 +177,7 @@ export class Msp {
   }
 
   async sendWithPromise(command: MSP_COMMANDS, data?: Uint8Array) {
-    console.log('sendWithPromise');
-
     const result = await this.send(command);
-    console.log(result);
     if (result) {
         return this.processResponse(result);
     } else {
@@ -268,7 +261,6 @@ export class Msp {
           }
           break;
         case 6:
-          console.log(enumToString(command as number, MSP_COMMANDS), messageBuffer);
           if (messageChecksum === char) {
             this.commandCount--;
             return {

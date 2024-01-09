@@ -1,5 +1,5 @@
 <template>
-    <div class="h-[150px] grid grid-cols-12 text-white">
+    <div class="grid grid-cols-12 text-white">
         <div class="col-span-2 flex justify-center items-center">
             <svgo-logo-full class="text-white text-[150px]" />
         </div>
@@ -14,7 +14,7 @@
             <SerialDevice></SerialDevice>
         </div>
     </div>
-    <div>
+    <div class="h-full">
         <slot></slot>
     </div>
 </template>

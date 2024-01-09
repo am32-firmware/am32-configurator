@@ -1,6 +1,7 @@
 import { Msp } from '~/src/communication/msp';
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import type { FourWay } from '~/src/communication/four_way';
+import { NUXT_ERROR_SIGNATURE } from 'nuxt/dist/app/composables/error';
 
 export const useSerialStore = defineStore('serial', () => {
     const hasConnection = ref(false)
@@ -40,6 +41,15 @@ export const useSerialStore = defineStore('serial', () => {
         selectedDevice.value = pairedDevicesOptions.value[pairedDevicesOptions.value.length - 1];
     }
 
+    const refreshReader = () => {
+        if (deviceHandles.value.port && deviceHandles.value.port.readable) {
+            deviceHandles.value.reader = deviceHandles.value.port.readable.getReader();
+        } else {
+            throw new Error('port or read stream not avaiable');
+        }
+        return deviceHandles.value.reader;
+    }
+
     function $reset() {
         hasConnection.value = false;
         isFourWay.value = false;
@@ -53,7 +63,7 @@ export const useSerialStore = defineStore('serial', () => {
         mspData.value = {} as MspData;
     }
  
-    return { mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset }
+    return { refreshReader, mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset }
 })
 
 export type SerialStore = ReturnType<typeof useSerialStore>

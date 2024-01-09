@@ -36,34 +36,3 @@ interface FourWayResponse {
     checksum: number;
     params: Uint8Array;
 }
-interface McuVariant {
-    name: string;
-    signature: string;
-    page_size: number;
-    flash_size: number;
-    flash_offset: string;
-    firmware_start: string;
-    eeprom_offset: string;
-}
-interface McuInfo {
-    meta: {
-        signature: number;
-        input: number;
-        interfaceMode: number;
-        available: boolean;
-        am32: {
-            fileName: string | null;
-            mcuType: string | null;
-        };
-    };
-    displayName: string;
-    firmwareName: string;
-    supported: boolean;
-    bootloader: {
-        input: number;
-        valid: boolean;
-        pin: string;
-        version: string;
-    },
-    layoutSize: number;
-}

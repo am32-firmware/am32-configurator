@@ -73,6 +73,9 @@ const fetchPairedDevices = async () => {
     if (pairedDevices.length > 0) {
         serialStore.selectLastDevice();
     } else {
+        if (serialStore.hasConnection) {
+            serialStore.$reset();
+        }
         serialStore.selectedDevice = {
             id: '-1',
             label: 'Select device'
@@ -80,9 +83,11 @@ const fetchPairedDevices = async () => {
     }
 }
 
+fetchPairedDevices();
+
 useIntervalFn(() => {
     fetchPairedDevices();
-}, 1000);
+}, 500);
 
 const connectToDevice = async () => {
     const portTmp: string[] | undefined = serialStore.selectedDevice?.id.split(':');
@@ -97,12 +102,18 @@ const connectToDevice = async () => {
         if (!serialStore.deviceHandles.port) {
             logError('Serial port not found');
         } else {
-            await serialStore.deviceHandles.port.open({
-                baudRate: 115200
-            })
+            if (!serialStore.deviceHandles.port.readable) {
+                await serialStore.deviceHandles.port.open({
+                    baudRate: 115200
+                });
+            }
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
-                serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
-                serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
+                if (!serialStore.deviceHandles.reader) {
+                    serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
+                }
+                if (!serialStore.deviceHandles.writer) {
+                    serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
+                }
                 Serial.init(log, logError, logWarning, serialStore.deviceHandles.reader, serialStore.deviceHandles.writer);
 
                 log('Connected to device');
@@ -111,13 +122,14 @@ const connectToDevice = async () => {
                     logError(`${err.message}, trying to exit fourway and try again.`);
                     serialStore.isFourWay = true;
                     await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+                    await delay(1000);
                     serialStore.isFourWay = false;
                     return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
                         logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
                         return null;
                     });
                 });
-                console.log(result);
+
                 if (result === null) {
                     await disconnectFromDevice();
 
@@ -127,13 +139,19 @@ const connectToDevice = async () => {
                 commandsQueue.processMspResponse(result!.commandName, result!.data);
                 
                 await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
-                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    if (result) {
+                        commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    }
                 });
                 await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
-                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    if (result) {
+                        commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    }
                 });
                 await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
-                    commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    if (result) {
+                        commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    }
                 });
 
                 serialStore.hasConnection = true;
@@ -159,7 +177,9 @@ const connectToEsc = async () => {
 
     // await FourWay.getInstance().getInfo(0);
 
-    for(let i = 0; i < 1; ++i) {
+    await delay(1000);
+
+    for(let i = 0; i < escStore.count; ++i) {
         const escData = {
             isLoading: true
         } as EscData;

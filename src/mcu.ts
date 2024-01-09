@@ -1,3 +1,38 @@
+import type { EepromLayoutKeys, McuSettings } from "./eeprom";
+
+export interface McuVariant {
+    name: string;
+    signature: string;
+    page_size: number;
+    flash_size: number;
+    flash_offset: string;
+    firmware_start: string;
+    eeprom_offset: string;
+}
+export interface McuInfo {
+    meta: {
+        signature: number;
+        input: number;
+        interfaceMode: number;
+        available: boolean;
+        am32: {
+            fileName: string | null;
+            mcuType: string | null;
+        };
+    };
+    displayName: string;
+    firmwareName: string;
+    supported: boolean;
+    bootloader: {
+        input: number;
+        valid: boolean;
+        pin: string;
+        version: number;
+    },
+    layoutSize: number;
+    settings: McuSettings;
+}
+
 class Mcu {
     static variants: {
         [key: string]: McuVariant;
@@ -42,9 +77,18 @@ class Mcu {
     }
 
     private mcu: McuVariant;
+    private info: McuInfo | null = null;
 
     constructor(signature: number) {
          this.mcu = Mcu.getVariant(signature);
+    }
+
+    setInfo(info: McuInfo) {
+        this.info = info;
+    }
+
+    getInfo(): McuInfo {
+        return this.info as McuInfo;
     }
 
     /**
