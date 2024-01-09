@@ -17,6 +17,5 @@ export default {
       collections: getIconCollections(["fluent", "ph", "heroicons"]),
     }),
   ],
-  darkMode: 'class',
 } satisfies Config
 
