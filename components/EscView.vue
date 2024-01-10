@@ -12,17 +12,29 @@
                 <div class="text-gray-700 w-full flex items-start gap-6" v-else-if="mcu?.bootloader.pin">
                     <div>
                         <div class="font-bold">Bootloader</div>
-                        <div class="text-xs">PIN: {{ mcu.bootloader.pin }}</div>
-                        <div class="text-xs">Version: {{ mcu.bootloader.version }}</div>
+                        <div class="grid grid-cols-3 text-xs">
+                            <div class="col-span-2">PIN</div>
+                            <div class="">{{ mcu.bootloader.pin }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 text-xs">
+                            <div class="col-span-2">Version</div>
+                            <div>{{ mcu.bootloader.version }}</div>
+                        </div>
                     </div>
                     <div>
                         <div class="font-bold">MCU</div>
-                        <div class="text-xs">Type: {{ mcu?.meta.am32.mcuType }}</div>
+                        <div class="text-xs">
+                            <div>{{ mcu?.meta.am32.mcuType }}</div>
+                        </div>
                     </div>
                     <div>
                         <div class="font-bold">Firmware</div>
-                        <div class="text-xs">Name: {{ mcu?.meta.am32.fileName }}</div>
-                        <div class="text-xs">Version: {{ getSettingValue('MAIN_REVISION') }}.{{ getSettingValue('SUB_REVISION') }}</div>
+                        <div class="grid grid-cols-5 text-xs">
+                            <div class="col-span-2">Name</div>
+                            <div class="col-span-3">{{ mcu?.meta.am32.fileName }}</div>
+                            <div class="col-span-2">Version</div>
+                            <div class="col-span-3">{{ getSettingValue('MAIN_REVISION') }}.{{ getSettingValue('SUB_REVISION') }}</div>
+                        </div>
                     </div>
                 </div>
             </div>

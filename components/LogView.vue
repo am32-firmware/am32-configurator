@@ -1,15 +1,19 @@
 <template>
     <div ref="wrapper" class="p-2 overflow-auto">
-        <div v-for="(entry, i) of logStore.entries" class="flex flex-row">
-            <div class="w-[50px] text-center text-white">
-                #{{ i }}
+        <div v-for="entry of logStore.entries" class="flex flex-row gap-2">
+            <div class="text-white">
+                {{ $dayjs(entry[0]).format('HH:mm:ss') }}
             </div>
-            <div class="w-[20px] text-center">
-                <div v-if="entry[2] === 'warning'">w</div>
-                <div v-else-if="entry[2] === 'error'">e</div>
+            <div v-if="entry[2]">
+                <div v-if="entry[2] === 'warning'">
+                    <UIcon name="i-material-symbols-light-warning" class="text-yellow-400"></UIcon>
+                </div>
+                <div v-else-if="entry[2] === 'error'">
+                    <UIcon name="i-material-symbols-error" class="text-red-400"></UIcon>
+                </div>
             </div>
-            <div class="flex-grow" :class="getTextColor(entry[2])">
-                {{ $dayjs(entry[0]).format('HH:mm:ss') }} - {{ entry[1] }}
+            <div class="text-left" :class="getTextColor(entry[2])">
+                {{ entry[1] }}
             </div>
         </div>
     </div>
