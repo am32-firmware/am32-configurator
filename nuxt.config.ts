@@ -23,7 +23,8 @@ export default defineNuxtConfig({
         Roboto: true,
         "Nunito Sans": true,
       }
-    }]
+    }],
+    "@nuxt/content"
   ],
   pinia: {
     storesDirs: ['./stores/**'],

@@ -53,7 +53,7 @@ onMounted(() => {
 const serialStore = useSerialStore();
 const { log, logWarning, logError } = useLogStore();
 
-if ('serial' in navigator) {
+if (navigator && 'serial' in navigator) {
   serialStore.hasSerial = true;
   Msp.init(log, logWarning, logError);
   FourWay.init(log, logWarning, logError);
