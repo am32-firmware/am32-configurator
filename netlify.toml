@@ -1,6 +1,6 @@
 # example netlify.toml
 [build]
-  command = "bun run generate"
+  command = "bun run build"
   functions = "netlify/functions"
   publish = "dist"
 
