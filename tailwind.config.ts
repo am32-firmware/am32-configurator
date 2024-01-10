@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss'
 import { iconsPlugin, getIconCollections } from "@egoist/tailwindcss-icons"
+import typography from '@tailwindcss/typography'
 
 export default {
   content: [],
@@ -16,6 +17,7 @@ export default {
       // You can also ignore this option to automatically discover all icon collections you have installed
       collections: getIconCollections(["heroicons", "material-symbols"]),
     }),
+    typography()
   ],
 } satisfies Config
 

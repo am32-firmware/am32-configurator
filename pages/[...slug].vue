@@ -20,12 +20,17 @@
         <div v-else>
             <nav class="w-full border-b border-t flex justify-center">
                 <ContentNavigation v-slot="{ navigation }">
-                    <div v-for="link of navigation" :key="link._path" class="py-4 transition-all hover:bg-slate-900">
+                    <div
+                        v-for="link of navigation"
+                        :key="link._path"
+                        class="py-4 transition-all hover:bg-slate-900 relative text-xl w-fit block after:block after:content-[''] after:bottom-0 after:absolute after:h-[3px] after:bg-white after:w-full after:scale-x-0 after:hover:scale-x-100 after:transition after:duration-300 after:origin-center">
                         <NuxtLink active-class="!bg-slate-800" class="p-4 transition-all bg-transparent" :to="link._path">{{ link.title }}</NuxtLink>
                     </div>
                 </ContentNavigation>
             </nav>
-            <ContentDoc />
+            <div class="p-4 max-w-[1400px] m-auto prose prose-invert">
+                <ContentDoc />
+            </div>
         </div>
     </div>
 </template>
