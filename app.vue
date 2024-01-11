@@ -1,7 +1,7 @@
 <template>
   <NuxtPwaManifest />
-  <div class="min-h-screen">
-    <NuxtLayout v-if="serialStore.hasSerial">
+  <div class="min-h-screen bg-gray-950">
+    <NuxtLayout v-if="serialStore.hasSerial" class="h-full">
       <NuxtPage />
     </NuxtLayout>
     <div v-else>

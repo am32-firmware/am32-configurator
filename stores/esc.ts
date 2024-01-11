@@ -5,14 +5,14 @@ export const useEscStore = defineStore('esc', () => {
 
     const escData = ref<EscData[]>([]);
 
-    const escInfo = ref<McuInfo[]>([]);
+    let escInfo = reactive<McuInfo[]>([]);
 
     const settingsDirty = ref(false);
 
     const $reset = () => {
         count.value = 0;
         escData.value = [];
-        escInfo.value = [];
+        escInfo = [];
     }
 
     return { settingsDirty, count, escData, escInfo, $reset }

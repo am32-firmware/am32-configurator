@@ -162,5 +162,5 @@ export type EepromLayoutKeys = keyof typeof EepromLayout;
 export type EepromLayoutValues = typeof EepromLayout[EepromLayoutKeys];
 
 export type McuSettings = {
-    [key in EepromLayoutKeys as string]: number | number[] | Uint8Array | string
+    [key in EepromLayoutKeys as string]: number | number[]
 };

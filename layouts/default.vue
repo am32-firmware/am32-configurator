@@ -1,13 +1,13 @@
 <template>
-    <div class="grid grid-cols-12 text-white">
+    <div class="grid grid-cols-12 text-white ">
         <div class="col-span-2 flex justify-center items-center">
             <svgo-logo-full class="text-white text-[150px]"></svgo-logo-full>
         </div>
-        <div class="col-span-8">
+        <div class="col-span-8 h-[200px] max-h-[200px]">
             <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
                 <div v-if="logStore.entries.length === 0">AlkaMotors</div>
 
-                <Log class="h-full max-h-[150px] overflow-auto"></Log>
+                <Log v-else class="h-full overflow-auto"></Log>
             </div>
         </div>
         <div v-if="serialStore.hasSerial" class="col-span-2">

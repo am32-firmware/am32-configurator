@@ -36,3 +36,6 @@ interface FourWayResponse {
     checksum: number;
     params: Uint8Array;
 }
+
+type SettingsType = 'select' | 'bool' | 'string' | 'number';
+type SettingsSelectOptionsType = { label: string, value: numer };
