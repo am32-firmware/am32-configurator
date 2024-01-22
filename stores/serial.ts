@@ -1,12 +1,11 @@
+import { defineStore, acceptHMRUpdate } from 'pinia';
 import { Msp } from '~/src/communication/msp';
-import { defineStore, acceptHMRUpdate } from 'pinia'
 import type { FourWay } from '~/src/communication/four_way';
-import { NUXT_ERROR_SIGNATURE } from 'nuxt/dist/app/composables/error';
 
 export const useSerialStore = defineStore('serial', () => {
-    const hasConnection = ref(false)
-    const hasSerial = ref(true)
-    const isFourWay = ref(false)
+    const hasConnection = ref(false);
+    const hasSerial = ref(true);
+    const isFourWay = ref(false);
     const pairedDevices = ref<SerialPort[]>([]);
     const pairedDevicesOptions = computed(() => pairedDevices.value.map(d =>
         ({ id: `${d.getInfo().usbVendorId}:${d.getInfo().usbProductId}`, label: `0x${padStr(d.getInfo().usbVendorId?.toString(16) ?? '', 4, '0')}:0x${padStr(d.getInfo().usbProductId?.toString(16) ?? '', 4, '0')}` }))
@@ -31,13 +30,13 @@ export const useSerialStore = defineStore('serial', () => {
 
     const mspData = ref<MspData>({} as MspData);
 
-    function addSerialDevices(devices: SerialPort[]) {
+    function addSerialDevices (devices: SerialPort[]) {
         pairedDevices.value = [
             ...devices
         ];
     }
 
-    function selectLastDevice() {
+    function selectLastDevice () {
         selectedDevice.value = pairedDevicesOptions.value[pairedDevicesOptions.value.length - 1];
     }
 
@@ -48,9 +47,9 @@ export const useSerialStore = defineStore('serial', () => {
             throw new Error('port or read stream not avaiable');
         }
         return deviceHandles.value.reader;
-    }
+    };
 
-    function $reset() {
+    function $reset () {
         hasConnection.value = false;
         isFourWay.value = false;
         deviceHandles.value = {
@@ -62,12 +61,12 @@ export const useSerialStore = defineStore('serial', () => {
         };
         mspData.value = {} as MspData;
     }
- 
-    return { refreshReader, mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset }
-})
+
+    return { refreshReader, mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset };
+});
 
 export type SerialStore = ReturnType<typeof useSerialStore>
 
 if (import.meta.hot) {
- import.meta.hot.accept(acceptHMRUpdate(useSerialStore, import.meta.hot))
+    import.meta.hot.accept(acceptHMRUpdate(useSerialStore, import.meta.hot));
 }

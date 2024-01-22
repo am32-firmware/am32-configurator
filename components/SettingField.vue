@@ -1,32 +1,42 @@
 <template>
-    <div class="relative">
-        <UFormGroup>
-            <template #label>
-                <div class="flex items-center gap-1 mb-1">
-                    <div>{{ name }}</div>
-                    <UTooltip v-if="help" :text="help" :popper="{ placement: 'right' }">
-                        <UIcon name="i-material-symbols-help-outline" class="text-blue-500 text-lg"></UIcon>
-                    </UTooltip>
-                </div>
-            </template>
-            <div v-if="type === 'select'">
-                <USelect v-model="value" :options="options" :placeholder="placeholder"></USelect>
-            </div>
-            <UToggle v-else-if="type === 'bool'"></UToggle>
-            <div v-else-if="type === 'number'">
-                <URange v-model="value" :min="min" :max="max" :step="step"></URange>
-                <div>{{ value }}</div>
-            </div>
-        </UFormGroup>
-        <div v-if="otherValues && otherValues.length > 0" class="absolute top-0 right-0 flex gap-1">
-            <div v-for="o of otherValues">
-                <div class="w-[10px] h-[10px] rounded-full" :class="{
-                    'bg-green-500': getCompareValue(o) === value,
-                    'bg-red-500': getCompareValue(o) !== value,
-                }"></div>
-            </div>
+  <div class="relative">
+    <UFormGroup>
+      <template #label>
+        <div class="flex items-center gap-1 mb-1">
+          <div>{{ name }}</div>
+          <UTooltip v-if="help" :text="help" :popper="{ placement: 'right' }">
+            <UIcon name="i-material-symbols-help-outline" class="text-blue-500 text-lg" />
+          </UTooltip>
         </div>
+      </template>
+      <div v-if="type === 'select'">
+        <USelect v-model="value" :disabled="isDisabled" :options="options" :placeholder="placeholder" />
+      </div>
+      <UToggle v-else-if="type === 'bool'" v-model="boolValue" :disabled="isDisabled" />
+      <div v-else-if="type === 'number'">
+        <URange v-model="value" :disabled="isDisabled" :min="min" :max="max" :step="step" />
+      </div>
+      <slot name="unit" :unit="unit" :value="value">
+        <div v-if="unit || showValue" class="flex">
+          <div>{{ value }}</div>
+          <div v-if="unit">
+            {{ unit }}
+          </div>
+        </div>
+      </slot>
+    </UFormGroup>
+    <div v-if="otherValues && otherValues.length > 0" class="absolute top-0 right-0 pt-1 flex gap-1">
+      <div v-for="(o, i) of otherValues" :key="i">
+        <div
+          class="w-[10px] h-[10px] rounded-full"
+          :class="{
+            'bg-green-500': getCompareValue(o) === value,
+            'bg-red-500': getCompareValue(o) !== value,
+          }"
+        />
+      </div>
     </div>
+  </div>
 </template>
 <script setup lang="ts">
 import type { EepromLayoutKeys } from '~/src/eeprom';
@@ -46,16 +56,37 @@ interface SettingFieldProps {
     step?: number;
     displayFactor?: number;
     offset?: number;
+    unit?: string;
+    showValue?: boolean;
+    disabled?: boolean | ((value: number) => boolean)
 }
 
 const props = withDefaults(defineProps<SettingFieldProps>(), {
     displayFactor: 1,
-    offset: 0
+    offset: 0,
+    placeholder: undefined,
+    description: undefined,
+    help: undefined,
+    options: undefined,
+    min: undefined,
+    max: undefined,
+    step: undefined,
+    unit: undefined,
+    showValue: false,
+    disabled: false
 });
 
-const emits = defineEmits<{
-    (e: 'change', value: { field: EepromLayoutKeys, value: number }): void
-}>();
+const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number }): void}>();
+
+const isDisabled = computed(() => {
+    if (props.disabled) {
+        if (typeof props.disabled === 'function') {
+            return props.disabled(value.value);
+        }
+        return props.disabled;
+    }
+    return false;
+});
 
 const value = computed({
     get: () => {
@@ -69,7 +100,7 @@ const value = computed({
     set: (val) => {
         let value = val;
         if (props.type === 'number') {
-            value = Math.round((value - props.offset) / props.displayFactor)
+            value = Math.round((value - props.offset) / props.displayFactor);
         }
         console.log(value);
         emits('change', {
@@ -77,11 +108,20 @@ const value = computed({
             value
         });
     }
-})
+});
+
+const boolValue = computed({
+    get: () => {
+        return props.escInfo[0].settings[props.field] as number === 1;
+    },
+    set: (val) => {
+        value.value = val ? 1 : 0;
+    }
+});
 
 const getCompareValue = (value: number) => {
     return props.type === 'number' ? value * props.displayFactor + props.offset : value;
-}
+};
 
 const otherValues = computed(() => props.escInfo?.map(i => i.settings[props.field]) as number[] ?? []);
 </script>

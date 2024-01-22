@@ -1,3 +1,3 @@
-export default function(a: number, e: any) {
+export default function (a: number, e: any) {
     return e[a];
 }

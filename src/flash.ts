@@ -1,7 +1,7 @@
-import type { McuInfo } from "./mcu";
+import type { McuInfo } from './mcu';
 
 class Flash {
-    static getInfo(flash: FourWayResponse) {
+    static getInfo (flash: FourWayResponse) {
         const info: McuInfo = {
             meta: {
                 signature: (flash.params[1] << 8) | flash.params[0],
@@ -9,9 +9,9 @@ class Flash {
                 interfaceMode: flash.params[3],
                 available: true,
                 am32: {
-                        fileName: null,
-                        mcuType: null,
-                },
+                    fileName: null,
+                    mcuType: null
+                }
             },
             displayName: 'UNKNOWN',
             firmwareName: 'UNKNOWN',
@@ -26,7 +26,7 @@ class Flash {
             settingsDirty: false,
             settings: {}
         };
-    
+
         return info;
     }
 }

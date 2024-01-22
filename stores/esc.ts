@@ -1,4 +1,4 @@
-import type { McuInfo } from "~/src/mcu";
+import type { McuInfo } from '~/src/mcu';
 
 export const useEscStore = defineStore('esc', () => {
     const count = ref(0);
@@ -13,11 +13,11 @@ export const useEscStore = defineStore('esc', () => {
         count.value = 0;
         escData.value = [];
         escInfo = [];
-    }
+    };
 
-    return { settingsDirty, count, escData, escInfo, $reset }
+    return { settingsDirty, count, escData, escInfo, $reset };
 });
 
 if (import.meta.hot) {
-    import.meta.hot.accept(acceptHMRUpdate(useEscStore, import.meta.hot))
- }
+    import.meta.hot.accept(acceptHMRUpdate(useEscStore, import.meta.hot));
+}

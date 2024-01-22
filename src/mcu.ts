@@ -1,4 +1,4 @@
-import type { EepromLayoutKeys, McuSettings } from "./eeprom";
+import type { McuSettings } from './eeprom';
 
 export interface McuVariant {
     name: string;
@@ -38,29 +38,29 @@ class Mcu {
     static variants: {
         [key: string]: McuVariant;
     } = {
-        "1F06": {
-            name: "STM32F051",
-            signature: "0x1f06",
-            page_size: 1024,
-            flash_size: 65536,
-            flash_offset: "0x08000000",
-            firmware_start: "0x1000",
-            eeprom_offset: "0x7c00",
-        },
-        "3506": {
-            name: "ARM64K",
-            signature: "0x3506",
-            page_size: 1024,
-            flash_size: 65536,
-            flash_offset: "0x08000000",
-            firmware_start: "0x1000",
-            eeprom_offset: "0xF800",
-        },
-    };
+            '1F06': {
+                name: 'STM32F051',
+                signature: '0x1f06',
+                page_size: 1024,
+                flash_size: 65536,
+                flash_offset: '0x08000000',
+                firmware_start: '0x1000',
+                eeprom_offset: '0x7c00'
+            },
+            3506: {
+                name: 'ARM64K',
+                signature: '0x3506',
+                page_size: 1024,
+                flash_size: 65536,
+                flash_offset: '0x08000000',
+                firmware_start: '0x1000',
+                eeprom_offset: '0xF800'
+            }
+        };
 
     static BOOT_LOADER_PINS = {
         PA2: 0x02,
-        PB4: 0x14,
+        PB4: 0x14
     };
 
     static RESET_DELAY_MS = 5000;
@@ -69,7 +69,7 @@ class Mcu {
     static BOOT_LOADER_VERSION_OFFSET = 0x00C0;
     static BOOT_LOADER_VERSION_SIZE = 1;
 
-    static getVariant(signature: number) {
+    static getVariant (signature: number) {
         const mcu = Mcu.variants[signature.toString(16).toUpperCase()];
         if (!mcu) {
             throw new Error(`mcu signature ${signature.toString(16).toUpperCase()} unknown!`);
@@ -80,15 +80,15 @@ class Mcu {
     private mcu: McuVariant;
     private info: McuInfo | null = null;
 
-    constructor(signature: number) {
-         this.mcu = Mcu.getVariant(signature);
+    constructor (signature: number) {
+        this.mcu = Mcu.getVariant(signature);
     }
 
-    setInfo(info: McuInfo) {
+    setInfo (info: McuInfo) {
         this.info = info;
     }
 
-    getInfo(): McuInfo {
+    getInfo (): McuInfo {
         return this.info as McuInfo;
     }
 
@@ -97,7 +97,7 @@ class Mcu {
    *
    * @returns {string}
    */
-    getName() {
+    getName () {
         return this.mcu.name;
     }
 
@@ -106,7 +106,7 @@ class Mcu {
      *
      * @returns {number}
      */
-    getFlashSize() {
+    getFlashSize () {
         return this.mcu.flash_size;
     }
 
@@ -115,7 +115,7 @@ class Mcu {
      *
      * @returns {number}
      */
-    getFlashOffset() {
+    getFlashOffset () {
         return parseInt(this.mcu.flash_offset, 16);
     }
 
@@ -124,7 +124,7 @@ class Mcu {
      *
      * @returns {number}
      */
-    getEepromOffset() {
+    getEepromOffset () {
         return parseInt(this.mcu.eeprom_offset, 16);
     }
 
@@ -133,7 +133,7 @@ class Mcu {
      *
      * @returns {number}
      */
-    getPageSize() {
+    getPageSize () {
         return this.mcu.page_size;
     }
 
@@ -142,12 +142,12 @@ class Mcu {
      *
      * @returns {number}
      */
-    getFirmwareStart() {
-        if(this.mcu.firmware_start) {
+    getFirmwareStart () {
+        if (this.mcu.firmware_start) {
             return parseInt(this.mcu.firmware_start, 16);
         }
 
-        throw new Error("MCU does not have firmware start address");
+        throw new Error('MCU does not have firmware start address');
     }
 }
 

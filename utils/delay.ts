@@ -1,5 +1,5 @@
-import { promiseTimeout } from "@vueuse/core";
+import { promiseTimeout } from '@vueuse/core';
 
-export default function(ms: number) {
+export default function (ms: number) {
     return promiseTimeout(ms);
 }
