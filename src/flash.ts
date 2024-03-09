@@ -24,7 +24,8 @@ class Flash {
             },
             layoutSize: 0,
             settingsDirty: false,
-            settings: {}
+            settings: {},
+            settingsBuffer: new Uint8Array()
         };
 
         return info;

@@ -7,19 +7,6 @@
     <div v-else>
       No WebSerial
     </div>
-    <footer class="absolute bottom-0 w-full bg-gray-800">
-      <div class="grid grid-cols-3 leading-loose">
-        <div class="text-center">
-          AM32 Configurator
-        </div>
-        <div class="text-center">
-          powered by Nuxt and Netlify
-        </div>
-        <div class="text-center">
-          v0.0.1
-        </div>
-      </div>
-    </footer>
     <UNotifications />
   </div>
 </template>

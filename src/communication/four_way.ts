@@ -1,5 +1,6 @@
+import type { McuSettings } from '../eeprom';
 import Flash from '../flash';
-import Mcu from '../mcu';
+import Mcu, { type McuInfo } from '../mcu';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
 
@@ -159,6 +160,7 @@ export class FourWay {
 
             const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray);
+            mcu.getInfo().settingsBuffer = settingsArray;
 
             for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
                 if (value === mcu.getInfo().bootloader.input) {
@@ -171,122 +173,6 @@ export class FourWay {
             console.error(e);
             throw new Error(e.message);
         }
-
-        // info.displayName = am32Source.buildDisplayName(info, info.meta.am32.fileName ? info.meta.am32.fileName.slice(0, info.meta.am32.fileName.lastIndexOf('_')) : 'UNKNOWN');
-        // info.firmwareName = am32Source.getName();
-
-        console.log(mcu);
-
-        /* try {
-          let mcu = null;
-          try {
-            mcu = new MCU(info.meta.interfaceMode, info.meta.signature);
-            if (!mcu.class) {
-              console.debug('Unknown MCU class.');
-              throw new UnknownPlatformError('Neither SiLabs nor Arm');
-            }
-          } catch(e) {
-            console.log('Unknown interface', e);
-            throw new UnknownPlatformError('Neither SiLabs nor Arm');
-          }
-
-          let source = null;
-
-          if (mcu.class === Arm) {
-            // Assume AM32 to be the default
-            source = am32Source;
-
-            const eepromOffset = mcu.getEepromOffset();
-
-            //Attempt reading filename
-            try {
-              const fileNameRead = await this.read(eepromOffset - 32, 16);
-              const fileName = new TextDecoder().decode(fileNameRead.params.slice(0, fileNameRead.params.indexOf(0x00)));
-
-              if (/[A-Z0-9_]+/.test(fileName)) {
-                info.meta.am32.fileName = fileName;
-                info.meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
-              }
-            } catch(e) {
-              // Failed reading filename - could be old version of AM32
-            }
-
-            info.layout = source.getLayout();
-            info.layoutSize = source.getLayoutSize();
-
-            const  settingsArray = (await this.read(eepromOffset, info.layoutSize)).params;
-            info.settingsArray = Array.from(settingsArray);
-            info.settings = Convert.arrayToSettingsObject(settingsArray, info.layout);
-
-            if(!Object.values(am32Eeprom.BOOT_LOADER_PINS).includes(info.meta.input)) {
-              source = null;
-
-              info.settings.NAME = 'Unknown';
-
-              // TODO: Find out if there is a way to reliably identify BLHeli_32
-              // info.settings.NAME = 'BLHeli_32';
-            }
-          }
-
-          const layoutRevision = info.settings.LAYOUT_REVISION.toString();
-          info.layoutRevision = layoutRevision;
-          if(source) {
-            info.defaultSettings = source.getDefaultSettings(layoutRevision);
-          }
-
-          if(!info.defaultSettings) {
-            this.addLogMessage('layoutNotSupported', { revision: layoutRevision });
-          }
-
-          const layoutName = (info.settings.LAYOUT || '').trim();
-          let make = null;
-
-          // Arm
-          if (info.isArm) {
-            if (
-              info.settings.NAME === 'BLHeli_32'
-            ) {
-              let revision = 'Unsupported/Unrecognized';
-              make = 'Unknown';
-
-              info.displayName = `${make} - ${info.settings.NAME}, ${revision}`;
-              info.firmwareName = info.settings.NAME;
-
-              info.supported = false;
-            } else if (source instanceof sources.AM32Source) {
-              info.bootloader = {};
-              if(info.meta.input) {
-                info.bootloader.input = info.meta.input;
-                info.bootloader.valid = false;
-              }
-
-              for(let [key, value] of Object.entries(am32Eeprom.BOOT_LOADER_PINS)) {
-                if(value === info.bootloader.input) {
-                  info.bootloader.valid = true;
-                  info.bootloader.pin = key;
-                  info.bootloader.version = info.settings.BOOT_LOADER_REVISION;
-                }
-              }
-
-              info.settings.LAYOUT = info.settings.NAME;
-
-              info.displayName = am32Source.buildDisplayName(info, info.meta.am32.fileName ? info.meta.am32.fileName.slice(0, info.meta.am32.fileName.lastIndexOf('_')) : info.settings.NAME);
-              info.firmwareName = am32Source.getName();
-            }
-          }
-
-          info.make = make;
-        } catch (e: any) {
-          console.debug(`ESC ${target + 1} read settings failed ${e.message}`, e);
-          throw new Error(e);
-        }
-
-        try {
-          //info.individualSettings = getIndividualSettings(info);
-        } catch(e: any) {
-          console.debug('Could not get individual settings');
-          throw new Error(e);
-        } */
 
         return info;
     }
@@ -336,14 +222,6 @@ export class FourWay {
 
     sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
         let currentTry = 0;
-        /* const { ready, start, stop } = useTimeout(1000, {
-        controls: true,
-        callback: () => {
-          if (currentTry >= retries) {
-            throw new Error('four way timeout');
-          }
-        }
-      }); */
 
         const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
             while (currentTry++ < retries) {
@@ -480,6 +358,44 @@ export class FourWay {
                 data.subarray(address, Math.min(address + step, data.length))
             );
         }
+    }
+
+    async writeSettings (target: number, esc: McuInfo) {
+        const flash = await this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target]);
+
+        if (flash) {
+            const newSettingsArray = objectToSettingsArray(esc.settings);
+            console.log(esc, newSettingsArray, esc.settingsBuffer);
+            if (newSettingsArray.length !== esc.settingsBuffer.length) {
+                throw new Error('settings length mismatch');
+            }
+
+            if (compare(newSettingsArray, esc.settingsBuffer)) {
+                this.logWarning('No changed settings found for ESC #' + (target + 1));
+            } else {
+                const info = Flash.getInfo(flash!);
+                const mcu = new Mcu(info.meta.signature);
+
+                let readbackSettings = null;
+
+                await this.write(mcu.getEepromOffset(), newSettingsArray);
+                readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
+
+                if (readbackSettings) {
+                    console.log(readbackSettings);
+
+                    if (!compare(newSettingsArray, readbackSettings.params)) {
+                        throw new Error('SettingsVerificationError(newSettingsArray, readbackSettings)');
+                    }
+
+                    this.log('Successful wrote settings to ESC #' + (target + 1));
+                }
+            }
+
+            return newSettingsArray;
+        }
+
+        throw new Error('EscInitError');
     }
 
     testAlive () {

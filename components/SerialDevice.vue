@@ -40,7 +40,7 @@
             <UButton size="xs" @click="connectToEsc">
               <UIcon name="i-material-symbols-find-in-page-outline" />
             </UButton>
-            <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty">
+            <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty" @click="writeConfig">
               <UIcon name="i-material-symbols-save" />
             </UButton>
           </div>
@@ -230,6 +230,17 @@ const connectToEsc = async () => {
         escStore.escInfo.push(result);
 
         escData.isLoading = false;
+    }
+};
+
+const writeConfig = async () => {
+    if (!serialStore.isFourWay) {
+        throw new Error('No 4way connection found');
+    }
+
+    for (let i = 0; i < escStore.count; ++i) {
+        const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
+        console.log(result);
     }
 };
 

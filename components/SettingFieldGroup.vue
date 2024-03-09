@@ -6,11 +6,11 @@
     <div class="flex">
       <div v-if="switches.length > 0" class="p-4">
         <div v-for="{ field, name } of switches" :key="field">
-          <UCheckbox :label="name" :value="model(field).value" @update:model-value="model(field).value = $event" />
+          <UCheckbox :label="name" v-model="model(field).value"/>
         </div>
       </div>
       <div class="flex-grow grid gap-4 p-4" :class="`grid-cols-${cols}`">
-        <slot />
+        <slot></slot>
       </div>
     </div>
   </div>
@@ -41,7 +41,8 @@ withDefaults(defineProps<SettingFieldGroupProps>(), {
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
-        return escStore.escInfo[0].settings[field];
+        console.log(field, escStore.escInfo[0].settings[field] === 1);
+        return escStore.escInfo[0].settings[field] === 1;
     },
     set: (_val) => {
         emits('change', {

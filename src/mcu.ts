@@ -9,6 +9,7 @@ export interface McuVariant {
     firmware_start: string;
     eeprom_offset: string;
 }
+
 export interface McuInfo {
     meta: {
         signature: number;
@@ -32,6 +33,7 @@ export interface McuInfo {
     layoutSize: number;
     settingsDirty: boolean;
     settings: McuSettings;
+    settingsBuffer: Uint8Array;
 }
 
 class Mcu {
