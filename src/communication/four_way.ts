@@ -1,4 +1,3 @@
-import type { McuSettings } from '../eeprom';
 import Flash from '../flash';
 import Mcu, { type McuInfo } from '../mcu';
 import CommandQueue from '~/src/communication/commands.queue';
@@ -58,9 +57,9 @@ export class FourWay {
     public commandCount = 0;
 
     constructor (
-      private log: ((s: string) => void),
-      private logError: ((s: string) => void),
-      private logWarning: ((s: string) => void)
+      private readonly log: ((s: string) => void),
+      private readonly logError: ((s: string) => void),
+      private readonly logWarning: ((s: string) => void)
     ) {
     }
 
