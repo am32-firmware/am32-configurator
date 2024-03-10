@@ -1,5 +1,12 @@
 <template>
-  <div class="min-h-[150px] min-w-[400px] p-4 border bg-slate-500 border-slate-900 rounded-xl">
+  <div
+    class="min-h-[150px] min-w-[400px] p-4 border bg-slate-500 border-slate-900 rounded-xl cursor-pointer ring-4"
+    :class="{
+      'ring-red-500': mcu?.isSelected,
+      'ring-gray-500': !mcu?.isSelected
+    }"
+    @click="toggleSelected"
+  >
     <div class="h-full">
       <div class="text-gray-400 mb-4 flex gap-2">
         <div>
@@ -88,7 +95,10 @@ const props = defineProps<{
     mcu: McuInfo | null | undefined
 }>();
 
-const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLayoutKeys, value: boolean }): void}>();
+const emit = defineEmits<{
+  (e: 'change', value: { index: number, field: EepromLayoutKeys, value: boolean }): void,
+  (e: 'toggle', value: number): void
+}>();
 
 const iconName = computed(() => `i-material-symbols-counter-${props.index + 1}-outline`);
 
@@ -129,4 +139,8 @@ const layoutVersion = computed(() => getSettingValue<number>('LAYOUT_REVISION'))
 function getSettingValue<T> (name: EepromLayoutKeys): T | null {
     return props.mcu?.settings[name] as T ?? null;
 }
+
+const toggleSelected = () => {
+    emit('toggle', props.index);
+};
 </script>

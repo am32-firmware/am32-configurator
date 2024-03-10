@@ -34,6 +34,7 @@ export interface McuInfo {
     settingsDirty: boolean;
     settings: McuSettings;
     settingsBuffer: Uint8Array;
+    isSelected: boolean;
 }
 
 class Mcu {

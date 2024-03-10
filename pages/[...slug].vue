@@ -10,7 +10,14 @@
         <div v-if="serialStore.isFourWay" class="h-full">
           <div class="flex gap-4 w-full justify-center">
             <div v-for="n of escStore.count" :key="n">
-              <EscView :is-loading="!hasEsc(n - 1)" :index="n - 1" :esc="escStore.escData[n - 1]" :mcu="escStore.escInfo[n - 1]" @change="onChange" />
+              <EscView
+                :is-loading="!hasEsc(n - 1)"
+                :index="n - 1"
+                :esc="escStore.escData[n - 1]"
+                :mcu="escStore.escInfo[n - 1]"
+                @change="onChange"
+                @toggle="onToggle"
+              />
             </div>
           </div>
           <div v-if="allLoaded" class="p-4 max-w-[1400px] m-auto">
@@ -164,14 +171,13 @@
                   field="PWM_FREQUENCY"
                   name="PWM Frequency"
                   type="number"
-                  :min="24"
+                  :min="8"
                   :max="48"
                   :step="1"
                   unit="kHz"
                   @change="onSettingsChange"
                 >
                   <template #unit="{ value }">
-                    <div>{{ escStore.escInfo[0].settings.VARIABLE_PWM_FREQUENCY }}</div>
                     <div v-if="escStore.escInfo[0].settings.VARIABLE_PWM_FREQUENCY === 1">
                       {{ value }}kHz - {{ value as number * 2 }}kHz
                     </div>
@@ -228,7 +234,7 @@
                   :offset="750"
                   show-value
                   @change="onSettingsChange"
-                ></SettingField>
+                />
 
                 <SettingField
                   :esc-info="escStore.escInfo"
@@ -241,7 +247,7 @@
                   :offset="1750"
                   show-value
                   @change="onSettingsChange"
-                ></SettingField>
+                />
 
                 <SettingField
                   :esc-info="escStore.escInfo"
@@ -254,7 +260,7 @@
                   :offset="1374"
                   show-value
                   @change="onSettingsChange"
-                ></SettingField>
+                />
 
                 <SettingField
                   :esc-info="escStore.escInfo"
@@ -265,7 +271,7 @@
                   :max="100"
                   show-value
                   @change="onSettingsChange"
-                ></SettingField>
+                />
               </SettingFieldGroup>
             </div>
           </div>
@@ -307,6 +313,10 @@ const allLoaded = computed(() => escStore.escInfo.length > 0 && escStore.escInfo
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
     escStore.escInfo[payload.index].settingsDirty = escStore.escInfo[payload.index].settings[payload.field] !== (payload.value ? 1 : 0);
     escStore.escInfo[payload.index].settings[payload.field] = (payload.value ? 1 : 0);
+};
+
+const onToggle = (index: number) => {
+    escStore.escInfo[index].isSelected = !escStore.escInfo[index].isSelected;
 };
 
 const protocolOptions = [

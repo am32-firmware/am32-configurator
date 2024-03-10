@@ -39,3 +39,16 @@ interface FourWayResponse {
 
 type SettingsType = 'select' | 'bool' | 'string' | 'number';
 type SettingsSelectOptionsType = { label: string, value: numer };
+
+interface HexData {
+    address: number,
+    bytes: number,
+    data: number[]
+}
+
+interface Hex {
+    data: HexData[],
+    endOfFile: boolean,
+    bytes: number,
+    startLinearAddress: number
+}

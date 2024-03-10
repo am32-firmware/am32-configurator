@@ -40,7 +40,7 @@
             <UButton size="xs" @click="connectToEsc">
               <UIcon name="i-material-symbols-find-in-page-outline" />
             </UButton>
-            <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty" @click="writeConfig">
+            <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty || escStore.isSaving" :loading="escStore.isSaving" @click="writeConfig">
               <UIcon name="i-material-symbols-save" />
             </UButton>
           </div>
@@ -57,6 +57,56 @@
           4way
         </UKbd>
       </div>
+      <div v-if="serialStore.hasConnection && escStore.count > 0">
+        <UButton label="Flash firmware" icon="i-material-symbols-full-stacked-bar-chart" @click="flashModalOpen = true" />
+      </div>
+      <UModal v-model="flashModalOpen" prevent-close>
+        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center justify-center gap-2 text-xl">
+                <UIcon name="i-material-symbols-full-stacked-bar-chart" class="h-8 w-8" />
+                <div class="text-2xl">
+                  Flash Firmware
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div class="flex flex-col gap-4">
+            <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
+            <USelectMenu
+              v-model="selectedRelease"
+              searchable
+              searchable-placeholder="Search a release..."
+              :options="releasesOptions"
+            />
+            <USelectMenu
+              v-model="selectedAsset"
+              searchable
+              searchable-placeholder="Search a hex file..."
+              :options="assets"
+              :disabled="assets.length === 0 || !ignoreMcuLayout"
+            />
+          </div>
+
+          <template #footer>
+            <div class="flex flex-col items-end gap-4">
+              <div>
+                <UButton
+                  label="Start flash"
+                  :disabled="!selectedAsset || selectedAsset === 'NOT FOUND'"
+                  @click="startFlash"
+                />
+              </div>
+              <div v-if="escStore.activeTarget > -1" class="w-full">
+                <UProgress :value="escStore.bytesWritten / escStore.totalBytes" indicator />
+                <div>{{ escStore.bytesWritten }} / {{ escStore.totalBytes }} bytes</div>
+              </div>
+            </div>
+          </template>
+        </UCard>
+      </UModal>
     </div>
   </div>
 </template>
@@ -72,6 +122,24 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { log, logWarning, logError } = useLogStore();
 const usbVendorIds = [0x0483, 0x2E3C];
+const flashModalOpen = ref(false);
+
+const { data } = useAsyncData('github', () => github());
+const assets = ref<string[]>([]);
+
+const releasesOptions = computed(() => (data.value as any[]).map(r => r.tag_name));
+
+const selectedRelease = ref('');
+const selectedAsset = ref('');
+const ignoreMcuLayout = ref(false);
+
+watch(selectedRelease, (tag: string) => {
+    const releases = (data.value as any[]).find(r => r.tag_name === tag);
+    assets.value = releases.assets.map((a: any) => a.name);
+
+    const currentAsset = assets.value.find(a => a === `AM32_${escStore.escInfo[0].meta.am32.fileName}_${tag.substring(1)}.hex`);
+    selectedAsset.value = currentAsset ?? 'NOT FOUND';
+});
 
 const isAnySettingsDirty = computed(() => !!escStore.escInfo.find(e => e.settingsDirty) || escStore.settingsDirty);
 
@@ -238,10 +306,14 @@ const writeConfig = async () => {
         throw new Error('No 4way connection found');
     }
 
+    escStore.isSaving = true;
+
     for (let i = 0; i < escStore.count; ++i) {
         const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
-        console.log(result);
+        escStore.escInfo[i].settingsBuffer = result;
     }
+    escStore.isSaving = false;
+    escStore.settingsDirty = false;
 };
 
 const disconnectFromDevice = async () => {
@@ -264,6 +336,17 @@ const disconnectFromDevice = async () => {
         escStore.$reset();
 
         log('Connection to device closed');
+    }
+};
+
+const startFlash = async () => {
+    const fileUrl = ((data.value as any[]).find(r => r.tag_name === selectedRelease.value).assets as any[]).find(a => a.name === selectedAsset.value).browser_download_url;
+    const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
+    const hexString = await file.text();
+    console.log(hexString);
+    for (let i = 0; i < 1; ++i) {
+        escStore.activeTarget = i;
+        await FourWay.getInstance().writeHex(i, hexString);
     }
 };
 </script>

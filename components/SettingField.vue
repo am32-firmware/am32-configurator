@@ -1,7 +1,10 @@
 <template>
-  <div class="relative" :class="{
-    'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': isDisabled
-  }">
+  <div
+    class="relative"
+    :class="{
+      'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': isDisabled
+    }"
+  >
     <UFormGroup>
       <template #label>
         <div class="flex items-center gap-1 mb-1">

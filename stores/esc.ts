@@ -8,6 +8,7 @@ export const useEscStore = defineStore('esc', () => {
     let escInfo = reactive<McuInfo[]>([]);
 
     const settingsDirty = ref(false);
+    const isSaving = ref(false);
 
     const $reset = () => {
         count.value = 0;
@@ -15,7 +16,11 @@ export const useEscStore = defineStore('esc', () => {
         escInfo = [];
     };
 
-    return { settingsDirty, count, escData, escInfo, $reset };
+    const activeTarget = ref(-1);
+    const totalBytes = ref(0);
+    const bytesWritten = ref(0);
+
+    return { settingsDirty, isSaving, count, escData, escInfo, activeTarget, totalBytes, bytesWritten, $reset };
 });
 
 if (import.meta.hot) {

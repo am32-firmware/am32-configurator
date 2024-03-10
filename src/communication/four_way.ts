@@ -1,5 +1,6 @@
 import Flash from '../flash';
 import Mcu, { type McuInfo } from '../mcu';
+import asciiToBuffer from '~/utils/ascii-to-buffer';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
 
@@ -207,7 +208,7 @@ export class FourWay {
         }
 
         try {
-            return await Serial.write(message, 500);
+            return await Serial.write(message, 200);
         } catch (e: any) {
             this.logError(`MSP command failed: ${e.message}`);
             return null;
@@ -364,7 +365,6 @@ export class FourWay {
 
         if (flash) {
             const newSettingsArray = objectToSettingsArray(esc.settings);
-            console.log(esc, newSettingsArray, esc.settingsBuffer);
             if (newSettingsArray.length !== esc.settingsBuffer.length) {
                 throw new Error('settings length mismatch');
             }
@@ -381,8 +381,6 @@ export class FourWay {
                 readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
-                    console.log(readbackSettings);
-
                     if (!compare(newSettingsArray, readbackSettings.params)) {
                         throw new Error('SettingsVerificationError(newSettingsArray, readbackSettings)');
                     }
@@ -395,6 +393,81 @@ export class FourWay {
         }
 
         throw new Error('EscInitError');
+    }
+
+    async writeHex (target: number, hex: string) { // }, force: boolean, migrate: boolean) {
+        const escStore = useEscStore();
+        const parsed = Flash.parseHex(hex);
+        if (parsed) {
+            const initFlash = await this.initFlash(target, 10);
+            const info = Flash.getInfo(initFlash!);
+            const mcu = new Mcu(info.meta.signature);
+            const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
+            const flash = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
+            if (flash) {
+                const eepromOffset = mcu.getEepromOffset();
+                const pageSize = mcu.getPageSize();
+                const firmwareStart = mcu.getFirmwareStart();
+
+                escStore.totalBytes = (flash.byteLength - firmwareStart) * 2;
+                escStore.bytesWritten = 0;
+
+                const message = await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
+                if (message) {
+                    const originalSettings = message.params;
+
+                    const eepromInfo = new Uint8Array(17).fill(0x00);
+                    eepromInfo.set([originalSettings[1], originalSettings[2]], 1);
+                    eepromInfo.set(asciiToBuffer('FLASH FAIL  '), 5);
+
+                    await this.write(eepromOffset, eepromInfo);
+
+                    await this.writePages(0x04, 0x40, pageSize, flash);
+                    try {
+                        await this.verifyPages(0x04, 0x40, pageSize, flash);
+                    } catch (error) {
+                        this.logError('flashingVerificationFailed');
+                    }
+
+                    originalSettings[0] = 0x01;
+                    originalSettings.fill(0x00, 3, 5);
+                    originalSettings.set(asciiToBuffer('NOT READY   '), 5);
+
+                    await this.write(eepromOffset, originalSettings);
+                }
+            }
+        }
+    }
+
+    /**
+   * Verify multiple pages up to (but not including) end page
+   *
+   * @param {number} begin
+   * @param {number} end
+   * @param {number} pageSize
+   * @param {Uint8Array} data
+   */
+    async verifyPages (begin: number, end: number, pageSize: number, data: Uint8Array) {
+        const beginAddress = begin * pageSize;
+        const endAddress = end * pageSize;
+        const step = 0x80;
+
+        const escStore = useEscStore();
+
+        for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
+            const message = await this.readAddress(address, Math.min(step, data.length - address));
+            if (message) {
+                const reference = data.subarray(message.address, message.address + message.params.byteLength);
+
+                if (!compare(message.params, reference)) {
+                    console.debug('Verification failed - retry');
+                    this.logError(`failed to verify write at address 0x${message.address.toString(0x10)}`);
+                    throw new Error(`failed to verify write at address 0x${message.address.toString(0x10)}`);
+                } else {
+                    escStore.bytesWritten += step;
+                }
+            }
+        }
     }
 
     testAlive () {
