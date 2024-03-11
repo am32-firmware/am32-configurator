@@ -409,7 +409,7 @@ const startRemoteFlash = async () => {
 };
 
 const startFlash = async (hexString: string) => {
-    for (let i = 0; i < 1; ++i) {
+    for (let i = 0; i < escStore.count; ++i) {
         escStore.activeTarget = i;
         escStore.escData[i].isLoading = true;
         await FourWay.getInstance().writeHex(i, hexString, 100);
