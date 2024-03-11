@@ -56,8 +56,6 @@ export class FourWay {
         return FourWay.instance;
     }
 
-    public commandCount = 0;
-
     constructor (
       private readonly log: ((s: string) => void),
       private readonly logError: ((s: string) => void),
@@ -261,14 +259,6 @@ export class FourWay {
         return new Promise(callback);
     }
 
-    /**
-   * Parse a message and invoke either resolve or reject callback
-   *
-   * @param {ArrayBuffer} buffer
-   * @param {function} resolve
-   * @param {function} reject
-   * @returns {Promise}
-   */
     parseMessage (buffer: ArrayBuffer) {
         const fourWayIf = 0x2E;
 
@@ -310,7 +300,6 @@ export class FourWay {
             throw new Error(error);
         }
 
-        this.commandCount--;
         return {
             commandName: message.command,
             data: message

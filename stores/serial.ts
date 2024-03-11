@@ -6,6 +6,7 @@ export const useSerialStore = defineStore('serial', () => {
     const hasConnection = ref(false);
     const hasSerial = ref(true);
     const isFourWay = ref(false);
+    const isDirectConnect = ref(false);
     const pairedDevices = ref<SerialPort[]>([]);
     const pairedDevicesOptions = computed(() => pairedDevices.value.map(d =>
         ({ id: `${d.getInfo().usbVendorId}:${d.getInfo().usbProductId}`, label: `0x${padStr(d.getInfo().usbVendorId?.toString(16) ?? '', 4, '0')}:0x${padStr(d.getInfo().usbProductId?.toString(16) ?? '', 4, '0')}` }))
@@ -62,7 +63,7 @@ export const useSerialStore = defineStore('serial', () => {
         mspData.value = {} as MspData;
     }
 
-    return { refreshReader, mspData, isFourWay, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset };
+    return { refreshReader, mspData, isFourWay, isDirectConnect, hasConnection, hasSerial, addSerialDevices, selectLastDevice, pairedDevices, pairedDevicesOptions, selectedDevice, deviceHandles, $reset };
 });
 
 export type SerialStore = ReturnType<typeof useSerialStore>

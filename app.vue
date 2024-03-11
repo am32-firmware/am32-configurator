@@ -13,6 +13,7 @@
   </div>
 </template>
 <script setup>
+import { Direct } from './src/communication/direct';
 import { FourWay } from './src/communication/four_way';
 import Msp from './src/communication/msp';
 const { $pwa } = useNuxtApp();
@@ -50,6 +51,7 @@ if (navigator && 'serial' in navigator) {
     serialStore.hasSerial = true;
     Msp.init(log, logWarning, logError);
     FourWay.init(log, logWarning, logError);
+    Direct.init(log, logWarning, logError);
 
     log('initializing...');
 } else {

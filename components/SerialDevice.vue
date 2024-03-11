@@ -3,7 +3,12 @@
     <div class="p-4 grid grid-cols-1 gap-2">
       <div class="flex flex-column gap-2">
         <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
-        <USelectMenu v-model="baudrate" class="flex-grow" :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection" :options="baudrateOptions" />
+        <USelectMenu
+          v-model="baudrate"
+          class="flex-grow"
+          :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice"
+          :options="baudrateOptions"
+        />
       </div>
       <div class="flex justify-between gap-2">
         <UButton size="2xs" @click="requestSerialDevices">
@@ -46,7 +51,7 @@
           </div>
         </div>
       </div>
-      <div v-if="serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
+      <div v-if="false && serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
         <UKbd>
           {{ serialStore.mspData.type }}
         </UKbd>
@@ -57,8 +62,12 @@
           4way
         </UKbd>
       </div>
-      <div v-if="serialStore.hasConnection && escStore.count > 0">
-        <UButton label="Flash firmware" icon="i-material-symbols-full-stacked-bar-chart" @click="flashModalOpen = true" />
+      <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4">
+        <UButton label="Flash firmware" size="xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
+        <div>
+          <UButton label="Save config" size="xs" icon="i-material-symbols-sim-card-download-outline" color="red" variant="link" @click="saveConfigModalOpen = true"></UButton>
+          <UButton label="Apply config" size="xs" icon="i-material-symbols-upload-file-outline" color="violet" variant="link" @click="applyConfigModalOpen = true"></UButton>
+        </div>
       </div>
       <UModal v-model="flashModalOpen" :prevent-close="escStore.activeTarget > -1">
         <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
@@ -124,12 +133,50 @@
           </template>
         </UCard>
       </UModal>
+      <UModal v-model="saveConfigModalOpen">
+        <UCard  :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center justify-center gap-2 text-xl">
+                <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
+                <div class="text-2xl">
+                  Save current ESC config
+                </div>
+              </div>
+            </div>
+          </template>
+          <div>
+            <div class="flex flex-col gap-2">
+              <div class="text-center">Select ESC(s) to save:</div>
+              <div class="w-full text-center flex justify-center gap-2">
+                <div
+                  v-for="n of escStore.escInfo.length"
+                  :key="n"
+                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                  :class="{
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                  }"
+                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                >
+                  {{ n }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <template #footer>
+            <div class="text-right">
+              <UButton label="Download" @click="downloadEscConfig" />
+            </div>
+          </template>
+        </UCard>
+      </UModal>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import commandsQueue from '~/src/communication/commands.queue';
+import { Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
@@ -140,8 +187,11 @@ const toast = useToast();
 const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { log, logWarning, logError } = useLogStore();
-const usbVendorIds = [0x0483, 0x2E3C];
+const usbFCVendorIds = [0x0483, 0x2E3C];
+const usbDirectVendorIds = [0x1a86];
 const flashModalOpen = ref(false);
+const saveConfigModalOpen = ref(false);
+const applyConfigModalOpen = ref(false);
 const file_input = ref<HTMLInputElement>();
 
 const { data } = useAsyncData('github', () => github());
@@ -152,6 +202,17 @@ const releasesOptions = computed(() => (data.value as any[]).map(r => r.tag_name
 const selectedRelease = ref('');
 const selectedAsset = ref('');
 const ignoreMcuLayout = ref(false);
+const savingOrApplyingSelectedEscs = ref<number[]>([]);
+
+const toggleSavingOrApplyingSelectedEsc = (n: number) => {
+  if (savingOrApplyingSelectedEscs.value.includes(n)) {
+    savingOrApplyingSelectedEscs.value = [
+      ...savingOrApplyingSelectedEscs.value.filter(num => num !== n)
+    ];
+  } else {
+    savingOrApplyingSelectedEscs.value.push(n);
+  }
+}
 
 watch(selectedRelease, (tag: string) => {
     const releases = (data.value as any[]).find(r => r.tag_name === tag);
@@ -179,17 +240,29 @@ const baudrate = ref('115200');
 
 const requestSerialDevices = async () => {
     await navigator.serial.requestPort({
-        filters: usbVendorIds.map(id => ({ usbVendorId: id }))
+        filters: [
+          ...usbFCVendorIds.map(id => ({ usbVendorId: id })),
+          ...usbDirectVendorIds.map(id => ({ usbVendorId: id }))
+        ]
     });
     await fetchPairedDevices();
 };
+
+const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(parseInt(serialStore.selectedDevice.id.split(':')[0])));
 
 const fetchPairedDevices = async () => {
     const pairedDevices: SerialPort[] = await navigator.serial.getPorts();
     serialStore.addSerialDevices(pairedDevices);
 
     if (pairedDevices.length > 0) {
+      if (serialStore.selectedDevice.id === '-1') {
         serialStore.selectLastDevice();
+        if (serialStore.selectedDevice) {
+          if (isDirectConnectDevice.value) {
+            baudrate.value = '19200';
+          }
+        }
+      }
     } else {
         if (serialStore.hasConnection) {
             serialStore.$reset();
@@ -236,6 +309,7 @@ const connectToDevice = async () => {
                     throw new Error(`${e.message}`);
                 }
             }
+            
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
                 if (!serialStore.deviceHandles.reader) {
                     serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
@@ -247,51 +321,61 @@ const connectToDevice = async () => {
 
                 log('Connected to device');
 
-                const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
-                    logError(`${err.message}, trying to exit fourway and try again.`);
-                    serialStore.isFourWay = true;
-                    await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
-                    await delay(1000);
-                    serialStore.isFourWay = false;
-                    return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
-                        logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
-                        return null;
-                    });
-                });
+                if (isDirectConnectDevice.value) {
+                  Direct.getInstance().init();
+                } else {
+                  const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
+                      logError(`${err.message}, trying to exit fourway and try again.`);
+                      serialStore.isFourWay = true;
+                      await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+                      await delay(1000);
+                      serialStore.isFourWay = false;
+                      return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
+                          logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
+                          return null;
+                      });
+                  });
 
-                if (result === null) {
-                    await disconnectFromDevice();
+                  if (result === null) {
+                      await disconnectFromDevice();
 
-                    throw new Error('Cant read or write to device!');
+                      throw new Error('Cant read or write to device!');
+                  }
+
+                  commandsQueue.processMspResponse(result!.commandName, result!.data);
+
+                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
+                      if (result) {
+                          commandsQueue.processMspResponse(result!.commandName, result!.data);
+                      }
+                  });
+                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
+                      if (result) {
+                          commandsQueue.processMspResponse(result!.commandName, result!.data);
+                      }
+                  });
+                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
+                      if (result) {
+                          commandsQueue.processMspResponse(result!.commandName, result!.data);
+                      }
+                  });
                 }
-
-                commandsQueue.processMspResponse(result!.commandName, result!.data);
-
-                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
-                    if (result) {
-                        commandsQueue.processMspResponse(result!.commandName, result!.data);
-                    }
-                });
-                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
-                    if (result) {
-                        commandsQueue.processMspResponse(result!.commandName, result!.data);
-                    }
-                });
-                await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
-                    if (result) {
-                        commandsQueue.processMspResponse(result!.commandName, result!.data);
-                    }
-                });
 
                 serialStore.hasConnection = true;
             } else {
                 logError('Something went wrong!');
             }
+            
         }
     }
 };
 
 const connectToEsc = async () => {
+  if (isDirectConnectDevice.value) {
+    if (serialStore.isDirectConnect) {
+      serialStore.isDirectConnect = true;
+    }
+  } else {
     if (!serialStore.isFourWay) {
         const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
@@ -317,6 +401,7 @@ const connectToEsc = async () => {
 
         escData.isLoading = false;
     }
+  }
 };
 
 const writeConfig = async () => {
@@ -342,9 +427,6 @@ const disconnectFromDevice = async () => {
         if (serialStore.isFourWay) {
             await FourWay.getInstance().send(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
         }
-
-        Msp.getInstance().commandCount = 0;
-        FourWay.getInstance().commandCount = 0;
 
         Serial.deinit();
 
@@ -431,5 +513,18 @@ const startFlash = async (hexString: string) => {
     if (file_input.value) {
       file_input.value.value = '';
     }
+}
+
+const downloadEscConfig = async () => {
+  for (let n of savingOrApplyingSelectedEscs.value) {
+    const blob = new Blob([escStore.escInfo[n - 1].settingsBuffer], {
+      type: 'application/octet-stream'
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = 'esc' + n + '_config.bin';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
 }
 </script>
