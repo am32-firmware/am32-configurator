@@ -404,8 +404,9 @@ const startLocalFlash = async (event: Event) => {
 
 const startRemoteFlash = async () => {
     const fileUrl = ((data.value as any[]).find(r => r.tag_name === selectedRelease.value).assets as any[]).find(a => a.name === selectedAsset.value).browser_download_url;
-    const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
-    startFlash(await file.text());
+    //const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
+    const file = await useFetch('/api/download?url=' + fileUrl);
+    startFlash(file.data.value as string);
 };
 
 const startFlash = async (hexString: string) => {
