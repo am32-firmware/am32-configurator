@@ -24,11 +24,19 @@
       <div class="flex gap-4 pt-2">
         <div class="flex gap-2 items-center">
           <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
-          <UIcon name="i-ion-hardware-chip-sharp" dynamic :class="serialStore.hasConnection && serialStore.mspData.api_version ? 'text-green-500' : 'text-red-500'" />
+          <UIcon
+            name="i-ion-hardware-chip-sharp"
+            dynamic
+            :class="{
+              'text-green-500': serialStore.hasConnection && serialStore.mspData.api_version,
+              'text-red-500': !(serialStore.hasConnection && serialStore.mspData.api_version),
+              '!hidden': serialStore.isDirectConnect
+            }"
+          />
         </div>
-        <div v-if="serialStore.hasConnection && serialStore.mspData.motorCount > 0" class="w-full flex justify-between">
+        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between">
           <div class="flex gap-2">
-            <UChip v-if="serialStore.mspData.motorCount > 0" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
+            <UChip v-if="serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
               <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'" />
             </UChip>
             <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
@@ -42,7 +50,7 @@
             </UChip>
           </div>
           <div class="flex gap-2">
-            <UButton size="xs" @click="connectToEsc">
+            <UButton v-if="!serialStore.isDirectConnect" size="xs" @click="connectToEsc">
               <UIcon name="i-material-symbols-find-in-page-outline" />
             </UButton>
             <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty || escStore.isSaving" :loading="escStore.isSaving" @click="writeConfig">
@@ -65,8 +73,22 @@
       <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4">
         <UButton label="Flash firmware" size="xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
         <div>
-          <UButton label="Save config" size="xs" icon="i-material-symbols-sim-card-download-outline" color="red" variant="link" @click="saveConfigModalOpen = true"></UButton>
-          <UButton label="Apply config" size="xs" icon="i-material-symbols-upload-file-outline" color="violet" variant="link" @click="applyConfigModalOpen = true"></UButton>
+          <UButton
+            label="Save config"
+            size="xs"
+            icon="i-material-symbols-sim-card-download-outline"
+            color="red"
+            variant="link"
+            @click="saveConfigModalOpen = true"
+          />
+          <UButton
+            label="Apply config"
+            size="xs"
+            icon="i-material-symbols-upload-file-outline"
+            color="violet"
+            variant="link"
+            @click="applyConfigModalOpen = true"
+          />
         </div>
       </div>
       <UModal v-model="flashModalOpen" :prevent-close="escStore.activeTarget > -1">
@@ -83,28 +105,35 @@
           </template>
 
           <div v-if="file_input?.files?.length === 0" class="flex flex-col gap-4">
-              <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
-              <USelectMenu
-                v-model="selectedRelease"
-                searchable
-                searchable-placeholder="Search a release..."
-                :options="releasesOptions"
-              />
-              <USelectMenu
-                v-model="selectedAsset"
-                searchable
-                searchable-placeholder="Search a hex file..."
-                :options="assets"
-                :disabled="assets.length === 0 || !ignoreMcuLayout"
-              />
+            <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
+            <USelectMenu
+              v-model="selectedRelease"
+              searchable
+              searchable-placeholder="Search a release..."
+              :options="releasesOptions"
+            />
+            <USelectMenu
+              v-model="selectedAsset"
+              searchable
+              searchable-placeholder="Search a hex file..."
+              :options="assets"
+              :disabled="assets.length === 0 || !ignoreMcuLayout"
+            />
           </div>
           <div v-else class="text-green-500 text-center">
-              Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
+            Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
           </div>
 
           <template #footer>
             <div class="flex flex-col items-end gap-4">
-              <input ref="file_input" id="file_input" accept=".hex" type="file" class="hidden" @change="startLocalFlash" />
+              <input
+                id="file_input"
+                ref="file_input"
+                accept=".hex"
+                type="file"
+                class="hidden"
+                @change="startLocalFlash"
+              >
               <div v-if="escStore.activeTarget === -1" class="flex gap-4">
                 <UButton
                   label="Flash local file"
@@ -134,7 +163,7 @@
         </UCard>
       </UModal>
       <UModal v-model="saveConfigModalOpen">
-        <UCard  :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center justify-center gap-2 text-xl">
@@ -147,7 +176,9 @@
           </template>
           <div>
             <div class="flex flex-col gap-2">
-              <div class="text-center">Select ESC(s) to save:</div>
+              <div class="text-center">
+                Select ESC(s) to save:
+              </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
                   v-for="n of escStore.escInfo.length"
@@ -175,8 +206,9 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable camelcase */
 import commandsQueue from '~/src/communication/commands.queue';
-import { Direct } from '~/src/communication/direct';
+import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
@@ -188,7 +220,7 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { log, logWarning, logError } = useLogStore();
 const usbFCVendorIds = [0x0483, 0x2E3C];
-const usbDirectVendorIds = [0x1a86];
+const usbDirectVendorIds = [0x1A86];
 const flashModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
@@ -205,14 +237,14 @@ const ignoreMcuLayout = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
 
 const toggleSavingOrApplyingSelectedEsc = (n: number) => {
-  if (savingOrApplyingSelectedEscs.value.includes(n)) {
-    savingOrApplyingSelectedEscs.value = [
-      ...savingOrApplyingSelectedEscs.value.filter(num => num !== n)
-    ];
-  } else {
-    savingOrApplyingSelectedEscs.value.push(n);
-  }
-}
+    if (savingOrApplyingSelectedEscs.value.includes(n)) {
+        savingOrApplyingSelectedEscs.value = [
+            ...savingOrApplyingSelectedEscs.value.filter(num => num !== n)
+        ];
+    } else {
+        savingOrApplyingSelectedEscs.value.push(n);
+    }
+};
 
 watch(selectedRelease, (tag: string) => {
     const releases = (data.value as any[]).find(r => r.tag_name === tag);
@@ -241,8 +273,8 @@ const baudrate = ref('115200');
 const requestSerialDevices = async () => {
     await navigator.serial.requestPort({
         filters: [
-          ...usbFCVendorIds.map(id => ({ usbVendorId: id })),
-          ...usbDirectVendorIds.map(id => ({ usbVendorId: id }))
+            ...usbFCVendorIds.map(id => ({ usbVendorId: id })),
+            ...usbDirectVendorIds.map(id => ({ usbVendorId: id }))
         ]
     });
     await fetchPairedDevices();
@@ -255,14 +287,14 @@ const fetchPairedDevices = async () => {
     serialStore.addSerialDevices(pairedDevices);
 
     if (pairedDevices.length > 0) {
-      if (serialStore.selectedDevice.id === '-1') {
-        serialStore.selectLastDevice();
-        if (serialStore.selectedDevice) {
-          if (isDirectConnectDevice.value) {
-            baudrate.value = '19200';
-          }
+        if (serialStore.selectedDevice.id === '-1') {
+            serialStore.selectLastDevice();
+            if (serialStore.selectedDevice) {
+                if (isDirectConnectDevice.value) {
+                    baudrate.value = '19200';
+                }
+            }
         }
-      }
     } else {
         if (serialStore.hasConnection) {
             serialStore.$reset();
@@ -309,7 +341,7 @@ const connectToDevice = async () => {
                     throw new Error(`${e.message}`);
                 }
             }
-            
+
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
                 if (!serialStore.deviceHandles.reader) {
                     serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
@@ -322,104 +354,135 @@ const connectToDevice = async () => {
                 log('Connected to device');
 
                 if (isDirectConnectDevice.value) {
-                  Direct.getInstance().init();
+                    const info = await Direct.getInstance().init();
+                    const escData = {
+                        isLoading: true
+                    } as EscData;
+
+                    serialStore.isDirectConnect = true;
+
+                    escStore.count = 1;
+
+                    escStore.escData.push(escData);
+
+                    escStore.escInfo.push(info!);
+
+                    escData.isLoading = false;
                 } else {
-                  const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
-                      logError(`${err.message}, trying to exit fourway and try again.`);
-                      serialStore.isFourWay = true;
-                      await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
-                      await delay(1000);
-                      serialStore.isFourWay = false;
-                      return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
-                          logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
-                          return null;
-                      });
-                  });
+                    const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
+                        logError(`${err.message}, trying to exit fourway and try again.`);
+                        serialStore.isFourWay = true;
+                        await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+                        await delay(1000);
+                        serialStore.isFourWay = false;
+                        return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
+                            logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
+                            return null;
+                        });
+                    });
 
-                  if (result === null) {
-                      await disconnectFromDevice();
+                    if (result === null) {
+                        await disconnectFromDevice();
 
-                      throw new Error('Cant read or write to device!');
-                  }
+                        throw new Error('Cant read or write to device!');
+                    }
 
-                  commandsQueue.processMspResponse(result!.commandName, result!.data);
+                    commandsQueue.processMspResponse(result!.commandName, result!.data);
 
-                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
-                      if (result) {
-                          commandsQueue.processMspResponse(result!.commandName, result!.data);
-                      }
-                  });
-                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
-                      if (result) {
-                          commandsQueue.processMspResponse(result!.commandName, result!.data);
-                      }
-                  });
-                  await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
-                      if (result) {
-                          commandsQueue.processMspResponse(result!.commandName, result!.data);
-                      }
-                  });
+                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
+                        if (result) {
+                            commandsQueue.processMspResponse(result!.commandName, result!.data);
+                        }
+                    });
+                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
+                        if (result) {
+                            commandsQueue.processMspResponse(result!.commandName, result!.data);
+                        }
+                    });
+                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
+                        if (result) {
+                            commandsQueue.processMspResponse(result!.commandName, result!.data);
+                        }
+                    });
                 }
 
                 serialStore.hasConnection = true;
             } else {
                 logError('Something went wrong!');
             }
-            
         }
     }
 };
 
 const connectToEsc = async () => {
-  if (isDirectConnectDevice.value) {
-    if (serialStore.isDirectConnect) {
-      serialStore.isDirectConnect = true;
+    if (isDirectConnectDevice.value) {
+        if (serialStore.isDirectConnect) {
+            serialStore.isDirectConnect = true;
+
+            escStore.count = 1;
+
+            escStore.escData = [];
+            escStore.escInfo = [];
+        }
+    } else {
+        if (!serialStore.isFourWay) {
+            const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+
+            serialStore.isFourWay = true;
+
+            escStore.count = result?.data.getUint8(0) ?? 0;
+        }
+
+        escStore.escData = [];
+        escStore.escInfo = [];
+
+        await delay(1000);
+
+        for (let i = 0; i < escStore.count; ++i) {
+            const escData = {
+                isLoading: true
+            } as EscData;
+            escStore.escData.push(escData);
+
+            const result = await FourWay.getInstance().getInfo(i);
+
+            escStore.escInfo.push(result);
+
+            escData.isLoading = false;
+        }
     }
-  } else {
-    if (!serialStore.isFourWay) {
-        const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
-
-        serialStore.isFourWay = true;
-
-        escStore.count = result?.data.getUint8(0) ?? 0;
-    }
-
-    escStore.escData = [];
-    escStore.escInfo = [];
-
-    await delay(1000);
-
-    for (let i = 0; i < escStore.count; ++i) {
-        const escData = {
-            isLoading: true
-        } as EscData;
-        escStore.escData.push(escData);
-
-        const result = await FourWay.getInstance().getInfo(i);
-
-        escStore.escInfo.push(result);
-
-        escData.isLoading = false;
-    }
-  }
 };
 
 const writeConfig = async () => {
-    if (!serialStore.isFourWay) {
-        throw new Error('No 4way connection found');
-    }
+    if (serialStore.isFourWay) {
+        escStore.isSaving = true;
 
-    escStore.isSaving = true;
-
-    for (let i = 0; i < escStore.count; ++i) {
-        if(escStore.escInfo[i].settingsDirty) {
-          const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
-          escStore.escInfo[i].settingsBuffer = result;
-          escStore.escInfo[i].settingsDirty = false;
+        for (let i = 0; i < escStore.count; ++i) {
+            if (escStore.escInfo[i].settingsDirty) {
+                const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
+                escStore.escInfo[i].settingsBuffer = result;
+                escStore.escInfo[i].settingsDirty = false;
+            }
+        }
+        escStore.isSaving = false;
+        escStore.settingsDirty = false;
+    } else if (serialStore.isDirectConnect) {
+        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+        console.log(mcu.getEepromOffset());
+        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
+        console.log(setAddress);
+        if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new DataView(new Uint8Array([Mcu.LAYOUT_SIZE]).buffer, 0));
+            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, new DataView(objectToSettingsArray(escStore.escInfo[0].settings).buffer, 0));
+            console.log(sendBuffer);
+            if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
+                console.log(writeFlash);
+                escStore.escInfo[0].settingsDirty = false;
+                escStore.escInfo[0].settingsBuffer = objectToSettingsArray(escStore.escInfo[0].settings);
+            }
         }
     }
-    escStore.isSaving = false;
-    escStore.settingsDirty = false;
 };
 
 const disconnectFromDevice = async () => {
@@ -443,50 +506,49 @@ const disconnectFromDevice = async () => {
 };
 
 const startLocalFlash = async (event: Event) => {
-  if (event.target instanceof HTMLInputElement) {
-    const file: File | undefined = event.target.files?.[0];
-    if (file) {
-      const logStore = useLogStore();
+    if (event.target instanceof HTMLInputElement) {
+        const file: File | undefined = event.target.files?.[0];
+        if (file) {
+            const logStore = useLogStore();
 
-      if (!ignoreMcuLayout.value) {
+            if (!ignoreMcuLayout.value) {
+                const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+                const eepromOffset = mcu.getEepromOffset();
+                const offset = 0x8000000;
+                const fileNamePlaceOffset = 30;
 
-        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
-        const eepromOffset = mcu.getEepromOffset();
-        const offset = 0x8000000;
-        const fileNamePlaceOffset = 30;
-
-        const fileFlash = Flash.parseHex(await file.text());
-        const findFileNameBlock = fileFlash!.data.find((d) =>
-          (eepromOffset - fileNamePlaceOffset) > (d.address - offset) &&
+                const fileFlash = Flash.parseHex(await file.text());
+                const findFileNameBlock = fileFlash!.data.find(d =>
+                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) &&
           (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
-        );
-        if (!findFileNameBlock) {
-          logStore.logError('File name not found in hex, probably too old!');
-          throw new Error('File name not found in hex file.');
-        }
+                );
+                if (!findFileNameBlock) {
+                    logStore.logError('File name not found in hex, probably too old!');
+                    throw new Error('File name not found in hex file.');
+                }
 
-        const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
-        if (!hexFileName.endsWith(escStore.escInfo[0].meta.am32.mcuType!)) {
-          logStore.logError('Invalid MCU type in hex file.');
-          throw new Error('Invalid MCU type in hex file.');
-        }
+                const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
+                if (!hexFileName.endsWith(escStore.escInfo[0].meta.am32.mcuType!)) {
+                    logStore.logError('Invalid MCU type in hex file.');
+                    throw new Error('Invalid MCU type in hex file.');
+                }
 
-        const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
-        const expectedFileName = escStore.escInfo[0].meta.am32.fileName!.slice(0, escStore.escInfo[0].meta.am32.fileName!.lastIndexOf('_'));
-        if ( currentFileName !== expectedFileName) {
-          logStore.logError('Layout does not match! Aborting flash!');
-          logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
-          throw new Error('Layout does not match! Aborting flash!');
+                const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
+                const expectedFileName = escStore.escInfo[0].meta.am32.fileName!.slice(0, escStore.escInfo[0].meta.am32.fileName!.lastIndexOf('_'));
+                if (currentFileName !== expectedFileName) {
+                    logStore.logError('Layout does not match! Aborting flash!');
+                    logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
+                    throw new Error('Layout does not match! Aborting flash!');
+                }
+            }
+            startFlash(await file.text());
         }
-      }
-      startFlash(await file.text());
     }
-  }
-}
+};
 
 const startRemoteFlash = async () => {
     const fileUrl = ((data.value as any[]).find(r => r.tag_name === selectedRelease.value).assets as any[]).find(a => a.name === selectedAsset.value).browser_download_url;
-    //const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
+    // const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
     const file = await useFetch('/api/download?url=' + fileUrl);
     startFlash(file.data.value as string);
 };
@@ -511,20 +573,20 @@ const startFlash = async (hexString: string) => {
     escStore.activeTarget = -1;
     flashModalOpen.value = false;
     if (file_input.value) {
-      file_input.value.value = '';
+        file_input.value.value = '';
     }
-}
+};
 
-const downloadEscConfig = async () => {
-  for (let n of savingOrApplyingSelectedEscs.value) {
-    const blob = new Blob([escStore.escInfo[n - 1].settingsBuffer], {
-      type: 'application/octet-stream'
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = 'esc' + n + '_config.bin';
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }
-}
+const downloadEscConfig = () => {
+    for (const n of savingOrApplyingSelectedEscs.value) {
+        const blob = new Blob([escStore.escInfo[n - 1].settingsBuffer], {
+            type: 'application/octet-stream'
+        });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'esc' + n + '_config.bin';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+};
 </script>

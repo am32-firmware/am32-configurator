@@ -5,8 +5,8 @@ export const useEscStore = defineStore('esc', () => {
 
     const escData = ref<EscData[]>([]);
 
-    let escInfo = ref<McuInfo[]>([]);
-    let selectedEscInfo = computed(() => escInfo.value.length > 0 ? escInfo.value.filter(e => e.isSelected) : []);
+    const escInfo = ref<McuInfo[]>([]);
+    const selectedEscInfo = computed(() => escInfo.value.length > 0 ? escInfo.value.filter(e => e.isSelected) : []);
 
     const settingsDirty = ref(false);
     const isSaving = ref(false);

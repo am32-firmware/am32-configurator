@@ -96,9 +96,8 @@ const props = defineProps<{
     mcu: McuInfo | null | undefined
 }>();
 
-const emit = defineEmits<{
-  (e: 'change', value: { index: number, field: EepromLayoutKeys, value: boolean }): void,
-  (e: 'toggle', value: number): void
+const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLayoutKeys, value: boolean }): void,
+(e: 'toggle', value: number): void
 }>();
 
 const iconName = computed(() => `i-material-symbols-counter-${props.index + 1}-outline`);
@@ -142,8 +141,8 @@ function getSettingValue<T> (name: EepromLayoutKeys): T | null {
 }
 
 const padVersion = (version: number) => {
-  return padStr(version + '', 2, '0');
-}
+    return padStr(version + '', 2, '0');
+};
 
 const toggleSelected = () => {
     emit('toggle', props.index);

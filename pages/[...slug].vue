@@ -6,8 +6,8 @@
           WebSerial not supported! Please use other browser!
         </div>
       </div>
-      <div v-else-if="serialStore.isFourWay" class="pt-4 pb-12 h-full">
-        <div v-if="serialStore.isFourWay" class="h-full">
+      <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
+        <div v-if="serialStore.isFourWay || serialStore.isDirectConnect" class="h-full">
           <div class="flex gap-4 w-full justify-center">
             <div v-for="n of escStore.count" :key="n">
               <EscView
@@ -53,6 +53,7 @@
                   field: 'COMPLEMENTARY_PWM',
                   name: 'Complementary PWM'
                 }]"
+                @change="onSettingsChange"
               >
                 <SettingField
                   :esc-info="escStore.selectedEscInfo"
@@ -138,6 +139,7 @@
                   field: 'LOW_VOLTAGE_CUTOFF',
                   name: 'Low voltage cut off'
                 }]"
+                @change="onSettingsChange"
               >
                 <SettingField
                   :esc-info="escStore.selectedEscInfo"

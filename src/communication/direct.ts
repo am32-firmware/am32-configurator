@@ -1,10 +1,19 @@
-import serial from "./serial";
+import Flash from '../flash';
+import Mcu from '../mcu';
+import serial from './serial';
 
 export enum DIRECT_COMMANDS {
-    cmd_SetAddress = 0xff,
-    cmd_SetBufferSize = 0xfe,
+    cmd_SetAddress = 0xFF,
+    cmd_SetBufferSize = 0xFE,
     cmd_WriteFlash = 0x01,
-    cmd_ReadFlash = 0x03
+    cmd_ReadFlash = 0x03,
+    cmd_SendBuffer = 0x00
+}
+
+export enum DIRECT_RESPONSES {
+    GOOD_ACK = 0x30,
+    BAD_ACK = 0xC1,
+    BAD_CRC = 0xC2
 }
 
 export class Direct {
@@ -33,14 +42,13 @@ export class Direct {
     ) {
     }
 
-    /*makeCRC(pBuff: Uint8Array){
+    makeCRC (pBuff: number[]) {
         let CRC_16 = 0;
-  
-        for(let i = 0; i < pBuff.length; i++) {
+
+        for (let i = 0; i < pBuff.length; i++) {
             let xb = pBuff[i];
-            for (let j = 0; j < 8; j++)
-            {
-                if (((xb & 0x01) ^ (CRC_16 & 0x0001)) !=0 ) {
+            for (let j = 0; j < 8; j++) {
+                if (((xb & 0x01) ^ (CRC_16 & 0x0001)) !== 0) {
                     CRC_16 = CRC_16 >> 1;
                     CRC_16 = CRC_16 ^ 0xA001;
                 } else {
@@ -49,11 +57,10 @@ export class Direct {
                 xb = xb >> 1;
             }
         }
-        calculated_crc_low_byte = CRC_16.bytes[0];
-        calculated_crc_high_byte = CRC_16.bytes[1];
-        return [CRC_16]
-      }*/
-    crc16(buffer: number[]) {
+        return CRC_16;
+    }
+
+    crc16 (buffer: number[]) {
         let crc = 0xFFFF;
         let odd;
 
@@ -72,47 +79,121 @@ export class Direct {
         return crc;
     };
 
-    checkCRC(pBuff: number[]) {
-        const low_byte = pBuff[pBuff.length - 2];          // one higher than len in buffer
-        const high_byte = pBuff[pBuff.length - 1];
-        const crc_byte = low_byte.toString(16) + high_byte.toString(16);
+    checkCRC (pBuff: number[]) {
+        const lowByte = pBuff[pBuff.length - 2]; // one higher than len in buffer
+        const highByte = pBuff[pBuff.length - 1];
+        const crcByte = lowByte.toString(16) + highByte.toString(16);
 
         const crc = this.crc16(pBuff);
 
-        console.log(crc.toString(16), crc_byte);
+        console.log(crc.toString(16), crcByte);
 
-        return crc.toString(16) === crc_byte;
+        return crc.toString(16) === crcByte;
     }
 
-    async init() {
-        const init = new Uint8Array([0, 0,    0,   0,   0,   0,   0,   0,   0,    0,   0,
+    async init () {
+        const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
         ]);
         const result = await serial.write(init);
         if (result) {
-            console.log(result.byteLength, result.subarray(init.length), [0x34,0x37,0x31,0x00,0x1f,0x06,0x06,0x01,0x30]);
+            const infoBuffer = result.subarray(init.length);
+            const message: FourWayResponse = {
+                command: 0x0,
+                address: 0x0,
+                ack: 0x0,
+                checksum: (infoBuffer[6 + 1] << 8) | infoBuffer[7 + 1],
+                params: infoBuffer.slice(4, 4 + 4)
+            };
+            const info = Flash.getInfo(message);
+            info.meta.input = infoBuffer[3];
+            info.meta.signature = (infoBuffer[4] << 8) | infoBuffer[5];
+
+            const mcu = new Mcu(info.meta.signature);
+            mcu.setInfo(info);
+
+            const eepromOffset = mcu.getEepromOffset();
+
+            try {
+                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset - 32);
+                if (fileNameAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                    await delay(200);
+
+                    const fileNameRead = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new DataView(new Uint8Array([32]).buffer, 0));
+
+                    const fileName = new TextDecoder().decode(fileNameRead!.slice(0, fileNameRead?.indexOf(0x0)));
+
+                    if (/[A-Z0-9_]+/.test(fileName)) {
+                        info.meta.am32.fileName = fileName;
+                        info.meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
+                    }
+
+                    if (info.meta.input) {
+                        info.bootloader.input = info.meta.input;
+                        info.bootloader.valid = false;
+                    }
+
+                    info.layoutSize = Mcu.LAYOUT_SIZE;
+
+                    const eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset);
+                    if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                        await delay(200);
+                        const settingsArray = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new DataView(new Uint8Array([info.layoutSize]).buffer, 0));
+                        info.settings = bufferToSettings(settingsArray!);
+                        info.settingsBuffer = settingsArray!;
+
+                        for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
+                            console.log(key, value, info.bootloader.input);
+                            if (value === info.bootloader.input) {
+                                info.bootloader.valid = true;
+                                info.bootloader.pin = key;
+                                info.bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
+                            }
+                        }
+
+                        return info;
+                    }
+                }
+            } catch (e: any) {
+                console.error(e);
+                throw new Error(e.message);
+            }
         }
-        const eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, 0x7c00);
-        console.log(eeprom);
     }
 
-    writeCommand(command: DIRECT_COMMANDS, address: number, payload?: Uint8Array) {
-        const buffer: number[] = [];
-        switch(command) {
-            case DIRECT_COMMANDS.cmd_SetAddress:
-                buffer.push(DIRECT_COMMANDS.cmd_SetAddress);
-                buffer.push(0x00);
-                buffer.push((address >> 8) & 0xFF);
-                buffer.push(address & 0xFF);
-                const crc = this.crc16(buffer);
-                console.log(crc.toString(16), crc >> 2);
-                buffer.push(crc & 0xFF);
-                buffer.push(crc >> 8 & 0xFF);
-                break;
-            default:
-                break;
+    writeCommand (command: DIRECT_COMMANDS, address: number, payload?: DataView) {
+        let buffer: number[] = [command];
+
+        switch (command) {
+        case DIRECT_COMMANDS.cmd_SetAddress:
+            buffer.push(0x00);
+            buffer.push((address >> 8) & 0xFF);
+            buffer.push(address & 0xFF);
+            break;
+        case DIRECT_COMMANDS.cmd_ReadFlash:
+            if (!payload) {
+                throw new Error('no payload');
+            }
+            buffer.push(payload.getUint8(0));
+            break;
+        case DIRECT_COMMANDS.cmd_WriteFlash:
+            buffer.push(0x01);
+            break;
+        case DIRECT_COMMANDS.cmd_SetBufferSize: {
+            const size = payload!.getUint8(0);
+            buffer.push(0x00);
+            buffer.push(0x00);
+            buffer.push(size === 256 ? 0 : size);
+        } break;
+        case DIRECT_COMMANDS.cmd_SendBuffer:
+            buffer = Array.from(new Uint8Array(payload!.buffer).values());
+            break;
+        default:
+            break;
         }
-        console.log(address, address >> 8, buffer);
-        return serial.write(new Uint8Array(buffer));
+        const crc = this.makeCRC(buffer);
+        buffer.push(crc & 0xFF);
+        buffer.push(crc >> 8 & 0xFF);
+        return serial.write(new Uint8Array(buffer)).then(result => result?.subarray(buffer.length));
     }
 }

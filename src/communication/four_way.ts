@@ -3,7 +3,6 @@ import Mcu, { type McuInfo } from '../mcu';
 import asciiToBuffer from '~/utils/ascii-to-buffer';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
-import { escapeJsonPointer } from 'ajv/dist/compile/util';
 
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
@@ -114,7 +113,7 @@ export class FourWay {
         return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
     }
 
-    reset(target: number) {
+    reset (target: number) {
         return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceReset, [target], 0);
     }
 
@@ -432,7 +431,7 @@ export class FourWay {
                             escStore.step = 'Verifing';
                             await delay(200);
                             await this.verifyPages(0x04, 0x40, pageSize, flash);
-                        } catch(error) {
+                        } catch (error) {
                             this.logError('flashingVerificationFailed');
                         }
                     }
