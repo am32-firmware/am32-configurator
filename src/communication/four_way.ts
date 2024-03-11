@@ -3,6 +3,7 @@ import Mcu, { type McuInfo } from '../mcu';
 import asciiToBuffer from '~/utils/ascii-to-buffer';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
+import { escapeJsonPointer } from 'ajv/dist/compile/util';
 
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
@@ -115,6 +116,10 @@ export class FourWay {
         return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
     }
 
+    reset(target: number) {
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceReset, [target], 0);
+    }
+
     /* buildDisplayName(flash: McuInfo, make: string) {
         const settings = flash.settings;
         let revision = 'Unsupported/Unrecognized';
@@ -177,12 +182,13 @@ export class FourWay {
         return info;
     }
 
-    readAddress (address: number, bytes: number, retries = 10) {
+    readAddress (address: number, bytes: number, retries = 10, timeout = 200) {
         return this.sendWithPromise(
             FOUR_WAY_COMMANDS.cmd_DeviceRead,
             [bytes === 256 ? 0 : bytes],
             address,
-            retries
+            retries,
+            timeout
         );
     }
 
@@ -197,7 +203,7 @@ export class FourWay {
         }
     }
 
-    async send (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0) {
+    async send (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, timeout = 200) {
         this.log(`Sending ${enumToString(command, FOUR_WAY_COMMANDS)}...`);
 
         const message = this.makePackage(command, params, address);
@@ -208,7 +214,7 @@ export class FourWay {
         }
 
         try {
-            return await Serial.write(message, 200);
+            return await Serial.write(message, timeout);
         } catch (e: any) {
             this.logError(`MSP command failed: ${e.message}`);
             return null;
@@ -220,12 +226,12 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10): Promise<FourWayResponse | null> {
+    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10, timeout = 200): Promise<FourWayResponse | null> {
         let currentTry = 0;
 
         const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
             while (currentTry++ < retries) {
-                const result = await this.send(command, params, address).catch((err) => {
+                const result = await this.send(command, params, address, timeout).catch((err) => {
                     console.log(err);
                     return null;
                 });
@@ -324,8 +330,8 @@ export class FourWay {
  * @param {Array<number>} data
  * @returns {Promise<Response>}
  */
-    write (address: number, data: number[] | Uint8Array) {
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceWrite, Array.from(data), address);
+    write (address: number, data: number[] | Uint8Array, timeout = 200) {
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceWrite, Array.from(data), address, 10, timeout);
     }
 
     /**
@@ -347,16 +353,20 @@ export class FourWay {
    * @param {number} pageSize
    * @param {Uint8Array} data
    */
-    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array) {
+    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array, timeout: number) {
         const beginAddress = begin * pageSize;
         const endAddress = end * pageSize;
         const step = 0x100;
+        const escStore = useEscStore();
 
         for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
             await this.write(
                 address,
-                data.subarray(address, Math.min(address + step, data.length))
+                data.subarray(address, Math.min(address + step, data.length)),
+                timeout
             );
+
+            escStore.bytesWritten += step;
         }
     }
 
@@ -395,7 +405,7 @@ export class FourWay {
         throw new Error('EscInitError');
     }
 
-    async writeHex (target: number, hex: string) { // }, force: boolean, migrate: boolean) {
+    async writeHex (target: number, hex: string, timout: number) { // }, force: boolean, migrate: boolean) {
         const escStore = useEscStore();
         const parsed = Flash.parseHex(hex);
         if (parsed) {
@@ -411,6 +421,7 @@ export class FourWay {
 
                 escStore.totalBytes = (flash.byteLength - firmwareStart) * 2;
                 escStore.bytesWritten = 0;
+                escStore.step = 'Writing';
 
                 const message = await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
                 if (message) {
@@ -420,13 +431,21 @@ export class FourWay {
                     eepromInfo.set([originalSettings[1], originalSettings[2]], 1);
                     eepromInfo.set(asciiToBuffer('FLASH FAIL  '), 5);
 
-                    await this.write(eepromOffset, eepromInfo);
+                    await this.write(eepromOffset, eepromInfo, timout);
 
-                    await this.writePages(0x04, 0x40, pageSize, flash);
+                    await this.writePages(0x04, 0x40, pageSize, flash, timout);
                     try {
+                        escStore.step = 'Verifing';
+                        await delay(200);
                         await this.verifyPages(0x04, 0x40, pageSize, flash);
                     } catch (error) {
-                        this.logError('flashingVerificationFailed');
+                        try {
+                            escStore.step = 'Verifing';
+                            await delay(200);
+                            await this.verifyPages(0x04, 0x40, pageSize, flash);
+                        } catch(error) {
+                            this.logError('flashingVerificationFailed');
+                        }
                     }
 
                     originalSettings[0] = 0x01;
@@ -455,7 +474,7 @@ export class FourWay {
         const escStore = useEscStore();
 
         for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
-            const message = await this.readAddress(address, Math.min(step, data.length - address));
+            const message = await this.readAddress(address, Math.min(step, data.length - address), 10, 100);
             if (message) {
                 const reference = data.subarray(message.address, message.address + message.params.byteLength);
 

@@ -32,17 +32,30 @@ class Serial {
             if (this.reader) {
                 await this.writer.write(data);
                 let ret: Uint8Array | null = null;
-                let result: ReadableStreamReadResult<Uint8Array> | null = await this.readWithTimeout<Uint8Array>(ms).catch((err) => {
-                    console.log(err);
-                    return null;
-                }) as ReadableStreamReadResult<Uint8Array> | null;
-                while (result && !result.done) {
+                let result: ReadableStreamReadResult<Uint8Array> | null = null;
+                if (ms === 0) {
+                    await delay(200);
+                    result = await this.read<Uint8Array>().catch((err) => {
+                        console.log(err);
+                        return null;
+                    }) as ReadableStreamReadResult<Uint8Array> | null;
+
                     if (result && result.value) {
                         ret = mergeUint8Arrays(ret ?? new Uint8Array(), result.value);
                     }
-                    result = await this.readWithTimeout<Uint8Array>(ms).catch((_err) => {
+                } else {
+                    result = await this.readWithTimeout<Uint8Array>(ms).catch((err) => {
+                        console.log(err);
                         return null;
                     }) as ReadableStreamReadResult<Uint8Array> | null;
+                    while (result && !result.done) {
+                        if (result && result.value) {
+                            ret = mergeUint8Arrays(ret ?? new Uint8Array(), result.value);
+                        }
+                        result = await this.readWithTimeout<Uint8Array>(ms).catch((_err) => {
+                            return null;
+                        }) as ReadableStreamReadResult<Uint8Array> | null;
+                    }
                 }
                 return ret;
             }

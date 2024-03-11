@@ -56,7 +56,6 @@ class Flash {
     static parseHex (hexString: string): Hex | null {
         let string = hexString.split('\n');
         string = string.map(e => e.endsWith('\r') ? e.substring(0, e.length - 1) : e);
-        console.log(string);
 
         // check if there is an empty line in the end of hex file, if there is, remove it
         if (string[string.length - 1] === '') {

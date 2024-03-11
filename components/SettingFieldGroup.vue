@@ -28,7 +28,7 @@ interface SwitchType {
 interface SettingFieldGroupProps {
     title: string;
     cols: number;
-    switches: SwitchType[];
+    switches?: SwitchType[];
 }
 
 const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number }): void}>();
@@ -41,7 +41,6 @@ withDefaults(defineProps<SettingFieldGroupProps>(), {
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
-        console.log(field, escStore.escInfo[0].settings[field] === 1);
         return escStore.escInfo[0].settings[field] === 1;
     },
     set: (_val) => {
@@ -49,7 +48,6 @@ const model = (field: EepromLayoutKeys) => computed({
             value: escStore.escInfo[0].settings[field] === 0 ? 1 : 0,
             field
         });
-        console.log(escStore.escInfo[0].settings[field]);
     }
 });
 </script>

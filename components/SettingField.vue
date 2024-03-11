@@ -19,11 +19,12 @@
       </div>
       <UToggle v-else-if="type === 'bool'" v-model="boolValue" :disabled="isDisabled" />
       <div v-else-if="type === 'number'">
-        <URange v-model="value" :disabled="isDisabled" :min="min" :max="max" :step="step" />
+        <URange v-model="value" :disabled="isDisabled" :min="min" :max="max" :step="step" :color="value === disabledValue ? 'orange' : 'primary'" />
       </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">
-          <div>{{ value }}</div>
+          <div v-if="value === disabledValue">DISABLED</div>
+          <div v-else>{{ value }}</div>
           <div v-if="unit">
             {{ unit }}
           </div>
@@ -63,7 +64,8 @@ interface SettingFieldProps {
     offset?: number;
     unit?: string;
     showValue?: boolean;
-    disabled?: boolean | ((value: number) => boolean)
+    disabled?: boolean | ((value: number) => boolean),
+    disabledValue?: number,
 }
 
 const props = withDefaults(defineProps<SettingFieldProps>(), {
@@ -99,7 +101,6 @@ const value = computed({
         if (props.type === 'number') {
             value = value * props.displayFactor + props.offset;
         }
-        console.log(value, props.type, props.displayFactor, props.offset);
         return value;
     },
     set: (val) => {
@@ -107,7 +108,6 @@ const value = computed({
         if (props.type === 'number') {
             value = Math.round((value - props.offset) / props.displayFactor);
         }
-        console.log(value);
         emits('change', {
             field: props.field,
             value

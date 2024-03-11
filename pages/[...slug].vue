@@ -1,12 +1,12 @@
 <template>
-  <UDashboardPage>
-    <UDashboardPanel>
+  <div>
+    <div>
       <div v-if="!serialStore.hasSerial">
         <div class="text-3x text-red-500">
           WebSerial not supported! Please use other browser!
         </div>
       </div>
-      <div v-else-if="serialStore.isFourWay" class="pt-4 h-full">
+      <div v-else-if="serialStore.isFourWay" class="pt-4 pb-12 h-full">
         <div v-if="serialStore.isFourWay" class="h-full">
           <div class="flex gap-4 w-full justify-center">
             <div v-for="n of escStore.count" :key="n">
@@ -20,11 +20,11 @@
               />
             </div>
           </div>
-          <div v-if="allLoaded" class="p-4 max-w-[1400px] m-auto">
+          <div v-if="allLoaded && escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
             <div class="flex flex-col gap-4 justify-center">
               <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="ESC_PROTOCOL"
                   name="Protocol"
                   type="select"
@@ -44,15 +44,18 @@
                   field: 'STALL_PROTECTION',
                   name: 'Stall protection'
                 }, {
-                  field: 'LOW_VOLTAGE_CUTOFF',
-                  name: 'Low voltage cut off'
-                }, {
                   field: 'USE_HALL_SENSORS',
                   name: 'Use hall sensors'
+                }, {
+                  field: 'VARIABLE_PWM_FREQUENCY',
+                  name: 'Variable PWM'
+                }, {
+                  field: 'COMPLEMENTARY_PWM',
+                  name: 'Complementary PWM'
                 }]"
               >
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="TIMING_ADVANCE"
                   name="Timing advance"
                   type="number"
@@ -64,7 +67,7 @@
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="STARTUP_POWER"
                   name="Startup power"
                   type="number"
@@ -75,7 +78,7 @@
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="MOTOR_KV"
                   name="Motor KV"
                   type="number"
@@ -88,7 +91,7 @@
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="MOTOR_POLES"
                   name="Motor poles"
                   type="number"
@@ -98,7 +101,7 @@
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="BEEP_VOLUME"
                   name="Beeper volume"
                   type="number"
@@ -108,7 +111,61 @@
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
+                  field="PWM_FREQUENCY"
+                  name="PWM Frequency"
+                  type="number"
+                  :min="8"
+                  :max="48"
+                  :step="1"
+                  unit="kHz"
+                  @change="onSettingsChange"
+                >
+                  <template #unit="{ value }">
+                    <div v-if="escStore.selectedEscInfo[0].settings.VARIABLE_PWM_FREQUENCY === 1">
+                      {{ value }}kHz - {{ value as number * 2 }}kHz
+                    </div>
+                    <div v-else>
+                      {{ value }}
+                    </div>
+                  </template>
+                </SettingField>
+              </SettingFieldGroup>
+              <SettingFieldGroup
+                title="Limits"
+                :cols="3"
+                :switches="[{
+                  field: 'LOW_VOLTAGE_CUTOFF',
+                  name: 'Low voltage cut off'
+                }]"
+              >
+                <SettingField
+                  :esc-info="escStore.selectedEscInfo"
+                  field="TEMPERATURE_LIMIT"
+                  name="Temperature limit"
+                  type="number"
+                  :min="70"
+                  :max="141"
+                  :step="1"
+                  :disabled-value="141"
+                  show-value
+                  @change="onSettingsChange"
+                />
+                <SettingField
+                  :esc-info="escStore.selectedEscInfo"
+                  field="CURRENT_LIMIT"
+                  name="Current limit"
+                  type="number"
+                  :min="0"
+                  :max="202"
+                  :step="2"
+                  :display-factor="2"
+                  :disabled-value="202"
+                  show-value
+                  @change="onSettingsChange"
+                />
+                <SettingField
+                  :esc-info="escStore.selectedEscInfo"
                   field="LOW_VOLTAGE_THRESHOLD"
                   name="Low voltage cut off threshold"
                   type="number"
@@ -117,7 +174,7 @@
                   :step="1"
                   :offset="250"
                   :display-factor="1"
-                  :disabled="(value: number) => escStore.escInfo[0].settings.LOW_VOLTAGE_CUTOFF === 0"
+                  :disabled="(value: number) => escStore.selectedEscInfo[0].settings.LOW_VOLTAGE_CUTOFF === 0"
                   show-value
                   @change="onSettingsChange"
                 />
@@ -132,60 +189,27 @@
                 @change="onSettingsChange"
               >
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="SINE_MODE_RANGE"
                   name="Sine Mode Power"
                   type="number"
                   :min="5"
                   :max="25"
-                  :disabled="(value: number) => escStore.escInfo[0].settings.SINUSOIDAL_STARTUP === 0"
+                  :disabled="(value: number) => escStore.selectedEscInfo[0].settings.SINUSOIDAL_STARTUP === 0"
                   show-value
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   field="SINE_MODE_POWER"
                   name="Sine Mode Power"
                   type="number"
                   :min="1"
                   :max="10"
-                  :disabled="(value: number) => escStore.escInfo[0].settings.SINUSOIDAL_STARTUP === 0"
+                  :disabled="(value: number) => escStore.selectedEscInfo[0].settings.SINUSOIDAL_STARTUP === 0"
                   show-value
                   @change="onSettingsChange"
                 />
-              </SettingFieldGroup>
-              <SettingFieldGroup
-                title="PWM"
-                :cols="3"
-                :switches="[{
-                  field: 'VARIABLE_PWM_FREQUENCY',
-                  name: 'Variable'
-                }, {
-                  field: 'COMPLEMENTARY_PWM',
-                  name: 'Complementary'
-                }]"
-                @change="onSettingsChange"
-              >
-                <SettingField
-                  :esc-info="escStore.escInfo"
-                  field="PWM_FREQUENCY"
-                  name="PWM Frequency"
-                  type="number"
-                  :min="8"
-                  :max="48"
-                  :step="1"
-                  unit="kHz"
-                  @change="onSettingsChange"
-                >
-                  <template #unit="{ value }">
-                    <div v-if="escStore.escInfo[0].settings.VARIABLE_PWM_FREQUENCY === 1">
-                      {{ value }}kHz - {{ value as number * 2 }}kHz
-                    </div>
-                    <div v-else>
-                      {{ value }}
-                    </div>
-                  </template>
-                </SettingField>
               </SettingFieldGroup>
               <SettingFieldGroup
                 title="Brake"
@@ -197,19 +221,19 @@
                 @change="onSettingsChange"
               >
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   name="Brake strength"
                   type="number"
                   field="BRAKE_STRENGTH"
                   :min="1"
                   :max="10"
                   :step="1"
-                  :disabled="(value: number) => escStore.escInfo[0].settings.BRAKE_ON_STOP === 0"
+                  :disabled="(value: number) => escStore.selectedEscInfo[0].settings.BRAKE_ON_STOP === 0"
                   show-value
                   @change="onSettingsChange"
                 />
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   name="Running brake level"
                   type="number"
                   field="RUNNING_BRAKE_LEVEL"
@@ -222,6 +246,7 @@
               </SettingFieldGroup>
               <SettingFieldGroup
                 title="Servo settings"
+                :cols="3"
               >
                 <SettingField
                   :esc-info="escStore.escInfo"
@@ -237,7 +262,7 @@
                 />
 
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   name="High threshold"
                   type="number"
                   field="SERVO_HIGH_THRESHOLD"
@@ -250,7 +275,7 @@
                 />
 
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   name="Neutral"
                   type="number"
                   field="SERVO_NEUTRAL"
@@ -263,7 +288,7 @@
                 />
 
                 <SettingField
-                  :esc-info="escStore.escInfo"
+                  :esc-info="escStore.selectedEscInfo"
                   name="Dead band"
                   type="number"
                   field="SERVO_DEAD_BAND"
@@ -295,8 +320,8 @@
           <ContentDoc />
         </div>
       </div>
-    </UDashboardPanel>
-  </UDashboardPage>
+    </div>
+  </div>
 </template>
 <script setup lang="ts">
 import type { EepromLayoutKeys } from '~/src/eeprom';
@@ -343,11 +368,9 @@ const protocolOptions = [
 ];
 
 const onSettingsChange = (payload: { field: EepromLayoutKeys, value: number }) => {
-    if (escStore.escInfo[0].settings[payload.field] !== payload.value) {
-        escStore.settingsDirty = true;
-    }
-    for (let i = 0; i < escStore.escInfo.length; ++i) {
-        escStore.escInfo[i].settings[payload.field] = payload.value;
+    for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
+        escStore.selectedEscInfo[i].settings[payload.field] = payload.value;
+        escStore.selectedEscInfo[i].settingsDirty = true;
     }
 };
 </script>

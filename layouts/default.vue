@@ -1,7 +1,7 @@
 <template>
-  <DashboardLayout>
-    <UDashboardPanel>
-      <UDashboardNavbar class="grid grid-cols-12 text-white ">
+  <div>
+    <div>
+      <div class="grid grid-cols-12 text-white ">
         <div class="col-span-2 flex justify-center items-center">
           <svgo-logo-full class="text-white text-[150px]" />
         </div>
@@ -17,27 +17,21 @@
         <div v-if="serialStore.hasSerial" class="col-span-2">
           <SerialDevice />
         </div>
-      </UDashboardNavbar>
-      <UFooter class="bg-gray-800">
-        <template #left>
-          <div class="text-center">
-            AM32 Configurator
-          </div>
-        </template>
-        <template>
-          <div class="text-center">
-            powered by Nuxt and Netlify
-          </div>
-        </template>
-        <template #right>
-          <div class="text-center">
-            v0.0.1
-          </div>
-        </template>
-      </UFooter>
-    </UDashboardPanel>
+      </div>
+      <div class="fixed bottom-0 left-0 right-0 flex justify-between p-2 z-10 bg-gray-800">
+        <div class="text-center min-w-[200px]">
+          AM32 Configurator
+        </div>
+        <div class="text-center min-w-[300px]">
+          powered by Nuxt and Vercel
+        </div>
+        <div class="text-center min-w-[200px]">
+          v0.0.1
+        </div>
+      </div>
+    </div>
     <slot />
-  </DashboardLayout>
+  </div>
 </template>
 <script setup lang="ts">
 const serialStore = useSerialStore();

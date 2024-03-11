@@ -2,7 +2,8 @@
   <div
     class="min-h-[150px] min-w-[400px] p-4 border bg-slate-500 border-slate-900 rounded-xl cursor-pointer ring-4"
     :class="{
-      'ring-red-500': mcu?.isSelected,
+      'ring-red-500': mcu?.isSelected && mcu.settingsDirty,
+      'ring-green-500': mcu?.isSelected && !mcu.settingsDirty,
       'ring-gray-500': !mcu?.isSelected
     }"
     @click="toggleSelected"
@@ -64,7 +65,7 @@
                 Version
               </div>
               <div class="col-span-3">
-                {{ getSettingValue('MAIN_REVISION') }}.{{ getSettingValue('SUB_REVISION') }}
+                {{ getSettingValue('MAIN_REVISION') }}.{{ padVersion(getSettingValue<number>('SUB_REVISION') ?? 0) }}
               </div>
             </div>
           </div>
@@ -138,6 +139,10 @@ const layoutVersion = computed(() => getSettingValue<number>('LAYOUT_REVISION'))
 
 function getSettingValue<T> (name: EepromLayoutKeys): T | null {
     return props.mcu?.settings[name] as T ?? null;
+}
+
+const padVersion = (version: number) => {
+  return padStr(version + '', 2, '0');
 }
 
 const toggleSelected = () => {

@@ -5,7 +5,8 @@ export const useEscStore = defineStore('esc', () => {
 
     const escData = ref<EscData[]>([]);
 
-    let escInfo = reactive<McuInfo[]>([]);
+    let escInfo = ref<McuInfo[]>([]);
+    let selectedEscInfo = computed(() => escInfo.value.length > 0 ? escInfo.value.filter(e => e.isSelected) : []);
 
     const settingsDirty = ref(false);
     const isSaving = ref(false);
@@ -13,14 +14,15 @@ export const useEscStore = defineStore('esc', () => {
     const $reset = () => {
         count.value = 0;
         escData.value = [];
-        escInfo = [];
+        escInfo.value = [];
     };
 
     const activeTarget = ref(-1);
     const totalBytes = ref(0);
     const bytesWritten = ref(0);
+    const step = ref('Writing');
 
-    return { settingsDirty, isSaving, count, escData, escInfo, activeTarget, totalBytes, bytesWritten, $reset };
+    return { settingsDirty, isSaving, count, escData, escInfo, selectedEscInfo, activeTarget, totalBytes, bytesWritten, step, $reset };
 });
 
 if (import.meta.hot) {

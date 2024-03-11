@@ -60,7 +60,7 @@
       <div v-if="serialStore.hasConnection && escStore.count > 0">
         <UButton label="Flash firmware" icon="i-material-symbols-full-stacked-bar-chart" @click="flashModalOpen = true" />
       </div>
-      <UModal v-model="flashModalOpen" prevent-close>
+      <UModal v-model="flashModalOpen" :prevent-close="escStore.activeTarget > -1">
         <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
           <template #header>
             <div class="flex items-center justify-between">
@@ -73,35 +73,52 @@
             </div>
           </template>
 
-          <div class="flex flex-col gap-4">
-            <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
-            <USelectMenu
-              v-model="selectedRelease"
-              searchable
-              searchable-placeholder="Search a release..."
-              :options="releasesOptions"
-            />
-            <USelectMenu
-              v-model="selectedAsset"
-              searchable
-              searchable-placeholder="Search a hex file..."
-              :options="assets"
-              :disabled="assets.length === 0 || !ignoreMcuLayout"
-            />
+          <div v-if="file_input?.files?.length === 0" class="flex flex-col gap-4">
+              <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
+              <USelectMenu
+                v-model="selectedRelease"
+                searchable
+                searchable-placeholder="Search a release..."
+                :options="releasesOptions"
+              />
+              <USelectMenu
+                v-model="selectedAsset"
+                searchable
+                searchable-placeholder="Search a hex file..."
+                :options="assets"
+                :disabled="assets.length === 0 || !ignoreMcuLayout"
+              />
+          </div>
+          <div v-else class="text-green-500 text-center">
+              Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
           </div>
 
           <template #footer>
             <div class="flex flex-col items-end gap-4">
-              <div>
+              <input ref="file_input" id="file_input" accept=".hex" type="file" class="hidden" @change="startLocalFlash" />
+              <div v-if="escStore.activeTarget === -1" class="flex gap-4">
+                <UButton
+                  label="Flash local file"
+                  :disabled="escStore.activeTarget > -1"
+                  color="orange"
+                  @click="file_input?.click()"
+                />
                 <UButton
                   label="Start flash"
                   :disabled="!selectedAsset || selectedAsset === 'NOT FOUND'"
-                  @click="startFlash"
+                  @click="startRemoteFlash"
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
-                <UProgress :value="escStore.bytesWritten / escStore.totalBytes" indicator />
-                <div>{{ escStore.bytesWritten }} / {{ escStore.totalBytes }} bytes</div>
+                Flashing ESC #{{ (escStore.activeTarget + 1) }} of {{ escStore.count }}
+                <UProgress
+                  :value="(escStore.bytesWritten / escStore.totalBytes) * 100"
+                  indicator
+                  :animation="['Writing', 'Verifing'].includes(escStore.step) ? undefined : 'carousel'"
+                />
+                <div class="flex justify-center pt-2 text-green-500">
+                  <div>{{ escStore.step }}</div>
+                </div>
               </div>
             </div>
           </template>
@@ -116,6 +133,8 @@ import commandsQueue from '~/src/communication/commands.queue';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
+import Flash from '~/src/flash';
+import Mcu from '~/src/mcu';
 
 const toast = useToast();
 const serialStore = useSerialStore();
@@ -123,6 +142,7 @@ const escStore = useEscStore();
 const { log, logWarning, logError } = useLogStore();
 const usbVendorIds = [0x0483, 0x2E3C];
 const flashModalOpen = ref(false);
+const file_input = ref<HTMLInputElement>();
 
 const { data } = useAsyncData('github', () => github());
 const assets = ref<string[]>([]);
@@ -141,7 +161,7 @@ watch(selectedRelease, (tag: string) => {
     selectedAsset.value = currentAsset ?? 'NOT FOUND';
 });
 
-const isAnySettingsDirty = computed(() => !!escStore.escInfo.find(e => e.settingsDirty) || escStore.settingsDirty);
+const isAnySettingsDirty = computed(() => escStore.escInfo.some(e => e.settingsDirty));
 
 const baudrateOptions = ref([
     '1000000',
@@ -283,8 +303,6 @@ const connectToEsc = async () => {
     escStore.escData = [];
     escStore.escInfo = [];
 
-    // await FourWay.getInstance().getInfo(0);
-
     await delay(1000);
 
     for (let i = 0; i < escStore.count; ++i) {
@@ -309,8 +327,11 @@ const writeConfig = async () => {
     escStore.isSaving = true;
 
     for (let i = 0; i < escStore.count; ++i) {
-        const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
-        escStore.escInfo[i].settingsBuffer = result;
+        if(escStore.escInfo[i].settingsDirty) {
+          const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
+          escStore.escInfo[i].settingsBuffer = result;
+          escStore.escInfo[i].settingsDirty = false;
+        }
     }
     escStore.isSaving = false;
     escStore.settingsDirty = false;
@@ -339,14 +360,75 @@ const disconnectFromDevice = async () => {
     }
 };
 
-const startFlash = async () => {
+const startLocalFlash = async (event: Event) => {
+  if (event.target instanceof HTMLInputElement) {
+    const file: File | undefined = event.target.files?.[0];
+    if (file) {
+      const logStore = useLogStore();
+
+      if (!ignoreMcuLayout.value) {
+
+        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+        const eepromOffset = mcu.getEepromOffset();
+        const offset = 0x8000000;
+        const fileNamePlaceOffset = 30;
+
+        const fileFlash = Flash.parseHex(await file.text());
+        const findFileNameBlock = fileFlash!.data.find((d) =>
+          (eepromOffset - fileNamePlaceOffset) > (d.address - offset) &&
+          (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
+        );
+        if (!findFileNameBlock) {
+          logStore.logError('File name not found in hex, probably too old!');
+          throw new Error('File name not found in hex file.');
+        }
+
+        const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
+        if (!hexFileName.endsWith(escStore.escInfo[0].meta.am32.mcuType!)) {
+          logStore.logError('Invalid MCU type in hex file.');
+          throw new Error('Invalid MCU type in hex file.');
+        }
+
+        const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
+        const expectedFileName = escStore.escInfo[0].meta.am32.fileName!.slice(0, escStore.escInfo[0].meta.am32.fileName!.lastIndexOf('_'));
+        if ( currentFileName !== expectedFileName) {
+          logStore.logError('Layout does not match! Aborting flash!');
+          logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
+          throw new Error('Layout does not match! Aborting flash!');
+        }
+      }
+      startFlash(await file.text());
+    }
+  }
+}
+
+const startRemoteFlash = async () => {
     const fileUrl = ((data.value as any[]).find(r => r.tag_name === selectedRelease.value).assets as any[]).find(a => a.name === selectedAsset.value).browser_download_url;
     const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
-    const hexString = await file.text();
-    console.log(hexString);
+    startFlash(await file.text());
+};
+
+const startFlash = async (hexString: string) => {
     for (let i = 0; i < 1; ++i) {
         escStore.activeTarget = i;
-        await FourWay.getInstance().writeHex(i, hexString);
+        escStore.escData[i].isLoading = true;
+        await FourWay.getInstance().writeHex(i, hexString, 100);
+        await delay(200);
+        escStore.step = 'Resetting';
+        await FourWay.getInstance().reset(i);
+        await delay(5000);
+        escStore.step = 'Read ESC';
+        const result = await FourWay.getInstance().getInfo(i);
+        escStore.escInfo[i] = result;
+        escStore.escData[i].isLoading = false;
     }
-};
+    escStore.step = '';
+    escStore.bytesWritten = 0;
+    escStore.totalBytes = 0;
+    escStore.activeTarget = -1;
+    flashModalOpen.value = false;
+    if (file_input.value) {
+      file_input.value.value = '';
+    }
+}
 </script>
