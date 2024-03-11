@@ -40,8 +40,6 @@ class Serial {
                         return null;
                     }) as ReadableStreamReadResult<Uint8Array> | null;
 
-                    console.log(result);
-
                     if (result && result.value) {
                         ret = mergeUint8Arrays(ret ?? new Uint8Array(), result.value);
                     }

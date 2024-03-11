@@ -119,7 +119,7 @@ export class Direct {
                 if (fileNameAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                     await delay(200);
 
-                    const fileNameRead = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new DataView(new Uint8Array([32]).buffer, 0));
+                    const fileNameRead = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([32]));
 
                     const fileName = new TextDecoder().decode(fileNameRead!.slice(0, fileNameRead?.indexOf(0x0)));
 
@@ -138,7 +138,7 @@ export class Direct {
                     const eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset);
                     if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                         await delay(200);
-                        const settingsArray = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new DataView(new Uint8Array([info.layoutSize]).buffer, 0));
+                        const settingsArray = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([info.layoutSize]));
                         info.settings = bufferToSettings(settingsArray!);
                         info.settingsBuffer = settingsArray!;
 
@@ -161,7 +161,7 @@ export class Direct {
         }
     }
 
-    writeCommand (command: DIRECT_COMMANDS, address: number, payload?: DataView) {
+    writeCommand (command: DIRECT_COMMANDS, address: number, payload?: Uint8Array) {
         let buffer: number[] = [command];
 
         switch (command) {
@@ -174,19 +174,19 @@ export class Direct {
             if (!payload) {
                 throw new Error('no payload');
             }
-            buffer.push(payload.getUint8(0));
+            buffer.push(payload[0]);
             break;
         case DIRECT_COMMANDS.cmd_WriteFlash:
             buffer.push(0x01);
             break;
         case DIRECT_COMMANDS.cmd_SetBufferSize: {
-            const size = payload!.getUint8(0);
+            const size = payload![0];
             buffer.push(0x00);
             buffer.push(0x00);
             buffer.push(size === 256 ? 0 : size);
         } break;
         case DIRECT_COMMANDS.cmd_SendBuffer:
-            buffer = Array.from(new Uint8Array(payload!.buffer).values());
+            buffer = Array.from(payload!);
             break;
         default:
             break;
@@ -195,5 +195,9 @@ export class Direct {
         buffer.push(crc & 0xFF);
         buffer.push(crc >> 8 & 0xFF);
         return serial.write(new Uint8Array(buffer)).then(result => result?.subarray(buffer.length));
+    }
+
+    flashHex (hex: Hex) {
+        console.log(hex);
     }
 }

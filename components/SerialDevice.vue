@@ -472,8 +472,8 @@ const writeConfig = async () => {
         const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
         console.log(setAddress);
         if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new DataView(new Uint8Array([Mcu.LAYOUT_SIZE]).buffer, 0));
-            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, new DataView(objectToSettingsArray(escStore.escInfo[0].settings).buffer, 0));
+            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([Mcu.LAYOUT_SIZE]));
+            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.escInfo[0].settings));
             console.log(sendBuffer);
             if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                 const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
@@ -554,26 +554,61 @@ const startRemoteFlash = async () => {
 };
 
 const startFlash = async (hexString: string) => {
-    for (let i = 0; i < escStore.count; ++i) {
-        escStore.activeTarget = i;
-        escStore.escData[i].isLoading = true;
-        await FourWay.getInstance().writeHex(i, hexString, 100);
-        await delay(200);
-        escStore.step = 'Resetting';
-        await FourWay.getInstance().reset(i);
-        await delay(5000);
-        escStore.step = 'Read ESC';
-        const result = await FourWay.getInstance().getInfo(i);
-        escStore.escInfo[i] = result;
-        escStore.escData[i].isLoading = false;
-    }
-    escStore.step = '';
-    escStore.bytesWritten = 0;
-    escStore.totalBytes = 0;
-    escStore.activeTarget = -1;
-    flashModalOpen.value = false;
-    if (file_input.value) {
-        file_input.value.value = '';
+    if (serialStore.isDirectConnect) {
+        const parsed = Flash.parseHex(hexString);
+        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+        if (parsed) {
+            escStore.step = 'Writing';
+            escStore.activeTarget = 0;
+            escStore.bytesWritten = 0;
+            escStore.totalBytes = parsed.bytes;
+            let i = 0;
+            for (const start of parsed.data) {
+                i = 0;
+                while (i < start.bytes) {
+                    const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, (start.address - mcu.getFlashOffset()) + i);
+                    console.log(setAddress);
+                    if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                        throw new Error('setAddress failed');
+                    }
+                    await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([128]));
+                    const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, new Uint8Array(start.data.slice(i, (i + 128 > start.data.length ? start.data.length - 1 : i + 128))));
+                    console.log(sendBuffer);
+                    if (sendBuffer?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                        throw new Error('sendBuffer failed');
+                    }
+                    const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
+                    console.log(writeFlash);
+                    if (writeFlash?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                        throw new Error('writeFlash failed');
+                    }
+                    escStore.bytesWritten += 128;
+                    i += 128;
+                }
+            }
+        }
+    } else {
+        for (let i = 0; i < escStore.count; ++i) {
+            escStore.activeTarget = i;
+            escStore.escData[i].isLoading = true;
+            await FourWay.getInstance().writeHex(i, hexString, 100);
+            await delay(200);
+            escStore.step = 'Resetting';
+            await FourWay.getInstance().reset(i);
+            await delay(5000);
+            escStore.step = 'Read ESC';
+            const result = await FourWay.getInstance().getInfo(i);
+            escStore.escInfo[i] = result;
+            escStore.escData[i].isLoading = false;
+        }
+        escStore.step = '';
+        escStore.bytesWritten = 0;
+        escStore.totalBytes = 0;
+        escStore.activeTarget = -1;
+        flashModalOpen.value = false;
+        if (file_input.value) {
+            file_input.value.value = '';
+        }
     }
 };
 

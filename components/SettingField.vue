@@ -19,12 +19,23 @@
       </div>
       <UToggle v-else-if="type === 'bool'" v-model="boolValue" :disabled="isDisabled" />
       <div v-else-if="type === 'number'">
-        <URange v-model="value" :disabled="isDisabled" :min="min" :max="max" :step="step" :color="value === disabledValue ? 'orange' : 'primary'" />
+        <URange
+          v-model="value"
+          :disabled="isDisabled"
+          :min="min"
+          :max="max"
+          :step="step"
+          :color="value === disabledValue ? 'orange' : 'primary'"
+        />
       </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">
-          <div v-if="value === disabledValue">DISABLED</div>
-          <div v-else>{{ value }}</div>
+          <div v-if="value === disabledValue">
+            DISABLED
+          </div>
+          <div v-else>
+            {{ value }}
+          </div>
           <div v-if="unit">
             {{ unit }}
           </div>
