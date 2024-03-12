@@ -197,6 +197,43 @@ export class Direct {
         return serial.write(new Uint8Array(buffer)).then(result => result?.subarray(buffer.length));
     }
 
+    async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {
+        let currentTry = 0;
+        while (true) {
+            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+            if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                if (currentTry++ === retries) {
+                    throw new Error('setAddress failed');
+                }
+            } else {
+                break;
+            }
+        }
+        currentTry = 0;
+        await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
+        while (true) {
+            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload);
+            if (sendBuffer?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                if (currentTry++ === retries) {
+                    throw new Error('sendBuffer failed');
+                }
+            } else {
+                break;
+            }
+        }
+        currentTry = 0;
+        while (true) {
+            const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
+            if (writeFlash?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                if (currentTry++ === retries) {
+                    throw new Error('writeFlash failed');
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
     flashHex (hex: Hex) {
         console.log(hex);
     }

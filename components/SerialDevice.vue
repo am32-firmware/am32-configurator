@@ -555,37 +555,30 @@ const startRemoteFlash = async () => {
 
 const startFlash = async (hexString: string) => {
     if (serialStore.isDirectConnect) {
+        const logStore = useLogStore();
         const parsed = Flash.parseHex(hexString);
         const mcu = new Mcu(escStore.escInfo[0].meta.signature);
         if (parsed) {
             escStore.step = 'Writing';
-            escStore.activeTarget = 0;
+            escStore.activeTarget = 1;
             escStore.bytesWritten = 0;
             escStore.totalBytes = parsed.bytes;
             let i = 0;
             for (const start of parsed.data) {
                 i = 0;
-                while (i < start.bytes) {
-                    const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, (start.address - mcu.getFlashOffset()) + i);
-                    console.log(setAddress);
-                    if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
-                        throw new Error('setAddress failed');
-                    }
-                    await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([128]));
-                    const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, new Uint8Array(start.data.slice(i, (i + 128 > start.data.length ? start.data.length - 1 : i + 128))));
-                    console.log(sendBuffer);
-                    if (sendBuffer?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
-                        throw new Error('sendBuffer failed');
-                    }
-                    const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                    console.log(writeFlash);
-                    if (writeFlash?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
-                        throw new Error('writeFlash failed');
-                    }
+                logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
+                while (true) {
+                    logStore.log(`... 0x${((start.address - mcu.getFlashOffset()) + (i * 128)).toString(16)} - 0x${((start.address - mcu.getFlashOffset()) + ((i + 1) * 128) - 1).toString(16)}`);
+                    const chunk = new Uint8Array(start.data.slice(i * 128, ((i + 1) * 128 > start.data.length ? start.data.length - 1 : (i + 1) * 128)));
+                    await Direct.getInstance().writeBufferToAddress((start.address - mcu.getFlashOffset()) + (i * 128), chunk);
                     escStore.bytesWritten += 128;
-                    i += 128;
+                    i += 1;
+                    if ((i + 1) * 128 > start.data.length) {
+                        break;
+                    }
                 }
             }
+            escStore.activeTarget = -1;
         }
     } else {
         for (let i = 0; i < escStore.count; ++i) {
