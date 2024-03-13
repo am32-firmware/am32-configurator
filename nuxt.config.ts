@@ -45,12 +45,11 @@ export default defineNuxtConfig({
                 {
                     src: 'assets/images/144x144.png',
                     sizes: '144x144',
-                    type: 'image/png',
-                    purpose: 'any'
+                    type: 'image/png'
                 },
                 {
                     src: 'assets/images/square_logo.svg',
-                    sizes: '48x48 72x72 96x96 128x128 144x144 256x256 512x512',
+                    sizes: '144x144',
                     type: 'image/svg',
                     purpose: 'any'
                 }
@@ -73,7 +72,8 @@ export default defineNuxtConfig({
             ]
         },
         workbox: {
-            globPatterns: ['**/*.{js,css,html,png,svg,ico}']
+            globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+            navigateFallback: '/'
         },
         client: {
             installPrompt: true,
