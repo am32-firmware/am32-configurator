@@ -122,7 +122,7 @@
               description="If you flash a frong mcu type, you will brick the mcu, recovering from this will take some efford!"
             />
             <UCheckbox
-              v-model="includePrerelease" 
+              v-model="includePrerelease"
               :ui="{
                 label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
               }"
@@ -263,7 +263,7 @@
           </template>
           <div>
             <div class="flex flex-col gap-2">
-              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin"/>
+              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" />
               <div class="text-center">
                 Select ESC(s) to apply:
               </div>
@@ -295,6 +295,7 @@
 
 <script setup lang="ts">
 /* eslint-disable camelcase */
+import db from '../src/db';
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
@@ -302,7 +303,6 @@ import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
 import Flash from '~/src/flash';
 import Mcu, { type McuInfo } from '~/src/mcu';
-import db from '../src/db';
 
 const toast = useToast();
 const serialStore = useSerialStore();
@@ -646,13 +646,13 @@ const startRemoteFlash = async () => {
     const dbEntry = await db.downloads.where('url').equals(fileUrl).first();
 
     if (dbEntry) {
-      return startFlash(dbEntry.text);
+        return startFlash(dbEntry.text);
     }
 
     const file = await useFetch('/api/download?url=' + fileUrl);
     await db.downloads.add({
-      url: fileUrl,
-      text: file.data.value as string
+        url: fileUrl,
+        text: file.data.value as string
     });
     escStore.activeTarget = 0;
     escStore.step = 'Downloading';
@@ -669,11 +669,14 @@ const startFlash = async (hexString: string) => {
             escStore.bytesWritten = 0;
 
             let i = 0;
-            const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
-            filled.set(parsed!.data[0].data);
-            parsed.data[0].data = Array.from(filled);
-            parsed.data[0].bytes = filled.length;
-            parsed.bytes = filled.length + 32;
+            if (parsed.bytes < 27 * 1024 - 1 + 32) {
+                const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
+                const highIndex = parsed.data.findIndex(d => d.bytes > 32);
+                filled.set(parsed!.data[highIndex].data);
+                parsed.data[highIndex].data = Array.from(filled);
+                parsed.data[highIndex].bytes = filled.length;
+                parsed.bytes = filled.length + 32;
+            }
 
             escStore.totalBytes = parsed.bytes;
             escStore.step = 'Writing';
@@ -701,7 +704,7 @@ const startFlash = async (hexString: string) => {
             escStore.activeTarget = -1;
         }
     } else {
-        for (let n of savingOrApplyingSelectedEscs.value) {
+        for (const n of savingOrApplyingSelectedEscs.value) {
             const i = n - 1;
             escStore.activeTarget = i;
             escStore.escData[i].isLoading = true;
@@ -740,23 +743,23 @@ const downloadEscConfig = () => {
 };
 
 const applyConfig = async () => {
-  if (applyConfigFile.value.input.files.length === 1) {
-    const file: File = applyConfigFile.value.input.files[0];
-    if (file) {
-      const buffer = new Uint8Array(await file.arrayBuffer());
-      const settings = bufferToSettings(buffer);
+    if (applyConfigFile.value.input.files.length === 1) {
+        const file: File = applyConfigFile.value.input.files[0];
+        if (file) {
+            const buffer = new Uint8Array(await file.arrayBuffer());
+            const settings = bufferToSettings(buffer);
 
-      for (let n of savingOrApplyingSelectedEscs.value) {
-        escStore.escInfo[n - 1].settings = settings;
-        escStore.escInfo[n - 1].settingsDirty = true;
-      }
+            for (const n of savingOrApplyingSelectedEscs.value) {
+                escStore.escInfo[n - 1].settings = settings;
+                escStore.escInfo[n - 1].settingsDirty = true;
+            }
 
-      await writeConfig();
+            await writeConfig();
+        }
+
+        if (applyConfigFile.value) {
+            applyConfigFile.value.input.value = '';
+        }
     }
-
-    if (applyConfigFile.value) {
-        applyConfigFile.value.input.value = '';
-    }
-  }
-}
+};
 </script>

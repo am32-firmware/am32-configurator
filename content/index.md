@@ -49,7 +49,7 @@ Current bootloaders can be found [here](https://github.com/AlkaMotors/AM32_Bootl
 
 There's a dedicated Slack chat channel here:
 
-https://am32-invite.herokuapp.com/
+[Slack](https://am32-invite.herokuapp.com/)
 
 Etiquette: Don't ask to ask and please wait around long enough for a reply - sometimes people are out flying, asleep or at work and can't answer immediately.
 
