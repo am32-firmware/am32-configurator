@@ -39,11 +39,29 @@ export default defineNuxtConfig({
             name: 'AM32 configurator',
             short_name: 'AM32CONF',
             theme_color: '#000000',
+            description: "Configurator for the ESC firmware AM32",
             icons: [
                 {
                     src: 'assets/images/logo.svg',
                     sizes: '48x48 72x72 96x96 128x128 256x256 512x512',
-                    type: 'image/svg'
+                    type: 'image/svg',
+                    purpose: 'any'
+                }
+            ],
+            screenshots: [
+                {
+                    "src": "assets/images/screenshot1.png",
+                    "sizes": "640x320",
+                    "type": "image/png",
+                    "form_factor": "wide",
+                    "label": "4in1 ESC"
+                },
+                {
+                    "src": "assets/images/screenshot1.png",
+                    "sizes": "640x320",
+                    "type": "image/png",
+                    "form_factor": "narrow",
+                    "label": "4in1 ESC"
                 }
             ]
         },

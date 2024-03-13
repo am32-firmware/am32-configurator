@@ -311,6 +311,9 @@
               v-for="link of navigation"
               :key="link._path"
               class="py-4 transition-all hover:bg-slate-900 relative text-xl w-fit block after:block after:content-[''] after:bottom-0 after:absolute after:h-[3px] after:bg-white after:w-full after:scale-x-0 after:hover:scale-x-100 after:transition after:duration-300 after:origin-center"
+              :class="{
+                'after:scale-x-100': isCurrentLink(link)
+              }"
             >
               <NuxtLink active-class="!bg-slate-800" class="p-4 transition-all bg-transparent" :to="link._path">
                 {{ link.title }}
@@ -375,4 +378,8 @@ const onSettingsChange = (payload: { field: EepromLayoutKeys, value: number }) =
         escStore.selectedEscInfo[i].settingsDirty = true;
     }
 };
+
+const isCurrentLink = (link: any) => {
+  return window.location.pathname === link._path;
+}
 </script>
