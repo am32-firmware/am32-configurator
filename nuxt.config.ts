@@ -44,7 +44,7 @@ export default defineNuxtConfig({
             icons: [
                 {
                     src: 'assets/images/144x144.png',
-                    sizes: '144x144',
+                    sizes: '288x288',
                     type: 'image/png'
                 },
                 {
