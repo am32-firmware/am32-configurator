@@ -32,13 +32,15 @@ class Flash {
         return info;
     }
 
-    static fillImage (data: Hex, size: number, flashOffset: number): Uint8Array | null {
-        const image = new Uint8Array(size).fill(0xFF);
+    static fillImage (data: Hex, size: number, flashOffset: number, char?: number): Uint8Array | null {
+        const image = new Uint8Array(size).fill(char ?? 0xFF);
 
         // data.data.forEach((block) => {
         for (let i = 0; i < data.data.length; i += 1) {
             const block = data.data[i];
             const address = block.address - flashOffset;
+
+            console.log(address, block.address, flashOffset);
 
             // Check preconditions
             if (address >= image.byteLength) {

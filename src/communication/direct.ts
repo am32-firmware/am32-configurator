@@ -7,7 +7,8 @@ export enum DIRECT_COMMANDS {
     cmd_SetBufferSize = 0xFE,
     cmd_WriteFlash = 0x01,
     cmd_ReadFlash = 0x03,
-    cmd_SendBuffer = 0x00
+    cmd_SendBuffer,
+    cmd_Reset
 }
 
 export enum DIRECT_RESPONSES {
@@ -188,6 +189,8 @@ export class Direct {
         case DIRECT_COMMANDS.cmd_SendBuffer:
             buffer = Array.from(payload!);
             break;
+        case DIRECT_COMMANDS.cmd_Reset:
+            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));;
         default:
             break;
         }
