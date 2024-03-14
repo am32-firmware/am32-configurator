@@ -137,6 +137,8 @@ export class FourWay {
     } */
 
     async getInfo (target: number) {
+        const logStore = useLogStore();
+
         const flash = await this.initFlash(target, 10);
         const info = Flash.getInfo(flash!);
         const mcu = new Mcu(info.meta.signature);
@@ -145,7 +147,7 @@ export class FourWay {
         const eepromOffset = mcu.getEepromOffset();
 
         try {
-            const fileNameRead = await this.readAddress(eepromOffset - 32, 16);
+            const fileNameRead = await this.readAddress(eepromOffset - 32, 32);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -169,6 +171,12 @@ export class FourWay {
                     mcu.getInfo().bootloader.valid = true;
                     mcu.getInfo().bootloader.pin = key;
                     mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
+                    if (mcu.getInfo().bootloader.version === 0xFF) {
+                        logStore.logWarning('Bootloader version unset, setting to 1');
+                        info.settings.BOOT_LOADER_REVISION = 1;
+                        await this.writeSettings(target, mcu.getInfo());
+                        mcu.getInfo().bootloader.version = 1;
+                    }
                 }
             }
         } catch (e: any) {

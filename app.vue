@@ -13,6 +13,7 @@
   </div>
 </template>
 <script setup>
+import { Octokit } from 'octokit';
 import { Direct } from './src/communication/direct';
 import { FourWay } from './src/communication/four_way';
 import Msp from './src/communication/msp';
@@ -21,6 +22,17 @@ const { $pwa } = useNuxtApp();
 const toast = useToast();
 
 onMounted(() => {
+    $fetch('/api/releases').then((res) => {
+        console.log(res);
+    });
+    const octo = new Octokit();
+    octo.rest.repos.listReleases({
+        owner: 'am32-firmware',
+        repo: 'am32'
+    }).then((res) => {
+        console.log(res.data);
+    });
+
     if ($pwa.offlineReady) {
         toast.add({
             icon: 'i-material-symbols-install-desktop',

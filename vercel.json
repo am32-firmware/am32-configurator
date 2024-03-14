@@ -1,0 +1,8 @@
+{
+    "crons": [
+      {
+        "path": "/cron/fetch-releases",
+        "schedule": "*/10 * * * *"
+      }
+    ]
+  }
