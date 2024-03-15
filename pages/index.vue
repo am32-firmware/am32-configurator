@@ -1,6 +1,7 @@
 <template>
   <div>
     <div>
+      <TopNavigation />
       <div v-if="!serialStore.hasSerial">
         <div class="text-3x text-red-500">
           WebSerial not supported! Please use other browser!
@@ -305,7 +306,6 @@
         </div>
       </div>
       <div v-else>
-        <TopNavigation />
         <div class="p-4 max-w-[1400px] m-auto prose prose-invert">
           <ContentDoc />
         </div>

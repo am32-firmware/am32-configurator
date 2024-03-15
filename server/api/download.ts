@@ -14,7 +14,9 @@ export default defineEventHandler(async (event) => {
         const blob = blobs.find(b => b.pathname.endsWith(fileName));
 
         if (blob) {
-            return blob.downloadUrl;
+            return {
+                data: [blob.downloadUrl]
+            };
         }
 
         throw createError({
@@ -22,20 +24,30 @@ export default defineEventHandler(async (event) => {
             statusMessage: 'file not found'
         });
     } else if (listQuery) {
-        const [, type] = listQuery.split('=');
-        switch (type) {
+        switch (listQuery) {
         case 'tags': {
             const { blobs } = await list({
-                prefix: 'releases',
-                mode: 'folded'
+                prefix: 'releases'
             });
-            return blobs.map(b => b.pathname);
+            const hexFiles = blobs.filter(b => b.pathname.endsWith('.hex')).map(b => b.pathname);
+            const tags: string[] = [];
+            for (const hexFile of hexFiles) {
+                const [, tag] = hexFile.split('/');
+                if (!tags.includes(tag)) {
+                    tags.push(tag);
+                }
+            }
+            return {
+                data: tags
+            };
         };
         default: {
             const { blobs } = await list({
-                prefix: `/releases/${type}`
+                prefix: `releases/${listQuery}`
             });
-            return blobs.map(b => b.pathname);
+            return {
+                data: blobs.filter(b => b.pathname.endsWith('.hex')).map(b => b.pathname)
+            };
         };
         }
     }

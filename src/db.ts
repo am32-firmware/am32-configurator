@@ -7,14 +7,13 @@ export class HexFile {
 }
 
 export class Am32Dexie extends Dexie {
-
     downloads!: Table<HexFile>;
 
-    constructor() {
+    constructor () {
         super('Am32Dexie');
         this.version(1).stores({
-            downloads: "++id, url, text"
-        })
+            downloads: '++id, url, text'
+        });
     }
 }
 

@@ -52,3 +52,14 @@ interface Hex {
     bytes: number,
     startLinearAddress: number
 }
+
+interface BlobFolderFile {
+    name: string;
+    url: string;
+}
+
+interface BlobFolder {
+    name: string,
+    files: BlobFolderFile[],
+    children: BlobFolder[]
+}

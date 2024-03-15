@@ -105,7 +105,38 @@
           </template>
 
           <div v-if="file_input?.files?.length === 0" class="flex flex-col gap-4">
-            <UCheckbox v-model="ignoreMcuLayout" label="Ignore current mcu layout" color="red" />
+            <UCheckbox
+              v-model="ignoreMcuLayout"
+              :ui="{
+                label: 'text-sm font-medium text-red-700 dark:text-red-500',
+              }"
+              label="Ignore current mcu layout"
+              color="red"
+            />
+            <UAlert
+              v-if="ignoreMcuLayout"
+              icon="i-heroicons-exclamation-triangle"
+              title="Alert!"
+              variant="subtle"
+              color="red"
+              description="If you flash a frong mcu type, you will brick the mcu, recovering from this will take some efford!"
+            />
+            <UCheckbox
+              v-model="includePrerelease"
+              :ui="{
+                label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
+              }"
+              label="Include prerelease versions"
+              color="orange"
+            />
+            <UAlert
+              v-if="includePrerelease"
+              icon="i-heroicons-exclamation-triangle"
+              title="Be aware!"
+              variant="subtle"
+              color="orange"
+              description="Prerelease or release candidate versions might have bugs, if you encounter issues, please join our discord and report them!"
+            />
             <USelectMenu
               v-model="selectedRelease"
               searchable
@@ -117,13 +148,31 @@
               searchable
               searchable-placeholder="Search a hex file..."
               :options="assets"
-              :disabled="assets.length === 0 || !ignoreMcuLayout"
+              :disabled="assets?.length === 0 || !ignoreMcuLayout"
+              :loading="pending"
             />
           </div>
           <div v-else class="text-green-500 text-center">
             Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
           </div>
-
+          <div v-if="serialStore.isFourWay" class="pt-4">
+            <div class="text-center">
+              Select ESC(s) to flash:
+            </div>
+            <div class="w-full text-center flex justify-center gap-2">
+              <div
+                v-for="n of escStore.escInfo.length"
+                :key="n"
+                class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                :class="{
+                  'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                }"
+                @click="toggleSavingOrApplyingSelectedEsc(n);"
+              >
+                {{ n }}
+              </div>
+            </div>
+          </div>
           <template #footer>
             <div class="flex flex-col items-end gap-4">
               <input
@@ -137,22 +186,22 @@
               <div v-if="escStore.activeTarget === -1" class="flex gap-4">
                 <UButton
                   label="Flash local file"
-                  :disabled="escStore.activeTarget > -1"
+                  :disabled="escStore.activeTarget > -1 || savingOrApplyingSelectedEscs.length === 0"
                   color="orange"
                   @click="file_input?.click()"
                 />
                 <UButton
                   label="Start flash"
-                  :disabled="!selectedAsset || selectedAsset === 'NOT FOUND'"
+                  :disabled="!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0"
                   @click="startRemoteFlash"
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
-                Flashing ESC #{{ (escStore.activeTarget + 1) }} of {{ escStore.count }}
+                Flashing ESC #{{ (escStore.activeTarget + 1) }} of {{ savingOrApplyingSelectedEscs.length }}
                 <UProgress
-                  :value="(escStore.bytesWritten / escStore.totalBytes) * 100"
-                  indicator
-                  :animation="['Writing', 'Verifing'].includes(escStore.step) ? undefined : 'carousel'"
+                  :value="progressIsIntermediate ? undefined : (escStore.bytesWritten / escStore.totalBytes) * 100"
+                  :indicator="!progressIsIntermediate"
+                  animation="carousel"
                 />
                 <div class="flex justify-center pt-2 text-green-500">
                   <div>{{ escStore.step }}</div>
@@ -196,7 +245,47 @@
           </div>
           <template #footer>
             <div class="text-right">
-              <UButton label="Download" @click="downloadEscConfig" />
+              <UButton label="Download" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="downloadEscConfig" />
+            </div>
+          </template>
+        </UCard>
+      </UModal>
+      <UModal v-model="applyConfigModalOpen">
+        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center justify-center gap-2 text-xl">
+                <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
+                <div class="text-2xl">
+                  Apply ESC config
+                </div>
+              </div>
+            </div>
+          </template>
+          <div>
+            <div class="flex flex-col gap-2">
+              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" />
+              <div class="text-center">
+                Select ESC(s) to apply:
+              </div>
+              <div class="w-full text-center flex justify-center gap-2">
+                <div
+                  v-for="n of escStore.escInfo.length"
+                  :key="n"
+                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                  :class="{
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                  }"
+                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                >
+                  {{ n }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <template #footer>
+            <div class="text-right">
+              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0 || applyConfigFile?.input.files.length === 0" @click="applyConfig" />
             </div>
           </template>
         </UCard>
@@ -212,6 +301,7 @@ import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/d
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
+import db from '~/src/db';
 import Flash from '~/src/flash';
 import Mcu from '~/src/mcu';
 
@@ -225,17 +315,34 @@ const flashModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
 const file_input = ref<HTMLInputElement>();
-
-const { data } = useAsyncData('get-releases', () => $fetch('/api/releases'));
-const assets = ref<string[]>([]);
-
-const { data: releasesOptionsData } = useAsyncData('get-release-tags', () => $fetch('/api/download?list=tags'));
-const releasesOptions = computed(() => releasesOptionsData.value ? (releasesOptionsData.value as string[]) : []);
+const applyConfigFile = ref();
 
 const selectedRelease = ref('');
 const selectedAsset = ref('');
 const ignoreMcuLayout = ref(false);
+const includePrerelease = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
+
+const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
+
+const { data, pending } = useAsyncData('get-releases', () => useFetch(`/api/download?list=${selectedRelease.value}`), {
+    watch: [selectedRelease]
+});
+const assets = computed(() => data.value?.data.value?.data.map((r) => {
+    const [,, fileName] = r.split('/');
+    return fileName;
+}));
+
+const { data: releasesOptionsData } = useAsyncData('get-release-tags', () => $fetch('/api/download?list=tags'));
+const releasesOptions = computed(() => releasesOptionsData.value ? releasesOptionsData.value.data.sort((a, b) => b.localeCompare(a)) : []);
+
+watch(releasesOptionsData, () => {
+    if (!selectedRelease.value && releasesOptions.value.length > 0) {
+        setTimeout(() => {
+            selectedRelease.value = releasesOptions.value[0];
+        }, 1000);
+    }
+});
 
 const toggleSavingOrApplyingSelectedEsc = (n: number) => {
     if (savingOrApplyingSelectedEscs.value.includes(n)) {
@@ -247,12 +354,12 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
     }
 };
 
-watch(selectedRelease, (tag: string) => {
-    const releases = data.value?.data.filter(r => r.pathname.includes(tag));
-    assets.value = releases?.map(a => a.downloadUrl) ?? [];
-
-    const currentAsset = assets.value.find(a => a === `AM32_${escStore.escInfo[0].meta.am32.fileName}_${tag.substring(1)}.hex`);
-    selectedAsset.value = currentAsset ?? 'NOT FOUND';
+watchEffect(() => {
+    if (assets.value && escStore.escInfo.length > 0) {
+        const tag = selectedRelease.value;
+        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.escInfo[0].meta.am32.fileName}_${tag.substring(1)}.hex`);
+        selectedAsset.value = currentAsset ?? 'NOT FOUND';
+    }
 });
 
 const isAnySettingsDirty = computed(() => escStore.escInfo.some(e => e.settingsDirty));
@@ -361,6 +468,8 @@ const connectToDevice = async () => {
                     } as EscData;
 
                     serialStore.isDirectConnect = true;
+
+                    savingOrApplyingSelectedEscs.value = [0];
 
                     escStore.count = 1;
 
@@ -548,12 +657,30 @@ const startLocalFlash = async (event: Event) => {
 };
 
 const startRemoteFlash = async () => {
-    // const fileUrl = data.value.find(r => r.tag_name === selectedRelease.value).assets as any[]).find(a => a.name === selectedAsset.value).browser_download_url;
-    const release = data.value;
-    // const file: Response = await fetch(`https://cors.bubblesort.me/?${fileUrl}`);
-    const file = await useFetch('/api/download?release=' + release);
-    console.log(file);
-    // startFlash(file.data.value as string);
+    const { data } = await useFetch(`/api/download?release=${selectedRelease.value}/${selectedAsset.value}`);
+    if (data.value?.data) {
+        const dbEntry = await db.downloads.where('url').equals(data.value.data[0]).first();
+
+        if (dbEntry) {
+            return startFlash(dbEntry.text);
+        }
+
+        const { data: hexData } = await useFetch<Blob>(data.value.data[0]);
+
+        if (hexData) {
+            const hexString = await hexData.value?.text();
+            if (hexString) {
+                await db.downloads.add({
+                    url: data.value.data[0],
+                    text: hexString
+                });
+                escStore.activeTarget = 0;
+                escStore.step = 'Downloading';
+
+                startFlash(hexString);
+            }
+        }
+    }
 };
 
 const startFlash = async (hexString: string) => {
@@ -562,11 +689,22 @@ const startFlash = async (hexString: string) => {
         const parsed = Flash.parseHex(hexString);
         const mcu = new Mcu(escStore.escInfo[0].meta.signature);
         if (parsed) {
-            escStore.step = 'Writing';
-            escStore.activeTarget = 1;
+            escStore.activeTarget = 0;
             escStore.bytesWritten = 0;
-            escStore.totalBytes = parsed.bytes;
+
             let i = 0;
+            if (parsed.bytes < 27 * 1024 - 1 + 32) {
+                const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
+                const highIndex = parsed.data.findIndex(d => d.bytes > 32);
+                filled.set(parsed!.data[highIndex].data);
+                parsed.data[highIndex].data = Array.from(filled);
+                parsed.data[highIndex].bytes = filled.length;
+                parsed.bytes = filled.length + 32;
+            }
+
+            escStore.totalBytes = parsed.bytes;
+            escStore.step = 'Writing';
+
             for (const start of parsed.data) {
                 i = 0;
                 logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
@@ -581,10 +719,18 @@ const startFlash = async (hexString: string) => {
                     }
                 }
             }
+            escStore.step = 'Rewriting config';
+            await writeConfig();
+            escStore.step = 'Resetting';
+            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_Reset, 0);
+            escStore.step = 'Read config';
+            await Direct.getInstance().init();
+
             escStore.activeTarget = -1;
         }
     } else {
-        for (let i = 0; i < escStore.count; ++i) {
+        for (const n of savingOrApplyingSelectedEscs.value) {
+            const i = n - 1;
             escStore.activeTarget = i;
             escStore.escData[i].isLoading = true;
             await FourWay.getInstance().writeHex(i, hexString, 100);
@@ -618,6 +764,27 @@ const downloadEscConfig = () => {
         link.download = 'esc' + n + '_config.bin';
         link.click();
         URL.revokeObjectURL(link.href);
+    }
+};
+
+const applyConfig = async () => {
+    if (applyConfigFile.value.input.files.length === 1) {
+        const file: File = applyConfigFile.value.input.files[0];
+        if (file) {
+            const buffer = new Uint8Array(await file.arrayBuffer());
+            const settings = bufferToSettings(buffer);
+
+            for (const n of savingOrApplyingSelectedEscs.value) {
+                escStore.escInfo[n - 1].settings = settings;
+                escStore.escInfo[n - 1].settingsDirty = true;
+            }
+
+            await writeConfig();
+        }
+
+        if (applyConfigFile.value) {
+            applyConfigFile.value.input.value = '';
+        }
     }
 };
 </script>
