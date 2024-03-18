@@ -23,7 +23,7 @@
           AM32 Configurator
         </div>
         <div class="text-center min-w-[300px]">
-          powered by Nuxt and Vercel
+          powered by Nuxt and Netlify
         </div>
         <div class="text-center min-w-[200px]">
           v0.0.1
