@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="min-w-[320px]">
     <div class="p-4 grid grid-cols-1 gap-2">
       <div class="flex flex-column gap-2">
         <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
@@ -24,37 +24,35 @@
       <div class="flex gap-4 pt-2">
         <div class="flex gap-2 items-center">
           <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
-          <UIcon
-            name="i-ion-hardware-chip-sharp"
-            dynamic
-            :class="{
-              'text-green-500': serialStore.hasConnection && serialStore.mspData.api_version,
-              'text-red-500': !(serialStore.hasConnection && serialStore.mspData.api_version),
-              '!hidden': serialStore.isDirectConnect
-            }"
-          />
         </div>
-        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between">
+        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between gap-4">
           <div class="flex gap-2">
             <UChip v-if="serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'" />
+              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'" />
             </UChip>
             <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'" />
+              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'" />
             </UChip>
             <UChip v-if="serialStore.mspData.motorCount > 2" text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'" />
+              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'" />
             </UChip>
             <UChip v-if="serialStore.mspData.motorCount > 3" text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" dynamic :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'" />
+              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'" />
             </UChip>
           </div>
           <div class="flex gap-2">
-            <UButton v-if="!serialStore.isDirectConnect" size="xs" @click="connectToEsc">
-              <UIcon name="i-material-symbols-find-in-page-outline" />
+            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" @click="connectToEsc">
+              Read
             </UButton>
-            <UButton color="blue" size="xs" :disabled="!isAnySettingsDirty || escStore.isSaving" :loading="escStore.isSaving" @click="writeConfig">
-              <UIcon name="i-material-symbols-save" />
+            <UButton
+              icon="i-material-symbols-save"
+              color="blue"
+              size="2xs"
+              :disabled="!isAnySettingsDirty || escStore.isSaving"
+              :loading="escStore.isSaving"
+              @click="writeConfig"
+            >
+              Save
             </UButton>
           </div>
         </div>
@@ -70,9 +68,11 @@
           4way
         </UKbd>
       </div>
-      <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4">
-        <UButton label="Flash firmware" size="xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
-        <div>
+      <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4 w-full">
+        <div class="w-full">
+          <UButton label="Flash firmware" size="2xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
+        </div>
+        <div class="min-w-[112px]">
           <UButton
             label="Save config"
             size="xs"

@@ -100,13 +100,23 @@ const { data, pending } = await useLazyFetch('/api/files');
 
 const filter = ref('');
 
-const links = computed(() => data.value?.data ?? []);
-const rootFolders = computed(() => data.value?.data.map((f) => {
-    return {
-        label: f.name?.toUpperCase() ?? 'ERROR',
-        slot: `${f.name}_data`
-    };
-}));
+watchEffect(() => {
+    if (!pending.value && data.value) {
+        links.value = data.value.data;
+        rootFolders.value = data.value.data.map((f) => {
+            return {
+                label: f.name?.toUpperCase() ?? 'ERROR',
+                slot: `${f.name}_data`
+            };
+        });
+    }
+});
+
+const links = ref<BlobFolder[]>([]);
+const rootFolders = ref<{
+  label: string,
+  slot: string
+}[]>([]);
 
 const getFolder = (name: string) => computed(() => {
     return data.value?.data.find(b => b.name === name) ?? null;
@@ -118,9 +128,5 @@ const getChildrenFolder = (folder?: BlobFolder | null) => {
         slot: 'files',
         files: f.files
     })).sort((a, b) => b.label.localeCompare(a.label)) ?? [];
-};
-
-const filterFiles = (files: BlobFolderFile[]) => {
-    return files.filter(f => f.name.toLowerCase().includes(filter.value?.toLowerCase() ?? ''));
 };
 </script>
