@@ -1,7 +1,14 @@
 {
-    "typescript.tsdk": "node_modules/typescript/lib",
-    "tailwindCSS.classAttributes": [
-        "active-class",
-        "inactive-class"
-    ]
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "tailwindCSS.classAttributes": [
+    "active-class",
+    "inactive-class"
+  ],
+  "deno.enable": true,
+  "deno.enablePaths": [
+    "netlify/edge-functions"
+  ],
+  "deno.unstable": true,
+  "deno.importMap": ".netlify/edge-functions-import-map.json",
+  "deno.path": "/home/eike/.config/netlify/deno-cli/deno"
 }
