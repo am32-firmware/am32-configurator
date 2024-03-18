@@ -1,7 +1,8 @@
-import fetchReleases from './src/fetch-releases';
 import 'dotenv';
+
+import fetchAndUploadReleases from './src/fetch-and-upload-releases';
 
 (async function () {
     console.log('fetching releases');
-    await fetchReleases(process.env.BLOB_READ_WRITE_TOKEN!, 'v2.08');
+    await fetchAndUploadReleases('v2.08');
 })();

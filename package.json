@@ -32,6 +32,8 @@
     "vue-tsc": "^1.2.0"
   },
   "dependencies": {
+    "@netlify/blobs": "^7.0.1",
+    "@netlify/functions": "^2.6.0",
     "@nuxt/ui": "^2.11.1",
     "@pinia/nuxt": "^0.5.1",
     "@vercel/analytics": "^1.2.2",

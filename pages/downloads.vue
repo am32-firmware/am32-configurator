@@ -33,8 +33,9 @@
                   <div class="grid grid-cols-4">
                     <div v-for="file of item.files" :key="file" class="py-1">
                       <ULink
-                        :to="file.url"
+                        :to="`api/file/${file.url}`"
                         external
+                        :download="file.name"
                         class="transition-all hover:text-green-500"
                         :class="{
                           'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
@@ -57,8 +58,9 @@
               <div class="grid grid-cols-4">
                 <div v-for="file of getFolder('tools').value?.files ?? []" :key="file.url" class="py-1">
                   <ULink
-                    :to="file.url"
+                    :to="`api/file/${file.url}`"
                     external
+                    :download="file.name"
                     class="transition-all hover:text-green-500"
                     :class="{
                       'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
@@ -76,8 +78,9 @@
               <div class="grid grid-cols-4">
                 <div v-for="file of getFolder('bootloader').value?.files ?? []" :key="file.url" class="py-1">
                   <ULink
-                    :to="file.url"
+                    :to="`api/file/${file.url}`"
                     external
+                    :download="file.name"
                     class="transition-all hover:text-green-500"
                     :class="{
                       'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
