@@ -24,4 +24,5 @@ logs
 !.env.example
 
 # Local Netlify folder
-.netlify
+.netlify/*
+!.netlify/blobs
