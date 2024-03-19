@@ -22,8 +22,13 @@
         <div class="text-center min-w-[200px]">
           AM32 Configurator
         </div>
-        <div class="text-center min-w-[300px]">
-          powered by Nuxt and Netlify
+        <div class="text-center min-w-[300px] flex gap-4">
+          <div>
+            <NuxtLink class="underline" to="https://github.com/am32-firmware/am32" target="_blank" external>Repository</NuxtLink>
+          </div>
+          <div>
+            powered by <NuxtLink class="underline" to="https://nuxt.com/" target="_blank" external>Nuxt</NuxtLink> and <NuxtLink class="underline" to="https://netlify.com" target="_blank" external>Netlify</NuxtLink>
+          </div>
         </div>
         <div class="text-center min-w-[200px]">
           v0.0.1

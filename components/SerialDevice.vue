@@ -325,21 +325,18 @@ const savingOrApplyingSelectedEscs = ref<number[]>([]);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
-const { data, pending } = useAsyncData('get-releases', () => useFetch(`/api/download?list=${selectedRelease.value}`), {
-    watch: [selectedRelease]
-});
-const assets = computed(() => data.value?.data.value?.data.map((r) => {
-    const [,, fileName] = r.split('/');
-    return fileName;
-}));
+const { data, pending } = useAsyncData('get-releases', () => useLazyFetch('/api/files?filter=releases'));
 
-const { data: releasesOptionsData } = useAsyncData('get-release-tags', () => $fetch('/api/download?list=tags'));
-const releasesOptions = computed(() => releasesOptionsData.value ? releasesOptionsData.value.data.sort((a, b) => b.localeCompare(a)) : []);
+const releases = computed(() => ((data.value?.data as unknown as { data: BlobFolder[]})?.data));
 
-watch(releasesOptionsData, () => {
-    if (!selectedRelease.value && releasesOptions.value.length > 0) {
+const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
+
+const releasesOptions = computed(() => (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a)));
+
+watch(releasesOptions, (d) => {
+    if (!selectedRelease.value && d?.length > 0) {
         setTimeout(() => {
-            selectedRelease.value = releasesOptions.value[0];
+            selectedRelease.value = d[0];
         }, 1000);
     }
 });
@@ -657,28 +654,26 @@ const startLocalFlash = async (event: Event) => {
 };
 
 const startRemoteFlash = async () => {
-    const { data } = await useFetch(`/api/download?release=${selectedRelease.value}/${selectedAsset.value}`);
-    if (data.value?.data) {
-        const dbEntry = await db.downloads.where('url').equals(data.value.data[0]).first();
+    const url = releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.find(f => f.name === selectedAsset.value)?.url;
+    if (url) {
+        const dbEntry = await db.downloads.where('url').equals(url).first();
+
+        escStore.activeTarget = 0;
+        escStore.step = 'Downloading';
 
         if (dbEntry) {
             return startFlash(dbEntry.text);
         }
 
-        const { data: hexData } = await useFetch<Blob>(data.value.data[0]);
+        const { data } = await useFetch(`/api/file/${url}`);
 
-        if (hexData) {
-            const hexString = await hexData.value?.text();
-            if (hexString) {
-                await db.downloads.add({
-                    url: data.value.data[0],
-                    text: hexString
-                });
-                escStore.activeTarget = 0;
-                escStore.step = 'Downloading';
+        if (data.value && typeof data.value === 'string') {
+            await db.downloads.add({
+                url,
+                text: data.value
+            });
 
-                startFlash(hexString);
-            }
+            startFlash(data.value);
         }
     }
 };

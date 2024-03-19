@@ -10,7 +10,6 @@ export default defineEventHandler(async (event) => {
             siteID: process.env.NETLIFY_SITE_ID,
             token: process.env.NETLIFY_TOKEN
         });
-        console.log(storeName, path, store);
         if (store) {
             const blob = await store.get(path, {
                 type: 'blob'

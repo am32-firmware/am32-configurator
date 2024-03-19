@@ -1,7 +1,5 @@
-import { list } from '@vercel/blob';
-
-export default defineEventHandler(async (event) => {
-    const query = getQuery(event);
+export default defineEventHandler((_event) => {
+    /* const query = getQuery(event);
 
     const releaseQuery = query.release?.toString();
     const listQuery = query.list?.toString();
@@ -50,7 +48,7 @@ export default defineEventHandler(async (event) => {
             };
         };
         }
-    }
+    } */
 
     throw createError({
         statusCode: 400,
