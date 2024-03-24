@@ -37,7 +37,7 @@ interface FourWayResponse {
     params: Uint8Array;
 }
 
-type SettingsType = 'select' | 'bool' | 'string' | 'number';
+type SettingsType = 'select' | 'bool' | 'string' | 'number' | 'rtttl';
 type SettingsSelectOptionsType = { label: string, value: numer };
 
 interface HexData {
@@ -63,3 +63,13 @@ interface BlobFolder {
     files: BlobFolderFile[],
     children: BlobFolder[]
 }
+
+declare module 'bluejay-rtttl-parse' {
+    export default class Rtttl {
+        static fromBluejayStartupMelody(startUpMelody: Uint8Array, name?: string): string;
+        static toBluejayStartupMelody(rtttl: string, length?: number): {
+            data: Uint8Array,
+            errorCodes: number[]
+        };
+    }
+};

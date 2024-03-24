@@ -296,6 +296,7 @@
 
 <script setup lang="ts">
 /* eslint-disable camelcase */
+import { routerKey } from 'vue-router';
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
@@ -522,6 +523,12 @@ const connectToDevice = async () => {
 };
 
 const connectToEsc = async () => {
+    const router = useRouter();
+    if (!router.currentRoute.value.fullPath.startsWith('/configurator')) {
+        router.push({
+            path: '/configurator'
+        });
+    }
     if (isDirectConnectDevice.value) {
         if (serialStore.isDirectConnect) {
             serialStore.isDirectConnect = true;

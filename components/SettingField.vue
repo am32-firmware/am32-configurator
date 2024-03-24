@@ -28,6 +28,9 @@
           :color="value === disabledValue ? 'orange' : 'primary'"
         />
       </div>
+      <div v-else-if="type === 'rtttl'">
+        <UTextarea v-model="rtttlValue" variant="outline" color="primary" :placeholder="placeholder" />
+      </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">
           <div v-if="value === disabledValue">
@@ -42,7 +45,7 @@
         </div>
       </slot>
     </UFormGroup>
-    <div v-if="otherValues && otherValues.length > 0" class="absolute top-0 right-0 pt-1 flex gap-1">
+    <div v-if="otherValues && otherValues.length > 0 && type !== 'rtttl'" class="absolute top-0 right-0 pt-1 flex gap-1">
       <div v-for="(o, i) of otherValues" :key="i">
         <div
           class="w-[10px] h-[10px] rounded-full"
@@ -56,6 +59,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import Rtttl from 'bluejay-rtttl-parse';
 import type { EepromLayoutKeys } from '~/src/eeprom';
 import type { McuInfo } from '~/src/mcu';
 
@@ -94,7 +98,7 @@ const props = withDefaults(defineProps<SettingFieldProps>(), {
     disabled: false
 });
 
-const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number }): void}>();
+const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number | number[] }): void}>();
 
 const isDisabled = computed(() => {
     if (props.disabled) {
@@ -136,8 +140,47 @@ const boolValue = computed({
 });
 
 const getCompareValue = (value: number) => {
-    return props.type === 'number' ? value * props.displayFactor + props.offset : value;
+    switch (props.type) {
+    case 'number':
+        return value * props.displayFactor + props.offset;
+    case 'rtttl':
+        return rtttlValue.value;
+    default:
+        break;
+    }
+
+    return value;
 };
 
 const otherValues = computed(() => props.escInfo?.map(i => i.settings[props.field]) as number[] ?? []);
+// The Simpsons:d=4,o=5,b=160:c.6,e6,f#6,8a6,g.6,e6,c6,8a,8f#,8f#,8f#,2g,8p,8p,8f#,8f#,8f#,8g,a#.,8c6,8c6,8c6,c6
+const rtttlValue = computed({
+    get: () => {
+        let arr = props.escInfo[0].settings[props.field] as number[];
+
+        console.log(arr);
+
+        for (let i = 0; i < arr.length - 1; ++i) {
+            if (
+                (arr[i] === 0x0 && arr[i + 1] === 0x0) ||
+            (arr[i] === 0xFF && arr[i + 1] === 0xFF)
+            ) {
+                arr = arr.slice(0, i);
+                break;
+            }
+        }
+
+        return Rtttl.fromBluejayStartupMelody(new Uint8Array(arr));
+    },
+    set: (val) => {
+        if (val !== rtttlValue.value) {
+            const buffer: Uint8Array = Rtttl.toBluejayStartupMelody(val).data;
+            buffer.fill(0x0, 128);
+            emits('change', {
+                field: props.field,
+                value: Array.from(buffer)
+            });
+        }
+    }
+});
 </script>

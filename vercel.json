@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/cron/fetch-releases",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}

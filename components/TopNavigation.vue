@@ -30,13 +30,15 @@
   </div>
 </template>
 <script setup lang="ts">
-const escStore = useEscStore();
-
 // const route = useRoute();
 const links = computed(() => [{
-    label: escStore.count > 0 ? 'Configurator' : 'AM32',
-    icon: escStore.count > 0 ? 'i-heroicons-cpu-chip-16-solid' : 'i-heroicons-home',
+    label: 'AM32',
+    icon: 'i-heroicons-home',
     to: '/'
+}, {
+    label: 'Configurator',
+    icon: 'i-heroicons-cpu-chip-16-solid',
+    to: '/configurator'
 }, {
     label: 'Downloads',
     icon: 'i-material-symbols-download-rounded',

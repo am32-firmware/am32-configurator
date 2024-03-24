@@ -38,6 +38,7 @@
     "@nuxt/ui": "^2.11.1",
     "@pinia/nuxt": "^0.5.1",
     "ajv": "^8.12.0",
+    "bluejay-rtttl-parse": "^2.0.2",
     "dotenv": "^16.4.5",
     "nuxt-svgo": "^4.0.0",
     "octokit": "^3.1.2",
