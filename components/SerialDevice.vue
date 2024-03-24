@@ -41,7 +41,7 @@
             </UChip>
           </div>
           <div class="flex gap-2">
-            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" @click="connectToEsc">
+            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
               Read
             </UButton>
             <UButton
@@ -161,7 +161,7 @@
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
-                v-for="n of escStore.escInfo.length"
+                v-for="n of escStore.escData.length"
                 :key="n"
                 class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                 :class="{
@@ -230,7 +230,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escInfo.length"
+                  v-for="n of escStore.escData.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -270,7 +270,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escInfo.length"
+                  v-for="n of escStore.escData.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -296,7 +296,6 @@
 
 <script setup lang="ts">
 /* eslint-disable camelcase */
-import { routerKey } from 'vue-router';
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
@@ -304,7 +303,7 @@ import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
 import Serial from '~/src/communication/serial';
 import db from '~/src/db';
 import Flash from '~/src/flash';
-import Mcu from '~/src/mcu';
+import Mcu, { type EscData } from '~/src/mcu';
 
 const toast = useToast();
 const serialStore = useSerialStore();
@@ -353,14 +352,14 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
 };
 
 watchEffect(() => {
-    if (assets.value && escStore.escInfo.length > 0) {
+    if (assets.value && escStore.escData.length > 0) {
         const tag = selectedRelease.value;
-        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.escInfo[0].meta.am32.fileName}_${tag.substring(1)}.hex`);
+        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${tag.substring(1)}.hex`);
         selectedAsset.value = currentAsset ?? 'NOT FOUND';
     }
 });
 
-const isAnySettingsDirty = computed(() => escStore.escInfo.some(e => e.settingsDirty));
+const isAnySettingsDirty = computed(() => escStore.escData.some(e => e.data?.settingsDirty));
 
 const baudrateOptions = ref([
     '1000000',
@@ -473,7 +472,7 @@ const connectToDevice = async () => {
 
                     escStore.escData.push(escData);
 
-                    escStore.escInfo.push(info!);
+                    escData.data = info!;
 
                     escData.isLoading = false;
                 } else {
@@ -533,10 +532,10 @@ const connectToEsc = async () => {
         if (serialStore.isDirectConnect) {
             serialStore.isDirectConnect = true;
 
+            escStore.expectedCount = 1;
             escStore.count = 1;
 
             escStore.escData = [];
-            escStore.escInfo = [];
         }
     } else {
         if (!serialStore.isFourWay) {
@@ -544,26 +543,35 @@ const connectToEsc = async () => {
 
             serialStore.isFourWay = true;
 
-            escStore.count = result?.data.getUint8(0) ?? 0;
+            escStore.expectedCount = result?.data.getUint8(0) ?? 0;
         }
 
         escStore.escData = [];
-        escStore.escInfo = [];
+        escStore.count = 0;
+        escStore.isLoading = true;
 
         await delay(1000);
 
-        for (let i = 0; i < escStore.count; ++i) {
+        for (let i = 0; i < escStore.expectedCount; ++i) {
             const escData = {
-                isLoading: true
+                isLoading: true,
+                isError: false
             } as EscData;
             escStore.escData.push(escData);
 
-            const result = await FourWay.getInstance().getInfo(i);
-
-            escStore.escInfo.push(result);
+            try {
+                const result = await FourWay.getInstance().getInfo(i);
+                escStore.escData[i].data = result;
+                escStore.count += 1;
+            } catch (e) {
+                console.error(e);
+                escData.isError = true;
+            }
 
             escData.isLoading = false;
         }
+
+        escStore.isLoading = false;
     }
 };
 
@@ -572,28 +580,28 @@ const writeConfig = async () => {
         escStore.isSaving = true;
 
         for (let i = 0; i < escStore.count; ++i) {
-            if (escStore.escInfo[i].settingsDirty) {
-                const result = await FourWay.getInstance().writeSettings(i, escStore.escInfo[i]);
-                escStore.escInfo[i].settingsBuffer = result;
-                escStore.escInfo[i].settingsDirty = false;
+            if (escStore.escData[i].data.settingsDirty) {
+                const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data);
+                escStore.escData[i].data.settingsBuffer = result;
+                escStore.escData[i].data.settingsDirty = false;
             }
         }
         escStore.isSaving = false;
         escStore.settingsDirty = false;
-    } else if (serialStore.isDirectConnect) {
-        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+    } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
+        const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
         console.log(mcu.getEepromOffset());
         const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
         console.log(setAddress);
         if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([Mcu.LAYOUT_SIZE]));
-            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.escInfo[0].settings));
+            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.firstValidEscData.data.settings));
             console.log(sendBuffer);
             if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                 const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
                 console.log(writeFlash);
-                escStore.escInfo[0].settingsDirty = false;
-                escStore.escInfo[0].settingsBuffer = objectToSettingsArray(escStore.escInfo[0].settings);
+                escStore.firstValidEscData.data.settingsDirty = false;
+                escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
             }
         }
     }
@@ -625,8 +633,8 @@ const startLocalFlash = async (event: Event) => {
         if (file) {
             const logStore = useLogStore();
 
-            if (!ignoreMcuLayout.value) {
-                const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+            if (!ignoreMcuLayout.value && escStore.firstValidEscData) {
+                const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
                 const eepromOffset = mcu.getEepromOffset();
                 const offset = 0x8000000;
                 const fileNamePlaceOffset = 30;
@@ -642,13 +650,13 @@ const startLocalFlash = async (event: Event) => {
                 }
 
                 const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
-                if (!hexFileName.endsWith(escStore.escInfo[0].meta.am32.mcuType!)) {
+                if (!hexFileName.endsWith(escStore.firstValidEscData.data.meta.am32.mcuType!)) {
                     logStore.logError('Invalid MCU type in hex file.');
                     throw new Error('Invalid MCU type in hex file.');
                 }
 
                 const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
-                const expectedFileName = escStore.escInfo[0].meta.am32.fileName!.slice(0, escStore.escInfo[0].meta.am32.fileName!.lastIndexOf('_'));
+                const expectedFileName = escStore.firstValidEscData.data.meta.am32.fileName!.slice(0, escStore.firstValidEscData.data.meta.am32.fileName!.lastIndexOf('_'));
                 if (currentFileName !== expectedFileName) {
                     logStore.logError('Layout does not match! Aborting flash!');
                     logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
@@ -686,10 +694,10 @@ const startRemoteFlash = async () => {
 };
 
 const startFlash = async (hexString: string) => {
-    if (serialStore.isDirectConnect) {
+    if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const logStore = useLogStore();
         const parsed = Flash.parseHex(hexString);
-        const mcu = new Mcu(escStore.escInfo[0].meta.signature);
+        const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
         if (parsed) {
             escStore.activeTarget = 0;
             escStore.bytesWritten = 0;
@@ -742,7 +750,7 @@ const startFlash = async (hexString: string) => {
             await delay(5000);
             escStore.step = 'Read ESC';
             const result = await FourWay.getInstance().getInfo(i);
-            escStore.escInfo[i] = result;
+            escStore.escData[i].data = result;
             escStore.escData[i].isLoading = false;
         }
         escStore.step = '';
@@ -758,7 +766,7 @@ const startFlash = async (hexString: string) => {
 
 const downloadEscConfig = () => {
     for (const n of savingOrApplyingSelectedEscs.value) {
-        const blob = new Blob([escStore.escInfo[n - 1].settingsBuffer], {
+        const blob = new Blob([escStore.escData[n - 1].data.settingsBuffer], {
             type: 'application/octet-stream'
         });
         const link = document.createElement('a');
@@ -777,8 +785,8 @@ const applyConfig = async () => {
             const settings = bufferToSettings(buffer);
 
             for (const n of savingOrApplyingSelectedEscs.value) {
-                escStore.escInfo[n - 1].settings = settings;
-                escStore.escInfo[n - 1].settingsDirty = true;
+                escStore.escData[n - 1].data.settings = settings;
+                escStore.escData[n - 1].data.settingsDirty = true;
             }
 
             await writeConfig();

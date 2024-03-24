@@ -15,32 +15,38 @@
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
         <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
           <template #tune>
-            <div v-if="escStore.escData.length === escStore.count && !escStore.escData[escStore.count - 1].isLoading" class="pt-4">
-              <SettingField
-                :esc-info="escStore.selectedEscInfo"
-                field="STARTUP_MELODY"
-                name="RTTTL"
-                type="rtttl"
-                placeholder="RTTTL String"
-                @change="onSettingsChange"
-              />
+            <div v-if="!escStore.isLoading && escStore.validEscInfo.length === escStore.count && !escStore.firstValidEscData?.isLoading" class="pt-4 grid grid-cols-2 gap-4">
+              <div
+                v-for="n of escStore.validEscInfo.length"
+                :key="n"
+              >
+                <div>ESC {{ n }}</div>
+                <SettingField
+                  :esc-info="escStore.selectedEscInfo"
+                  field="STARTUP_MELODY"
+                  :individual="n - 1"
+                  type="rtttl"
+                  placeholder="RTTTL String"
+                  @change="onSettingsChange"
+                />
+              </div>
             </div>
           </template>
           <template #settings>
             <div class="h-full pt-4">
               <div class="flex gap-4 w-full justify-center">
-                <div v-for="n of escStore.count" :key="n">
+                <div v-for="(info, n) of escStore.validEscInfo" :key="n">
                   <EscView
-                    :is-loading="!hasEsc(n - 1)"
-                    :index="n - 1"
-                    :esc="escStore.escData[n - 1]"
-                    :mcu="escStore.escInfo[n - 1]"
+                    :is-loading="info.isLoading"
+                    :index="n"
+                    :esc="info"
+                    :mcu="info.data"
                     @change="onChange"
                     @toggle="onToggle"
                   />
                 </div>
               </div>
-              <div v-if="allLoaded && escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
+              <div v-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
                 <div class="flex flex-col gap-4 justify-center">
                   <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
                     <SettingField
@@ -143,7 +149,7 @@
                       @change="onSettingsChange"
                     >
                       <template #unit="{ value }">
-                        <div v-if="escStore.selectedEscInfo[0].settings.VARIABLE_PWM_FREQUENCY === 1">
+                        <div v-if="escStore.firstValidEscData?.data.settings.VARIABLE_PWM_FREQUENCY === 1">
                           {{ value }}kHz - {{ value as number * 2 }}kHz
                         </div>
                         <div v-else>
@@ -196,7 +202,7 @@
                       :step="1"
                       :offset="250"
                       :display-factor="1"
-                      :disabled="(value: number) => escStore.selectedEscInfo[0].settings.LOW_VOLTAGE_CUTOFF === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF === 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -217,7 +223,7 @@
                       type="number"
                       :min="5"
                       :max="25"
-                      :disabled="(value: number) => escStore.selectedEscInfo[0].settings.SINUSOIDAL_STARTUP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -228,7 +234,7 @@
                       type="number"
                       :min="1"
                       :max="10"
-                      :disabled="(value: number) => escStore.selectedEscInfo[0].settings.SINUSOIDAL_STARTUP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -250,7 +256,7 @@
                       :min="1"
                       :max="10"
                       :step="1"
-                      :disabled="(value: number) => escStore.selectedEscInfo[0].settings.BRAKE_ON_STOP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP === 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -271,7 +277,7 @@
                     :cols="3"
                   >
                     <SettingField
-                      :esc-info="escStore.escInfo"
+                      :esc-info="escStore.selectedEscInfo"
                       name="Low threshold"
                       type="number"
                       field="SERVO_LOW_THRESHOLD"
@@ -335,19 +341,16 @@ import type { EepromLayoutKeys } from '~/src/eeprom';
 const serialStore = useSerialStore();
 const escStore = useEscStore();
 
-const hasEsc = (n: number) => {
-    return !!escStore.escData[n] && !!escStore.escInfo[n];
-};
-
-const allLoaded = computed(() => escStore.escInfo.length > 0 && escStore.escInfo.length === escStore.count && !escStore.escData.find(e => e.isLoading === true));
-
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
-    escStore.escInfo[payload.index].settingsDirty = escStore.escInfo[payload.index].settings[payload.field] !== (payload.value ? 1 : 0);
-    escStore.escInfo[payload.index].settings[payload.field] = (payload.value ? 1 : 0);
+    escStore.escData[payload.index].data.settingsDirty = escStore.escData[payload.index].data.settings[payload.field] !== (payload.value ? 1 : 0);
+    escStore.escData[payload.index].data.settings[payload.field] = (payload.value ? 1 : 0);
 };
 
 const onToggle = (index: number) => {
-    escStore.escInfo[index].isSelected = !escStore.escInfo[index].isSelected;
+    console.log(escStore.validEscInfo, index);
+    if (escStore.validEscInfo[index].data) {
+        escStore.validEscInfo[index].data.isSelected = !escStore.validEscInfo[index].data.isSelected;
+    }
 };
 
 const protocolOptions = [
@@ -373,10 +376,15 @@ const protocolOptions = [
     }
 ];
 
-const onSettingsChange = (payload: { field: EepromLayoutKeys, value: number | number[] }) => {
-    for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
-        escStore.selectedEscInfo[i].settings[payload.field] = payload.value;
-        escStore.selectedEscInfo[i].settingsDirty = true;
+const onSettingsChange = (payload: { field: EepromLayoutKeys, value: number | number[], individual?: number }) => {
+    if (payload.individual) {
+        escStore.selectedEscInfo[payload.individual].settings[payload.field] = payload.value;
+        escStore.selectedEscInfo[payload.individual].settingsDirty = true;
+    } else {
+        for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
+            escStore.selectedEscInfo[i].settings[payload.field] = payload.value;
+            escStore.selectedEscInfo[i].settingsDirty = true;
+        }
     }
 };
 </script>

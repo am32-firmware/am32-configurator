@@ -1,7 +1,7 @@
 type LogMessageType = undefined | null | 'warning' | 'error'
 type LogMessage = [Date, string, LogMessageType]
 type LogFn = (s: string) => void;
-type PromiseFn = (a: unknown | PromiseLike) => any
+type PromiseFn = (a: unknown | PromiseLike<any>) => any
 interface MspData {
     type: 'bf' | 'qs' | 'kiss' | null,
     protocol_version: number
@@ -16,19 +16,6 @@ interface MspData {
     motorCount: number
 }
 
-interface EscData {
-    isLoading: boolean;
-    boot: number;
-    eeprom_version: number;
-    bootloader_version: number;
-    firmware: {
-        major: number;
-        minor: number;
-    };
-    name: string;
-    reversed: boolean;
-}
-
 interface FourWayResponse {
     command: number;
     address: number;
@@ -38,7 +25,7 @@ interface FourWayResponse {
 }
 
 type SettingsType = 'select' | 'bool' | 'string' | 'number' | 'rtttl';
-type SettingsSelectOptionsType = { label: string, value: numer };
+type SettingsSelectOptionsType = { label: string, value: number };
 
 interface HexData {
     address: number,

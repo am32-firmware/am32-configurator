@@ -15,9 +15,12 @@
             <UIcon :name="iconName" dynamic class="text-white h-[20px] w-[20px]" />
           </UBadge>
         </div>
-        <USkeleton v-if="isLoading" class="h-[30px] w-full" />
+        <USkeleton v-if="isLoading && !esc?.isError" class="h-[30px] w-full" />
         <div v-else-if="esc?.isLoading" class="text-gray-700 font-bold text-lg">
           Loading ...
+        </div>
+        <div v-else-if="esc?.isError" class="text-black text-xl">
+          ESC did not respond!
         </div>
         <div v-else-if="mcu?.bootloader.pin" class="text-gray-700 w-full flex flex-wrap items-start gap-6">
           <div>
@@ -87,13 +90,12 @@
 </template>
 <script setup lang="ts">
 import type { EepromLayoutKeys } from '~/src/eeprom';
-import type { McuInfo } from '~/src/mcu';
+import type { EscData } from '~/src/mcu';
 
 const props = defineProps<{
     isLoading: boolean,
     index: number,
-    esc: EscData | null | undefined,
-    mcu: McuInfo | null | undefined
+    esc: EscData | null | undefined
 }>();
 
 const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLayoutKeys, value: boolean }): void,
@@ -106,11 +108,15 @@ const badgeColor = computed(() => {
     let color = 'green';
     if (!props.esc) {
         color = 'red';
+    } else if (props.esc.isError) {
+        color = 'red';
     } else if (props.isLoading) {
         color = 'yellow';
     }
     return color;
 });
+
+const mcu = computed(() => props.esc?.data);
 
 const isReversed = computed({
     get: () => (getSettingValue<number>('MOTOR_DIRECTION') ?? 0) === 1,
@@ -137,7 +143,7 @@ const is3DMode = computed({
 const layoutVersion = computed(() => getSettingValue<number>('LAYOUT_REVISION'));
 
 function getSettingValue<T> (name: EepromLayoutKeys): T | null {
-    return props.mcu?.settings[name] as T ?? null;
+    return mcu.value?.settings[name] as T ?? null;
 }
 
 const padVersion = (version: number) => {

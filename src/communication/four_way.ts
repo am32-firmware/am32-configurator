@@ -259,11 +259,11 @@ export class FourWay {
                 await delay(250);
             }
 
-            if (currentTry < retries) {
+            if (currentTry > retries) {
                 reject(new Error('max retries, please check connection'));
             }
         };
-        return new Promise(callback);
+        return new Promise(callback) as Promise<FourWayResponse | null>;
     }
 
     parseMessage (buffer: ArrayBuffer) {

@@ -8,7 +8,9 @@
     <UFormGroup>
       <template #label>
         <div class="flex items-center gap-1 mb-1">
-          <div>{{ name }}</div>
+          <div v-if="name">
+            {{ name }}
+          </div>
           <UTooltip v-if="help" :text="help" :popper="{ placement: 'right' }">
             <UIcon name="i-material-symbols-help-outline" class="text-blue-500 text-lg" />
           </UTooltip>
@@ -64,7 +66,7 @@ import type { EepromLayoutKeys } from '~/src/eeprom';
 import type { McuInfo } from '~/src/mcu';
 
 interface SettingFieldProps {
-    name: string;
+    name?: string;
     type: SettingsType;
     escInfo: McuInfo[];
     field: EepromLayoutKeys;
@@ -81,9 +83,11 @@ interface SettingFieldProps {
     showValue?: boolean;
     disabled?: boolean | ((value: number) => boolean),
     disabledValue?: number,
+    individual?: number
 }
 
 const props = withDefaults(defineProps<SettingFieldProps>(), {
+    name: undefined,
     displayFactor: 1,
     offset: 0,
     placeholder: undefined,
@@ -95,10 +99,12 @@ const props = withDefaults(defineProps<SettingFieldProps>(), {
     step: undefined,
     unit: undefined,
     showValue: false,
-    disabled: false
+    disabled: false,
+    individual: undefined,
+    disabledValue: undefined
 });
 
-const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number | number[] }): void}>();
+const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number | number[], individual?: number }): void}>();
 
 const isDisabled = computed(() => {
     if (props.disabled) {
@@ -112,8 +118,8 @@ const isDisabled = computed(() => {
 
 const value = computed({
     get: () => {
-        let value = props.escInfo[0].settings[props.field] as number;
-        if (props.type === 'number') {
+        let value = props.escInfo[props.individual ?? 0].settings[props.field] as number;
+        if (value && props.type === 'number') {
             value = value * props.displayFactor + props.offset;
         }
         return value;
@@ -125,6 +131,7 @@ const value = computed({
         }
         emits('change', {
             field: props.field,
+            individual: props.individual,
             value
         });
     }
@@ -132,7 +139,7 @@ const value = computed({
 
 const boolValue = computed({
     get: () => {
-        return props.escInfo[0].settings[props.field] as number === 1;
+        return props.escInfo[props.individual ?? 0].settings[props.field] as number === 1;
     },
     set: (val) => {
         value.value = val ? 1 : 0;
@@ -153,12 +160,11 @@ const getCompareValue = (value: number) => {
 };
 
 const otherValues = computed(() => props.escInfo?.map(i => i.settings[props.field]) as number[] ?? []);
+
 // The Simpsons:d=4,o=5,b=160:c.6,e6,f#6,8a6,g.6,e6,c6,8a,8f#,8f#,8f#,2g,8p,8p,8f#,8f#,8f#,8g,a#.,8c6,8c6,8c6,c6
 const rtttlValue = computed({
     get: () => {
-        let arr = props.escInfo[0].settings[props.field] as number[];
-
-        console.log(arr);
+        let arr = props.escInfo[props.individual ?? 0].settings[props.field] as number[];
 
         for (let i = 0; i < arr.length - 1; ++i) {
             if (
@@ -178,7 +184,8 @@ const rtttlValue = computed({
             buffer.fill(0x0, 128);
             emits('change', {
                 field: props.field,
-                value: Array.from(buffer)
+                value: Array.from(buffer),
+                individual: props.individual
             });
         }
     }

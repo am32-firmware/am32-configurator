@@ -41,11 +41,11 @@ withDefaults(defineProps<SettingFieldGroupProps>(), {
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
-        return escStore.escInfo[0].settings[field] === 1;
+        return escStore.firstValidEscData?.data.settings[field] === 1;
     },
     set: (_val) => {
         emits('change', {
-            value: escStore.escInfo[0].settings[field] === 0 ? 1 : 0,
+            value: escStore.firstValidEscData?.data.settings[field] === 0 ? 1 : 0,
             field
         });
     }

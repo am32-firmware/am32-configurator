@@ -37,6 +37,12 @@ export interface McuInfo {
     isSelected: boolean;
 }
 
+export interface EscData {
+    isLoading: boolean;
+    isError: boolean;
+    data: McuInfo;
+}
+
 class Mcu {
     static variants: {
         [key: string]: McuVariant;
