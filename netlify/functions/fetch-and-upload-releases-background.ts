@@ -6,5 +6,5 @@ export default async (_request: Request) => {
 };
 
 export const config: Config = {
-    schedule: '@daily'
+    schedule: '@hourly'
 };

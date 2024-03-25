@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { getStore } from '@netlify/blobs';
+import fetchReleases from '~/src/fetch-and-upload-releases';
 import 'dotenv';
 
 (async function () {
@@ -51,6 +52,8 @@ import 'dotenv';
             console.log(`\tskip ${tool}`);
         }
     }
+
+    await fetchReleases('v2.08');
 
     /* for (const release of data) {
         const semverTagName = release.tag_name.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2');

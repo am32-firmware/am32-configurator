@@ -15,9 +15,9 @@
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
         <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
           <template #tune>
-            <div v-if="!escStore.isLoading && escStore.validEscInfo.length === escStore.count && !escStore.firstValidEscData?.isLoading" class="pt-4 grid grid-cols-2 gap-4">
+            <div v-if="!escStore.isLoading && escStore.escData.length === escStore.expectedCount && !escStore.firstValidEscData?.isLoading" class="pt-4 grid grid-cols-2 gap-4">
               <div
-                v-for="n of escStore.validEscInfo.length"
+                v-for="n of escStore.selectedEscInfo.length"
                 :key="n"
               >
                 <div>ESC {{ n }}</div>
@@ -35,7 +35,7 @@
           <template #settings>
             <div class="h-full pt-4">
               <div class="flex gap-4 w-full justify-center">
-                <div v-for="(info, n) of escStore.validEscInfo" :key="n">
+                <div v-for="(info, n) of escStore.escData" :key="n">
                   <EscView
                     :is-loading="info.isLoading"
                     :index="n"
@@ -347,9 +347,9 @@ const onChange = (payload: { index: number, field: EepromLayoutKeys, value: bool
 };
 
 const onToggle = (index: number) => {
-    console.log(escStore.validEscInfo, index);
-    if (escStore.validEscInfo[index].data) {
-        escStore.validEscInfo[index].data.isSelected = !escStore.validEscInfo[index].data.isSelected;
+    console.log(escStore.escData, index);
+    if (escStore.escData[index].data) {
+        escStore.escData[index].data.isSelected = !escStore.escData[index].data.isSelected;
     }
 };
 

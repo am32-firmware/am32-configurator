@@ -27,17 +27,23 @@
         </div>
         <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between gap-4">
           <div class="flex gap-2">
-            <UChip v-if="serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect" text="1" size="2xl" :color="escStore.count > 0 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 0 ? 'text-green-500' : 'text-yellow-500'" />
-            </UChip>
-            <UChip v-if="serialStore.mspData.motorCount > 1" text="2" size="2xl" :color="escStore.count > 1 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 1 ? 'text-green-500' : 'text-yellow-500'" />
-            </UChip>
-            <UChip v-if="serialStore.mspData.motorCount > 2" text="3" size="2xl" :color="escStore.count > 2 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 2 ? 'text-green-500' : 'text-yellow-500'" />
-            </UChip>
-            <UChip v-if="serialStore.mspData.motorCount > 3" text="4" size="2xl" :color="escStore.count > 3 ? 'green' : 'yellow'">
-              <UIcon name="i-heroicons-cpu-chip-16-solid" class="text-xs" :class="escStore.count > 3 ? 'text-green-500' : 'text-yellow-500'" />
+            <UChip
+              v-for="n of serialStore.mspData.motorCount"
+              :key="n"
+              :text="n"
+              size="2xl"
+              color="blue"
+            >
+              <UIcon
+                name="i-heroicons-cpu-chip-16-solid"
+                class="text-xs"
+                :class="{
+                  'text-green-500': !escStore.escData[n - 1]?.isLoading && !escStore.escData[n - 1]?.isError,
+                  'text-orange-500': escStore.escData[n - 1]?.isLoading,
+                  'text-red-500': escStore.escData[n - 1]?.isError,
+                  'text-white': !escStore.escData[n - 1]
+                }"
+              />
             </UChip>
           </div>
           <div class="flex gap-2">
@@ -142,6 +148,7 @@
               searchable
               searchable-placeholder="Search a release..."
               :options="releasesOptions"
+              :loading="pending"
             />
             <USelectMenu
               v-model="selectedAsset"
@@ -156,7 +163,7 @@
             Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
           </div>
           <div v-if="serialStore.isFourWay" class="pt-4">
-            <div class="text-center">
+            <div class="text-center mb-2">
               Select ESC(s) to flash:
             </div>
             <div class="w-full text-center flex justify-center gap-2">
@@ -308,6 +315,7 @@ import Mcu, { type EscData } from '~/src/mcu';
 const toast = useToast();
 const serialStore = useSerialStore();
 const escStore = useEscStore();
+const { escData } = storeToRefs(escStore);
 const { log, logWarning, logError } = useLogStore();
 const usbFCVendorIds = [0x0483, 0x2E3C];
 const usbDirectVendorIds = [0x1A86];
@@ -325,7 +333,9 @@ const savingOrApplyingSelectedEscs = ref<number[]>([]);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
-const { data, pending } = useAsyncData('get-releases', () => useLazyFetch('/api/files?filter=releases'));
+const { data, pending } = useAsyncData('get-releases', () => useLazyFetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
+    watch: [includePrerelease]
+});
 
 const releases = computed(() => ((data.value?.data as unknown as { data: BlobFolder[]})?.data));
 
@@ -337,7 +347,14 @@ watch(releasesOptions, (d) => {
     if (!selectedRelease.value && d?.length > 0) {
         setTimeout(() => {
             selectedRelease.value = d[0];
-        }, 1000);
+        }, 200);
+    }
+});
+
+watch(includePrerelease, (b, a) => {
+    if (b !== a) {
+        selectedAsset.value = '';
+        selectedRelease.value = '';
     }
 });
 
@@ -460,7 +477,7 @@ const connectToDevice = async () => {
 
                 if (isDirectConnectDevice.value) {
                     const info = await Direct.getInstance().init();
-                    const escData = {
+                    const newEscData = {
                         isLoading: true
                     } as EscData;
 
@@ -470,11 +487,11 @@ const connectToDevice = async () => {
 
                     escStore.count = 1;
 
-                    escStore.escData.push(escData);
+                    escData.value.push(newEscData);
 
-                    escData.data = info!;
+                    newEscData.data = info!;
 
-                    escData.isLoading = false;
+                    newEscData.isLoading = false;
                 } else {
                     const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
                         logError(`${err.message}, trying to exit fourway and try again.`);
@@ -541,23 +558,25 @@ const connectToEsc = async () => {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
+            await delay(500);
+
             serialStore.isFourWay = true;
 
             escStore.expectedCount = result?.data.getUint8(0) ?? 0;
         }
 
-        escStore.escData = [];
+        escData.value = [];
         escStore.count = 0;
         escStore.isLoading = true;
 
         await delay(1000);
 
         for (let i = 0; i < escStore.expectedCount; ++i) {
-            const escData = {
+            const newEscData = {
                 isLoading: true,
                 isError: false
             } as EscData;
-            escStore.escData.push(escData);
+            escData.value.push(newEscData);
 
             try {
                 const result = await FourWay.getInstance().getInfo(i);
@@ -565,10 +584,10 @@ const connectToEsc = async () => {
                 escStore.count += 1;
             } catch (e) {
                 console.error(e);
-                escData.isError = true;
+                newEscData.isError = true;
             }
 
-            escData.isLoading = false;
+            newEscData.isLoading = false;
         }
 
         escStore.isLoading = false;
@@ -579,8 +598,8 @@ const writeConfig = async () => {
     if (serialStore.isFourWay) {
         escStore.isSaving = true;
 
-        for (let i = 0; i < escStore.count; ++i) {
-            if (escStore.escData[i].data.settingsDirty) {
+        for (let i = 0; i < escStore.escData.length; ++i) {
+            if (!escStore.escData[i].isError && escStore.escData[i].data.settingsDirty) {
                 const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data);
                 escStore.escData[i].data.settingsBuffer = result;
                 escStore.escData[i].data.settingsDirty = false;
@@ -742,16 +761,20 @@ const startFlash = async (hexString: string) => {
         for (const n of savingOrApplyingSelectedEscs.value) {
             const i = n - 1;
             escStore.activeTarget = i;
-            escStore.escData[i].isLoading = true;
             await FourWay.getInstance().writeHex(i, hexString, 100);
             await delay(200);
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);
             await delay(5000);
             escStore.step = 'Read ESC';
-            const result = await FourWay.getInstance().getInfo(i);
-            escStore.escData[i].data = result;
-            escStore.escData[i].isLoading = false;
+            try {
+                const result = await FourWay.getInstance().getInfo(i);
+
+                escStore.escData[i].data = result;
+                escStore.escData[i].isLoading = false;
+            } catch (e) {
+                console.error(e);
+            }
         }
         escStore.step = '';
         escStore.bytesWritten = 0;

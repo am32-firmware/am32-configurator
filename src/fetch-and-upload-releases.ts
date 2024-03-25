@@ -21,6 +21,14 @@ export default async function (minTag?: string) {
         token: process.env.NETLIFY_TOKEN
     });
 
+    const githubStore = getStore({
+        name: 'github-releases-cache',
+        siteID: process.env.NETLIFY_SITE_ID,
+        token: process.env.NETLIFY_TOKEN
+    });
+
+    await githubStore.setJSON('releases-cache', releases);
+
     for (const release of data) {
         const semverTagName = release.tag_name.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2');
 

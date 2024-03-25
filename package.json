@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "upload:files": "bun deploay-files/upload.ts",
+    "upload:files": "bun deploy-files/upload.ts",
     "lint": "eslint --ext .ts,.js,.vue ."
   },
   "devDependencies": {

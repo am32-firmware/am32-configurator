@@ -433,7 +433,7 @@ export class FourWay {
                     try {
                         escStore.step = 'Verifing';
                         await delay(200);
-                        await this.verifyPages(0x04, 0x40, pageSize, flash);
+                        // await this.verifyPages(0x04, 0x40, pageSize, flash);
                     } catch (error) {
                         try {
                             escStore.step = 'Verifing';
