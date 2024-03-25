@@ -430,7 +430,7 @@ export class FourWay {
                     await this.write(eepromOffset, eepromInfo, timout);
 
                     await this.writePages(0x04, 0x40, pageSize, flash, timout);
-                    try {
+                    /* try {
                         escStore.step = 'Verifing';
                         await delay(200);
                         // await this.verifyPages(0x04, 0x40, pageSize, flash);
@@ -442,7 +442,7 @@ export class FourWay {
                         } catch (error) {
                             this.logError('flashingVerificationFailed');
                         }
-                    }
+                    } */
 
                     originalSettings[0] = 0x01;
                     originalSettings.fill(0x00, 3, 5);
