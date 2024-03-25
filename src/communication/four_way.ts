@@ -248,7 +248,6 @@ export class FourWay {
                 if (result) {
                     try {
                         const response = this.parseMessage(result.buffer);
-                        console.log(enumToString(command, FOUR_WAY_COMMANDS), result.buffer, response);
                         if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;

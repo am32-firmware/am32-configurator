@@ -19,19 +19,16 @@
                 </h2>
                 <ul class="list-disc list-inside">
                   <li class="mb-2">
-                    Firmware Upgradeability: Seamless updates via Betaflight passthrough for G4, F4, and F7
-                    flight controllers.
+                    Firmware Upgradeability: Seamless updates via Betaflight passthrough.
                   </li>
                   <li class="mb-2">
-                    Motor Protocol Support: Compatible with Servo PWM and Dshot (300, 600) motor
-                    protocols.
+                    Motor Protocol Support: Compatible with Servo PWM and Dshot (300, 600) motor protocols.
                   </li>
                   <li class="mb-2">
-                    Bi-directional Dshot: Enhance control and telemetry with bidirectional communication
-                    support.
+                    Bi-directional Dshot: Enhance control and telemetry with bidirectional communication support.
                   </li>
                   <li class="mb-2">
-                    Telemetry Support: KISS standard ESC telemetry for comprehensive monitoring.
+                    Telemetry Support: Betaflight ESC telemetry, KISS standard ESC telemetry.
                   </li>
                   <li class="mb-2">
                     Variable PWM Frequency: Customize PWM frequency for precise motor control.
@@ -54,18 +51,7 @@
                 <p class="mb-4">
                   Visit the <a href="#">latest release</a> for firmware updates.
                 </p>
-                <p>Download the Multi_ESC config tool for <a href="#">Windows</a> or <a href="#">Linux</a>.</p>
-              </div>
-
-              <div class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">
-                  Hardware Compatibility
-                </h2>
-                <p class="mb-4">
-                  Refer to the target compatibility list for hardware compatibility information and
-                  installation instructions.
-                </p>
-                <p>View the <a href="#">compatibility list</a> (December 2020).</p>
+                <p>Download the Multi_ESC config tool under the <NuxtLink class="underline text-green-400" to="/downloads">Downloads</NuxtLink> section.</p>
               </div>
 
               <div class="mb-8">
@@ -73,8 +59,7 @@
                   Support & Community
                 </h2>
                 <p class="mb-4">
-                  Join the dedicated Slack chat channel for support, etiquette guidelines, and community
-                  interaction.
+                  Join the discord server for support and community interaction.
                 </p>
                 <UButton
                   to="https://discord.com/invite/h7ddYMmEVV"
