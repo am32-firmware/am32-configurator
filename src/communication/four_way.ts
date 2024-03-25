@@ -136,10 +136,10 @@ export class FourWay {
         return `${make} - ${this.name}, ${revision}${bootloader}`;
     } */
 
-    async getInfo (target: number) {
+    async getInfo (target: number, initRetries = 2) {
         const logStore = useLogStore();
 
-        const flash = await this.initFlash(target, 10);
+        const flash = await this.initFlash(target, initRetries);
         const info = Flash.getInfo(flash!);
         const mcu = new Mcu(info.meta.signature);
         mcu.setInfo(info);
@@ -248,9 +248,12 @@ export class FourWay {
                 if (result) {
                     try {
                         const response = this.parseMessage(result.buffer);
+                        console.log(enumToString(command, FOUR_WAY_COMMANDS), result.buffer, response);
                         if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;
+                        } else {
+                            this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                         }
                     } catch (e) {
                         console.error(e);
@@ -260,7 +263,8 @@ export class FourWay {
             }
 
             if (currentTry > retries) {
-                reject(new Error('max retries, please check connection'));
+                reject(new Error('max retries reached'));
+                this.logError('max retries reached');
             }
         };
         return new Promise(callback) as Promise<FourWayResponse | null>;
@@ -405,7 +409,7 @@ export class FourWay {
         const escStore = useEscStore();
         const parsed = Flash.parseHex(hex);
         if (parsed) {
-            const initFlash = await this.initFlash(target, 10);
+            const initFlash = await this.initFlash(target, 3);
             const info = Flash.getInfo(initFlash!);
             const mcu = new Mcu(info.meta.signature);
             const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;

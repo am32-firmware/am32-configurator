@@ -31,7 +31,7 @@
         />
       </div>
       <div v-else-if="type === 'rtttl'">
-        <UTextarea v-model="rtttlValue" variant="outline" color="primary" :placeholder="placeholder" />
+        <UTextarea v-model="rtttlValue" :disabled="isDisabled" variant="outline" color="primary" :placeholder="placeholder" />
       </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">

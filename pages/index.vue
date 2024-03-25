@@ -1,7 +1,6 @@
 <template>
   <div>
     <div>
-      <TopNavigation />
       <div class="p-4 max-w-[1400px] mx-auto pb-16">
         <div class="flex flex-col gap-4">
           <UCard>
@@ -114,6 +113,7 @@
                   to="https://www.patreon.com/user?u=44228479"
                   target="_blank"
                   external
+                  class="transition-all hover:text-red-400"
                 >
                   <UIcon name="i-mdi-patreon" />
                 </NuxtLink>
@@ -121,6 +121,7 @@
                   to="https://www.patreon.com/user?u=44228479"
                   target="_blank"
                   external
+                  class="transition-all hover:text-blue-400"
                 >
                   <UIcon name="i-mdi-paypal" />
                 </NuxtLink>

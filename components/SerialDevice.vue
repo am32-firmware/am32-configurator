@@ -168,7 +168,7 @@
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
-                v-for="n of escStore.escData.length"
+                v-for="n of escStore.selectedEscInfo.length"
                 :key="n"
                 class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                 :class="{
@@ -237,7 +237,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escData.length"
+                  v-for="n of escStore.selectedEscInfo.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -277,7 +277,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escData.length"
+                  v-for="n of escStore.selectedEscInfo.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -558,7 +558,7 @@ const connectToEsc = async () => {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
-            await delay(500);
+            await delay(2000);
 
             serialStore.isFourWay = true;
 
@@ -768,7 +768,7 @@ const startFlash = async (hexString: string) => {
             await delay(5000);
             escStore.step = 'Read ESC';
             try {
-                const result = await FourWay.getInstance().getInfo(i);
+                const result = await FourWay.getInstance().getInfo(i, 20);
 
                 escStore.escData[i].data = result;
                 escStore.escData[i].isLoading = false;

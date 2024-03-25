@@ -41,6 +41,7 @@
         </div>
       </div>
     </div>
+    <TopNavigation />
     <div class="max-w-[1920px] m-auto">
       <slot />
     </div>
