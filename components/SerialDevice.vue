@@ -476,20 +476,20 @@ const connectToDevice = async () => {
                 log('Connected to device');
 
                 if (isDirectConnectDevice.value) {
-                    const info = await Direct.getInstance().init();
-                    const newEscData = {
-                        isLoading: true
-                    } as EscData;
-
                     serialStore.isDirectConnect = true;
 
                     savingOrApplyingSelectedEscs.value = [0];
 
                     escStore.count = 1;
+                    escStore.expectedCount = 1;
+
+                    const info = await Direct.getInstance().init();
+                    const newEscData = {
+                        isLoading: true,
+                        data: info!
+                    } as EscData;
 
                     escData.value.push(newEscData);
-
-                    newEscData.data = info!;
 
                     newEscData.isLoading = false;
                 } else {
