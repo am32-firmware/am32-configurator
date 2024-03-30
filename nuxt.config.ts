@@ -11,6 +11,12 @@ export default defineNuxtConfig({
         shim: false,
         typeCheck: true
     },
+    runtimeConfig: {
+        public: {
+            auth0_domain: process.env.AUTH0_DOMAIN,
+            auth0_client_id: process.env.AUTH0_CLIENT_ID
+        }
+    },
     ssr: false,
     modules: [
         '@vite-pwa/nuxt',

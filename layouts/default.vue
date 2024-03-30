@@ -2,8 +2,12 @@
   <div>
     <div>
       <div class="grid grid-cols-12 text-white ">
-        <div class="col-span-2 flex justify-center items-center">
-          <svgo-logo-full class="text-white text-[150px]" />
+        <div class="col-span-2 flex flex-col justify-center items-center">
+          <svgo-logo-full class="text-white text-[120px]" />
+          <div v-if="isAuthenticated" class="flex gap-2 items-center">
+            <img v-if="user?.picture" :src="user.picture" class="max-h-[50px] w-auto">
+            Hello {{ user?.nickname ?? 'ERROR' }}
+          </div>
         </div>
         <div class="col-span-8 h-[200px] max-h-[200px]">
           <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
@@ -48,6 +52,14 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useAuth0 } from '@auth0/auth0-vue';
+
 const serialStore = useSerialStore();
 const logStore = useLogStore();
+
+const auth = useAuth0();
+
+const isAuthenticated = computed(() => auth.isAuthenticated.value);
+
+const user = computed(() => auth.user?.value);
 </script>

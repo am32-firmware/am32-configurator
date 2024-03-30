@@ -43,5 +43,9 @@ const links = computed(() => [{
     label: 'Downloads',
     icon: 'i-material-symbols-download-rounded',
     to: '/downloads'
+}, {
+    label: 'Profile',
+    icon: 'i-material-symbols-account-circle',
+    to: '/profile'
 }]);
 </script>

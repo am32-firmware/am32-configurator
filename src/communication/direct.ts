@@ -94,7 +94,7 @@ export class Direct {
 
     async init () {
         const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
+            0, 0x0D, ...('BLHeli'.split('').map(s => s.charCodeAt(0))), 0xF4, 0x7D
         ]);
         const result = await serial.write(init);
         if (result) {
@@ -190,7 +190,7 @@ export class Direct {
             buffer = Array.from(payload!);
             break;
         case DIRECT_COMMANDS.cmd_Reset:
-            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));;
+            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));
         default:
             break;
         }

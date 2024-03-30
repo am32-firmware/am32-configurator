@@ -33,6 +33,7 @@
     "vue-tsc": "^1.2.0"
   },
   "dependencies": {
+    "@auth0/auth0-vue": "^2.3.3",
     "@netlify/blobs": "^7.0.1",
     "@netlify/functions": "^2.6.0",
     "@nuxt/ui": "^2.11.1",
