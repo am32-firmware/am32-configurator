@@ -14,7 +14,7 @@
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
         <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
           <template #tune>
-            <div v-if="!escStore.isLoading && escStore.escData.length === escStore.expectedCount && !escStore.firstValidEscData?.isLoading" class="pt-4 flex flex-col gap-4">
+            <div class="pt-4 flex flex-col gap-4">
               <div class="flex gap-4 w-full justify-center">
                 <div v-for="(info, n) of escStore.escData" :key="n">
                   <EscView
@@ -27,22 +27,27 @@
                   />
                 </div>
               </div>
-              <UCheckbox v-model="syncAllEscTunes" label="Sync all ESCs?" />
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
-                >
-                  <div>ESC {{ n }}</div>
-                  <SettingField
-                    :esc-info="escStore.selectedEscInfo"
-                    field="STARTUP_MELODY"
-                    :individual="syncAllEscTunes ? undefined : n - 1"
-                    type="rtttl"
-                    placeholder="RTTTL String"
-                    :disabled="syncAllEscTunes ? n > 1 : false"
-                    @change="onSettingsChange"
-                  />
+              <div v-if="escStore.isLoading" class="flex justify-center items-center mt-20">
+                <UIcon class="text-green-500 w-[80px] h-[80px]" name="i-svg-spinners-blocks-wave" dynamic />
+              </div>
+              <div v-else-if="escStore.selectedEscInfo.length > 0">
+                <UCheckbox v-model="syncAllEscTunes" label="Sync all ESCs?" />
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div
+                    v-for="n of escStore.selectedEscInfo.length"
+                    :key="n"
+                  >
+                    <div>ESC {{ n }}</div>
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="STARTUP_MELODY"
+                      :individual="syncAllEscTunes ? undefined : n - 1"
+                      type="rtttl"
+                      placeholder="RTTTL String"
+                      :disabled="syncAllEscTunes ? n > 1 : false"
+                      @change="onSettingsChange"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -61,7 +66,10 @@
                   />
                 </div>
               </div>
-              <div v-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
+              <div v-if="escStore.isLoading" class="flex justify-center items-center mt-20">
+                <UIcon class="text-green-500 w-[80px] h-[80px]" name="i-svg-spinners-blocks-wave" dynamic />
+              </div>
+              <div v-else-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
                 <div class="flex flex-col gap-4 justify-center">
                   <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
                     <SettingField
