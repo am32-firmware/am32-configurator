@@ -104,7 +104,6 @@ class CommandQueue {
                 }
             }
 
-            serialStore.mspData.motorCount = 4;
             logStore.log(`Got msp data, MOTOR COUNT: ${serialStore.mspData.motorCount}`);
             break;
         case MSP_COMMANDS.MSP_MOTOR_CONFIG:
