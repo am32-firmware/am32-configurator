@@ -215,7 +215,7 @@ export class Msp {
                 }
                 break;
             case 2:
-                if ([ascii('<'), ascii('>')].includes(char)) {
+                if ([ascii('<'), ascii('>'), ascii('!')].includes(char)) {
                     ++state;
                 } else {
                     state = 0;

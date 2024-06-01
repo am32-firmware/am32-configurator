@@ -69,6 +69,9 @@ class CommandQueue {
             case 'KISS':
                 serialStore.mspData.type = 'kiss';
                 break;
+            case 'INAV':
+                serialStore.mspData.type = 'inav';
+                break;
             default:
                 serialStore.mspData.type = null;
                 logStore.logError(`Unknown fc type '${fcType}'`);
@@ -92,6 +95,17 @@ class CommandQueue {
             escStore.count = data.getUint8(0);
 
             logStore.log(`Init 4way, ESC COUNT: ${escStore.count}`);
+            break;
+        case MSP_COMMANDS.MSP_MOTOR:
+            serialStore.mspData.motorCount = 0;
+            for (let i = 0; i < data.buffer.byteLength; ++i) {
+                if (data.getUint8(i) > 0) {
+                    serialStore.mspData.motorCount++;
+                }
+            }
+
+            serialStore.mspData.motorCount = 4;
+            logStore.log(`Got msp data, MOTOR COUNT: ${serialStore.mspData.motorCount}`);
             break;
         case MSP_COMMANDS.MSP_MOTOR_CONFIG:
             serialStore.mspData.motorCount = data.getUint8(6);
