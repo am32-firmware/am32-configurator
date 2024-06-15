@@ -402,7 +402,7 @@ const requestSerialDevices = async () => {
     await fetchPairedDevices();
 };
 
-const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(parseInt(serialStore.selectedDevice.id.split(':')[0])));
+const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])));
 
 const fetchPairedDevices = async () => {
     const pairedDevices: SerialPort[] = await navigator.serial.getPorts();
@@ -449,9 +449,21 @@ const connectToDevice = async () => {
         } else {
             if (!serialStore.deviceHandles.port.readable) {
                 try {
-                    await serialStore.deviceHandles.port.open({
-                        baudRate: +baudrate.value
-                    });
+                    await serialStore.deviceHandles.serial.openPort(
+                        serialStore.deviceHandles.port, {
+                            baudRate: +baudrate.value
+                        } as {
+                          baudRate?: number;
+                          stopBits?: 1 | 2;
+                          parity?: 'none';
+                          'even': any;
+                          'odd': any;
+                          bufferSize?: number;
+                          flowControl?: 'none' | 'hardware';
+                          onconnect?: (ev: any) => void;
+                          ondisconnect?: (ev: any) => void;
+                      }
+                    );
                 } catch (e: any) {
                     logError('Port already in use!');
                     toast.add({
@@ -465,13 +477,13 @@ const connectToDevice = async () => {
             }
 
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
-                if (!serialStore.deviceHandles.reader) {
+                /* if (!serialStore.deviceHandles.reader) {
                     serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
                 }
                 if (!serialStore.deviceHandles.writer) {
                     serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
-                }
-                Serial.init(log, logError, logWarning, serialStore.deviceHandles.reader, serialStore.deviceHandles.writer);
+                } */
+                Serial.init(log, logError, logWarning, serialStore.deviceHandles.serial, serialStore.deviceHandles.port);
 
                 log('Connected to device');
 

@@ -226,12 +226,12 @@ export class FourWay {
         }
     }
 
-    sendWithCallback (command: FOUR_WAY_COMMANDS, callback: PromiseFn, params: number[] = [0], address: number = 0, retries = 0) {
+    sendWithCallback (command: FOUR_WAY_COMMANDS, callback: PromiseFn, params: number[] = [0], address = 0, retries = 0) {
         CommandQueue.addCallback(command, callback, retries);
         return this.send(command, params, address);
     }
 
-    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address: number = 0, retries: number = 10, timeout = 200): Promise<FourWayResponse | null> {
+    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200): Promise<FourWayResponse | null> {
         let currentTry = 0;
 
         const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
@@ -240,6 +240,7 @@ export class FourWay {
                     console.log(err);
                     return null;
                 });
+                console.log(params, enumToString(command, FOUR_WAY_COMMANDS), result);
                 if (command === FOUR_WAY_COMMANDS.cmd_InterfaceExit) {
                     resolve(null);
                     break;
@@ -251,9 +252,8 @@ export class FourWay {
                         if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;
-                        } else {
-                            this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                         }
+                        this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                     } catch (e) {
                         console.error(e);
                     }
@@ -418,7 +418,7 @@ export class FourWay {
                 const pageSize = mcu.getPageSize();
                 const firmwareStart = mcu.getFirmwareStart();
 
-                escStore.totalBytes = (flash.byteLength - firmwareStart) * 2;
+                escStore.totalBytes = flash.byteLength - firmwareStart;
                 escStore.bytesWritten = 0;
                 escStore.step = 'Writing';
 
