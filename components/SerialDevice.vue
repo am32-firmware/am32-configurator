@@ -168,7 +168,7 @@
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
-                v-for="n of escStore.escData.length"
+                v-for="n of escStore.selectedEscInfo.length"
                 :key="n"
                 class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                 :class="{
@@ -237,7 +237,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escData.length"
+                  v-for="n of escStore.selectedEscInfo.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -277,7 +277,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.escData.length"
+                  v-for="n of escStore.selectedEscInfo.length"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -317,8 +317,8 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { escData } = storeToRefs(escStore);
 const { log, logWarning, logError } = useLogStore();
-const usbFCVendorIds = [0x0483, 0x2E3C];
-const usbDirectVendorIds = [0x1A86];
+const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A];
+const usbDirectVendorIds = [0x1A86, 0x0403];
 const flashModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
@@ -402,7 +402,7 @@ const requestSerialDevices = async () => {
     await fetchPairedDevices();
 };
 
-const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(parseInt(serialStore.selectedDevice.id.split(':')[0])));
+const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])));
 
 const fetchPairedDevices = async () => {
     const pairedDevices: SerialPort[] = await navigator.serial.getPorts();
@@ -449,9 +449,21 @@ const connectToDevice = async () => {
         } else {
             if (!serialStore.deviceHandles.port.readable) {
                 try {
-                    await serialStore.deviceHandles.port.open({
-                        baudRate: +baudrate.value
-                    });
+                    await serialStore.deviceHandles.serial.openPort(
+                        serialStore.deviceHandles.port, {
+                            baudRate: +baudrate.value
+                        } as {
+                          baudRate?: number;
+                          stopBits?: 1 | 2;
+                          parity?: 'none';
+                          'even': any;
+                          'odd': any;
+                          bufferSize?: number;
+                          flowControl?: 'none' | 'hardware';
+                          onconnect?: (ev: any) => void;
+                          ondisconnect?: (ev: any) => void;
+                      }
+                    );
                 } catch (e: any) {
                     logError('Port already in use!');
                     toast.add({
@@ -465,31 +477,31 @@ const connectToDevice = async () => {
             }
 
             if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
-                if (!serialStore.deviceHandles.reader) {
+                /* if (!serialStore.deviceHandles.reader) {
                     serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
                 }
                 if (!serialStore.deviceHandles.writer) {
                     serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
-                }
-                Serial.init(log, logError, logWarning, serialStore.deviceHandles.reader, serialStore.deviceHandles.writer);
+                } */
+                Serial.init(log, logError, logWarning, serialStore.deviceHandles.serial, serialStore.deviceHandles.port);
 
                 log('Connected to device');
 
                 if (isDirectConnectDevice.value) {
-                    const info = await Direct.getInstance().init();
-                    const newEscData = {
-                        isLoading: true
-                    } as EscData;
-
                     serialStore.isDirectConnect = true;
 
                     savingOrApplyingSelectedEscs.value = [0];
 
                     escStore.count = 1;
+                    escStore.expectedCount = 1;
+
+                    const info = await Direct.getInstance().init();
+                    const newEscData = {
+                        isLoading: true,
+                        data: info!
+                    } as EscData;
 
                     escData.value.push(newEscData);
-
-                    newEscData.data = info!;
 
                     newEscData.isLoading = false;
                 } else {
@@ -558,7 +570,7 @@ const connectToEsc = async () => {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
-            await delay(500);
+            await delay(2000);
 
             serialStore.isFourWay = true;
 
@@ -768,7 +780,7 @@ const startFlash = async (hexString: string) => {
             await delay(5000);
             escStore.step = 'Read ESC';
             try {
-                const result = await FourWay.getInstance().getInfo(i);
+                const result = await FourWay.getInstance().getInfo(i, 20);
 
                 escStore.escData[i].data = result;
                 escStore.escData[i].isLoading = false;

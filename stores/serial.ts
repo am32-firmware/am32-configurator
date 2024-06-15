@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia';
-import { Msp } from '~/src/communication/msp';
+import { WebSerial } from 'webserial-wrapper';
+import type { Msp } from '~/src/communication/msp';
 import type { FourWay } from '~/src/communication/four_way';
 
 export const useSerialStore = defineStore('serial', () => {
@@ -17,12 +18,14 @@ export const useSerialStore = defineStore('serial', () => {
     });
     const deviceHandles = ref<{
         port: SerialPort | null,
+        serial: WebSerial,
         reader: ReadableStreamDefaultReader | null,
         writer: WritableStreamDefaultWriter | null,
         msp: Msp | null,
         fourWay: FourWay | null
     }>({
         port: null,
+        serial: new WebSerial(),
         reader: null,
         writer: null,
         msp: null,
@@ -42,7 +45,7 @@ export const useSerialStore = defineStore('serial', () => {
     }
 
     const refreshReader = () => {
-        if (deviceHandles.value.port && deviceHandles.value.port.readable) {
+        if (deviceHandles.value.port?.readable) {
             deviceHandles.value.reader = deviceHandles.value.port.readable.getReader();
         } else {
             throw new Error('port or read stream not avaiable');
@@ -55,6 +58,7 @@ export const useSerialStore = defineStore('serial', () => {
         isFourWay.value = false;
         deviceHandles.value = {
             port: null,
+            serial: deviceHandles.value.serial,
             reader: null,
             writer: null,
             msp: null,
