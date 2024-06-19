@@ -5,7 +5,7 @@ description: 'Landingpage'
 
 # AM32-MultiRotor-ESC-firmware
 
-Firmware for STM32F051 based speed controllers for use with mutirotors
+Firmware for STM32F051 based speed controllers for use with multirotors
 <p align="left">
   <a href="/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-brightgreen" alt="GitHub license" /></a>
 </p>
