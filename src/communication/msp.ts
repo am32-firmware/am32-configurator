@@ -192,7 +192,7 @@ export class Msp {
     }
 
     getTypeMotorCommand(type: string) {
-        switch(type) {
+        switch (type) {
             case 'inav':
                 return MSP_COMMANDS.MSP_MOTOR;
             default:
