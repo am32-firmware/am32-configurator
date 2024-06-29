@@ -191,6 +191,15 @@ export class Msp {
         }
     }
 
+    getTypeMotorCommand(type: string) {
+        switch(type) {
+            case 'inav':
+                return MSP_COMMANDS.MSP_MOTOR;
+            default:
+                return MSP_COMMANDS.MSP_MOTOR_CONFIG;
+        }
+    }
+
     processResponse (data: Uint8Array) {
         let state = 0;
         let messageBuffer = new ArrayBuffer(0);
