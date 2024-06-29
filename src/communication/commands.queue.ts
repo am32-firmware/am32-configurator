@@ -98,7 +98,7 @@ class CommandQueue {
             break;
         case MSP_COMMANDS.MSP_MOTOR:
             serialStore.mspData.motorCount = 0;
-            for (let i = 0; i < data.buffer.byteLength; ++i) {
+            for (let i = 0; i < data.buffer.byteLength; i+=2) {
                 if (data.getUint16(i) > 0) {
                     serialStore.mspData.motorCount++;
                 }
