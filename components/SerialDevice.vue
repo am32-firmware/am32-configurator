@@ -43,7 +43,7 @@
           Disconnect
         </UButton>
       </div>
-      <div class="flex gap-4 pt-2">
+      <div class="flex flex-col mb-auto ml:flex-row gap-4 pt-2">
         <div class="flex gap-2 items-center">
           <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
         </div>
@@ -68,22 +68,22 @@
               />
             </UChip>
           </div>
-          <div class="flex gap-2">
-            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
-              Read
-            </UButton>
-            <UButton
-              icon="i-material-symbols-save"
-              color="blue"
-              size="2xs"
-              :disabled="!isAnySettingsDirty || escStore.isSaving"
-              :loading="escStore.isSaving"
-              @click="writeConfig"
-            >
-              Save
-            </UButton>
-          </div>
         </div>
+      </div>
+      <div class="flex flex-col mr-auto ml:flex-row ml:mr-0 2xl:flex-col 2xl:ml-auto 3xl:flex-row 3xl:justify-end gap-2">
+        <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
+          Read
+        </UButton>
+        <UButton
+          icon="i-material-symbols-save"
+          color="blue"
+          size="2xs"
+          :disabled="!isAnySettingsDirty || escStore.isSaving"
+          :loading="escStore.isSaving"
+          @click="writeConfig"
+        >
+          Save
+        </UButton>
       </div>
       <div v-if="false && serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
         <UKbd>
