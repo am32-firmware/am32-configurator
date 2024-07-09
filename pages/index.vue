@@ -102,14 +102,14 @@
                 >
                   <UIcon name="i-mdi-patreon" />
                 </NuxtLink>
-                <NuxtLink
+                <!--<NuxtLink
                   to="https://www.patreon.com/user?u=44228479"
                   target="_blank"
                   external
                   class="transition-all hover:text-blue-400"
                 >
                   <UIcon name="i-mdi-paypal" />
-                </NuxtLink>
+                </NuxtLink>-->
               </div>
             </template>
           </UCard>

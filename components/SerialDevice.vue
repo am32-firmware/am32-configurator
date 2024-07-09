@@ -75,8 +75,15 @@
         </UKbd>
       </div>
       <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4 w-full">
-        <div class="w-full">
+        <div class="w-full flex flex-col space-y-2">
           <UButton label="Flash firmware" size="2xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
+          <UButton
+            label="Send default config"
+            size="2xs"
+            icon="i-material-symbols-sim-card-outline"
+            color="green"
+            @click="applyDefaultConfigModalOpen = true"
+          />
         </div>
         <div class="min-w-[112px]">
           <UButton
@@ -218,6 +225,45 @@
           </template>
         </UCard>
       </UModal>
+      <UModal v-model="applyDefaultConfigModalOpen">
+        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center justify-center gap-2 text-xl">
+                <UIcon name="i-material-symbols-sim-card-outline" class="h-8 w-8" />
+                <div class="text-2xl">
+                  Apply default config
+                </div>
+              </div>
+            </div>
+          </template>
+          <div>
+            <div class="flex flex-col gap-2">
+              <div class="text-center">
+                Select ESC(s) to apply:
+              </div>
+              <div class="w-full text-center flex justify-center gap-2">
+                <div
+                  v-for="n of escStore.selectedEscInfo.length"
+                  :key="n"
+                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                  :class="{
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                  }"
+                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                >
+                  {{ n }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <template #footer>
+            <div class="text-right">
+              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="applyDefaultConfig" />
+            </div>
+          </template>
+        </UCard>
+      </UModal>
       <UModal v-model="saveConfigModalOpen">
         <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
           <template #header>
@@ -320,6 +366,7 @@ const { log, logWarning, logError } = useLogStore();
 const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A];
 const usbDirectVendorIds = [0x1A86, 0x0403];
 const flashModalOpen = ref(false);
+const applyDefaultConfigModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
 const file_input = ref<HTMLInputElement>();
@@ -799,6 +846,26 @@ const startFlash = async (hexString: string) => {
     }
 };
 
+const applyDefaultConfig = async () => {
+    const file = await fetch('/assets/eeprom_default.bin');
+
+    if (file) {
+        const buffer = new Uint8Array(await file.arrayBuffer());
+        const settings = bufferToSettings(buffer);
+
+        for (const n of savingOrApplyingSelectedEscs.value) {
+            escStore.escData[n - 1].data.settings = settings;
+            escStore.escData[n - 1].data.settingsDirty = true;
+        }
+
+        await writeConfig();
+    }
+
+    if (applyConfigFile.value) {
+        applyConfigFile.value.input.value = '';
+    }
+};
+
 const downloadEscConfig = () => {
     for (const n of savingOrApplyingSelectedEscs.value) {
         const blob = new Blob([escStore.escData[n - 1].data.settingsBuffer], {
@@ -806,7 +873,7 @@ const downloadEscConfig = () => {
         });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'esc' + n + '_config.bin';
+        link.download = `esc${n}_config.bin`;
         link.click();
         URL.revokeObjectURL(link.href);
     }
