@@ -45,6 +45,7 @@
     "pinia": "^2.1.7",
     "queue": "^7.0.0",
     "semver": "^7.6.0",
-    "vite-plugin-checker": "latest"
+    "vite-plugin-checker": "latest",
+    "webserial-wrapper": "^1.0.4"
   }
 }

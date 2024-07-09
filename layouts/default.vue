@@ -37,10 +37,11 @@
           </div>
         </div>
         <div class="text-center min-w-[200px]">
-          v0.0.1
+          v0.0.2
         </div>
       </div>
     </div>
+    <TopNavigation />
     <div class="max-w-[1920px] m-auto">
       <slot />
     </div>

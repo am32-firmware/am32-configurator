@@ -3,7 +3,7 @@ type LogMessage = [Date, string, LogMessageType]
 type LogFn = (s: string) => void;
 type PromiseFn = (a: unknown | PromiseLike<any>) => any
 interface MspData {
-    type: 'bf' | 'qs' | 'kiss' | null,
+    type: 'bf' | 'qs' | 'kiss' | 'inav' | null,
     protocol_version: number
     api_version: string,
     batteryData: {

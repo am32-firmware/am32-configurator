@@ -1,6 +1,5 @@
 <template>
   <div>
-    <TopNavigation />
     <div class="p-4 max-w-[1400px] m-auto">
       <div v-if="pending" class="text-4xl text-center text-green-500 p-5">
         <UIcon name="i-svg-spinners-blocks-wave" />

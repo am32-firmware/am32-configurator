@@ -1,7 +1,6 @@
 <template>
   <div>
     <div>
-      <TopNavigation />
       <div v-if="!serialStore.hasSerial">
         <div class="text-3x text-red-500">
           WebSerial not supported! Please use other browser!
@@ -15,20 +14,41 @@
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
         <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
           <template #tune>
-            <div v-if="!escStore.isLoading && escStore.escData.length === escStore.expectedCount && !escStore.firstValidEscData?.isLoading" class="pt-4 grid grid-cols-2 gap-4">
-              <div
-                v-for="n of escStore.selectedEscInfo.length"
-                :key="n"
-              >
-                <div>ESC {{ n }}</div>
-                <SettingField
-                  :esc-info="escStore.selectedEscInfo"
-                  field="STARTUP_MELODY"
-                  :individual="n - 1"
-                  type="rtttl"
-                  placeholder="RTTTL String"
-                  @change="onSettingsChange"
-                />
+            <div class="pt-4 flex flex-col gap-4">
+              <div class="flex gap-4 w-full justify-center">
+                <div v-for="(info, n) of escStore.escData" :key="n">
+                  <EscView
+                    :is-loading="info.isLoading"
+                    :index="n"
+                    :esc="info"
+                    :mcu="info.data"
+                    @change="onChange"
+                    @toggle="onToggle"
+                  />
+                </div>
+              </div>
+              <div v-if="escStore.isLoading" class="flex justify-center items-center mt-20">
+                <UIcon class="text-green-500 w-[80px] h-[80px]" name="i-svg-spinners-blocks-wave" dynamic />
+              </div>
+              <div v-else-if="escStore.selectedEscInfo.length > 0">
+                <UCheckbox v-model="syncAllEscTunes" label="Sync all ESCs?" />
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div
+                    v-for="n of escStore.selectedEscInfo.length"
+                    :key="n"
+                  >
+                    <div>ESC {{ n }}</div>
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="STARTUP_MELODY"
+                      :individual="syncAllEscTunes ? undefined : n - 1"
+                      type="rtttl"
+                      placeholder="RTTTL String"
+                      :disabled="syncAllEscTunes ? n > 1 : false"
+                      @change="onSettingsChange"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -46,7 +66,10 @@
                   />
                 </div>
               </div>
-              <div v-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
+              <div v-if="escStore.isLoading" class="flex justify-center items-center mt-20">
+                <UIcon class="text-green-500 w-[80px] h-[80px]" name="i-svg-spinners-blocks-wave" dynamic />
+              </div>
+              <div v-else-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
                 <div class="flex flex-col gap-4 justify-center">
                   <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
                     <SettingField
@@ -341,6 +364,8 @@ import type { EepromLayoutKeys } from '~/src/eeprom';
 const serialStore = useSerialStore();
 const escStore = useEscStore();
 
+const syncAllEscTunes = ref(false);
+
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
     escStore.escData[payload.index].data.settingsDirty = escStore.escData[payload.index].data.settings[payload.field] !== (payload.value ? 1 : 0);
     escStore.escData[payload.index].data.settings[payload.field] = (payload.value ? 1 : 0);
@@ -376,13 +401,13 @@ const protocolOptions = [
     }
 ];
 
-const onSettingsChange = (payload: { field: EepromLayoutKeys, value: number | number[], individual?: number }) => {
-    if (payload.individual) {
-        escStore.selectedEscInfo[payload.individual].settings[payload.field] = payload.value;
-        escStore.selectedEscInfo[payload.individual].settingsDirty = true;
+const onSettingsChange = ({ field, value, individual }: { field: EepromLayoutKeys, value: number | number[], individual?: number }) => {
+    if (individual !== undefined) {
+        escStore.selectedEscInfo[individual].settings[field] = value;
+        escStore.selectedEscInfo[individual].settingsDirty = true;
     } else {
         for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
-            escStore.selectedEscInfo[i].settings[payload.field] = payload.value;
+            escStore.selectedEscInfo[i].settings[field] = value;
             escStore.selectedEscInfo[i].settingsDirty = true;
         }
     }
