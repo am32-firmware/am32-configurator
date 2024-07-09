@@ -191,6 +191,15 @@ export class Msp {
         }
     }
 
+    getTypeMotorCommand(type: "inav" | "bf" | "qs" | "kiss" | null) {
+        switch (type) {
+            case 'inav':
+                return MSP_COMMANDS.MSP_MOTOR;
+            default:
+                return MSP_COMMANDS.MSP_MOTOR_CONFIG;
+        }
+    }
+
     processResponse (data: Uint8Array) {
         let state = 0;
         let messageBuffer = new ArrayBuffer(0);
@@ -215,7 +224,7 @@ export class Msp {
                 }
                 break;
             case 2:
-                if ([ascii('<'), ascii('>')].includes(char)) {
+                if ([ascii('<'), ascii('>'), ascii('!')].includes(char)) {
                     ++state;
                 } else {
                     state = 0;

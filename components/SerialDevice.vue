@@ -582,7 +582,7 @@ const connectToDevice = async () => {
                             commandsQueue.processMspResponse(result!.commandName, result!.data);
                         }
                     });
-                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_MOTOR_CONFIG).then((result) => {
+                    await Msp.getInstance().sendWithPromise(Msp.getInstance().getTypeMotorCommand(serialStore.mspData.type)).then((result) => {
                         if (result) {
                             commandsQueue.processMspResponse(result!.commandName, result!.data);
                         }
