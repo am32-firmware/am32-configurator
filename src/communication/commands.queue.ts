@@ -72,6 +72,9 @@ class CommandQueue {
             case 'INAV':
                 serialStore.mspData.type = 'inav';
                 break;
+            case 'ARDU':
+                serialStore.mspData.type = 'ardu';
+                break;
             default:
                 serialStore.mspData.type = null;
                 logStore.logError(`Unknown fc type '${fcType}'`);
