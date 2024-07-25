@@ -52,14 +52,10 @@ class Serial {
                     if (!serialStore.deviceHandles.stream) {
                         return;
                     }
-                    console.log('endStream', ret);
                     if (serialStore.deviceHandles.stream.port.readable && serialStore.deviceHandles.stream.reader) {
                         try {
                             // serialStore.deviceHandles.stream.reader.releaseLock();
-                            serialStore.deviceHandles.stream!.ondata = (data) => {
-                                console.log(data);
-                            };
-                            console.log('resolve', ret);
+                            serialStore.deviceHandles.stream!.ondata = () => {};
                         } catch (a) {
                             console.error(a);
                             reject(a);
@@ -85,15 +81,13 @@ class Serial {
 
                 serialStore.deviceHandles.stream!.ondata = (data) => {
                     clearTimeout(t);
-                    console.log('ondata', data);
                     ret = mergeUint8Arrays(ret ?? new Uint8Array(), data);
-                    console.log(ret);
                     t = setTimeout(endStream, timeout);
                 };
 
                 t = setTimeout(endStream, timeout);
-
-                this.serial.writeStream(serialStore.deviceHandles.stream!, data).then(() => {
+                // this.serial.writeStream(serialStore.deviceHandles.stream!, data).then(() => {
+                this.serial.writeStream(serialStore.deviceHandles.stream!, [...new Uint8Array(data)]).then(() => {
                     try {
                         delay(200).then(() => {
                             this.serial!.readStream(serialStore.deviceHandles.stream!);

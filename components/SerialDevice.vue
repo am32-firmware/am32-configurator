@@ -363,8 +363,8 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { escData } = storeToRefs(escStore);
 const { log, logWarning, logError } = useLogStore();
-const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A, 0x1209, 0x26AC, 0x27AC, 0x2DAE, 0x3162, 0x35A7 ];
-const usbDirectVendorIds = [0x1A86, 0x0403];
+const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A, 0x1209, 0x26AC, 0x27AC, 0x2DAE, 0x3162, 0x35A7];
+const usbDirectVendorIds = [0x1A86, 0x0403, 0x4348];
 const flashModalOpen = ref(false);
 const applyDefaultConfigModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
@@ -542,6 +542,8 @@ const connectToDevice = async () => {
                     escStore.count = 1;
                     escStore.expectedCount = 1;
 
+                    await delay(200);
+
                     const info = await Direct.getInstance().init();
                     const newEscData = {
                         isLoading: true,
@@ -668,16 +670,12 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        console.log(mcu.getEepromOffset());
         const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
-        console.log(setAddress);
         if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([Mcu.LAYOUT_SIZE]));
             const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.firstValidEscData.data.settings));
-            console.log(sendBuffer);
             if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                console.log(writeFlash);
+                await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
                 escStore.firstValidEscData.data.settingsDirty = false;
                 escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
             }
@@ -693,9 +691,18 @@ const disconnectFromDevice = async () => {
 
         Serial.deinit();
 
+        /*
+        console.log(serialStore.deviceHandles);
         serialStore.deviceHandles.reader?.releaseLock();
         serialStore.deviceHandles.writer?.releaseLock();
         await serialStore.deviceHandles.port.close();
+        */
+
+        if (serialStore.deviceHandles.stream) {
+            serialStore.deviceHandles.stream.reader?.releaseLock();
+            serialStore.deviceHandles.stream.writer?.releaseLock();
+            serialStore.deviceHandles.stream.port.close();
+        }
 
         serialStore.$reset();
 
@@ -820,7 +827,7 @@ const startFlash = async (hexString: string) => {
         for (const n of savingOrApplyingSelectedEscs.value) {
             const i = n - 1;
             escStore.activeTarget = i;
-            await FourWay.getInstance().writeHex(i, hexString, 100);
+            await FourWay.getInstance().writeHex(i, hexString, 200);
             await delay(200);
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);

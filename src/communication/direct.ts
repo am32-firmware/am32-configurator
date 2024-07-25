@@ -87,16 +87,14 @@ export class Direct {
 
         const crc = this.crc16(pBuff);
 
-        console.log(crc.toString(16), crcByte);
-
         return crc.toString(16) === crcByte;
     }
 
     async init () {
-        const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
+        const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
         ]);
-        const result = await serial.write(init);
+        const result = await serial.write(init, 2000);
         if (result) {
             const infoBuffer = result.subarray(init.length);
             const message: FourWayResponse = {
@@ -144,7 +142,6 @@ export class Direct {
                         info.settingsBuffer = settingsArray!;
 
                         for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                            console.log(key, value, info.bootloader.input);
                             if (value === info.bootloader.input) {
                                 info.bootloader.valid = true;
                                 info.bootloader.pin = key;
@@ -190,7 +187,7 @@ export class Direct {
             buffer = Array.from(payload!);
             break;
         case DIRECT_COMMANDS.cmd_Reset:
-            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));;
+            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));
         default:
             break;
         }
