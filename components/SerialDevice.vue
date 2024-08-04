@@ -120,6 +120,7 @@
           <div v-if="true" class="flex flex-col gap-4">
             <UCheckbox
               v-model="ignoreMcuLayout"
+              :disabled="isFlashingActive"
               :ui="{
                 label: 'text-sm font-medium text-red-700 dark:text-red-500',
               }"
@@ -136,6 +137,7 @@
             />
             <UCheckbox
               v-model="includePrerelease"
+              :disabled="isFlashingActive"
               :ui="{
                 label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
               }"
@@ -152,7 +154,7 @@
             />
             <UTabs
               v-model="currentTab"
-              :items="[{ label: 'Release', slot: 'release' }, { label: 'Local', slot:'local' }]"
+              :items="flashTabs"
             >
               <template #release>
                 <div class="flex flex-col gap-4">
@@ -160,6 +162,7 @@
                     v-model="selectedRelease"
                     searchable
                     searchable-placeholder="Search a release..."
+                    :disabled="isFlashingActive"
                     :options="releasesOptions"
                     :loading="pending"
                   />
@@ -168,7 +171,7 @@
                     searchable
                     searchable-placeholder="Search a hex file..."
                     :options="assets"
-                    :disabled="assets?.length === 0 || !ignoreMcuLayout"
+                    :disabled="assets?.length === 0 || !ignoreMcuLayout || isFlashingActive"
                     :loading="pending"
                   />
                 </div>
@@ -180,8 +183,12 @@
                     size="sm"
                     icon="i-heroicons-folder"
                     accept=".hex"
+                    :disabled="isFlashingActive"
                     @change="selectFile($event)"
                   />
+                  <div v-if="isFlashingActive" class="text-green-500 text-center">
+                    Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
+                  </div>
                 </div>
               </template>
             </UTabs>
@@ -387,6 +394,7 @@ const selectedAsset = ref('');
 const ignoreMcuLayout = ref(false);
 const includePrerelease = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
+const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
@@ -399,6 +407,8 @@ const releases = computed(() => ((data.value?.data as unknown as { data: BlobFol
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
 const releasesOptions = computed(() => (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a)));
+
+const flashTabs = computed(() => [{ label: 'Release', disabled: isFlashingActive.value, slot: 'release' }, { label: 'Local', disabled: isFlashingActive.value, slot: 'local' }]);
 
 watch(releasesOptions, (d) => {
     if (!selectedRelease.value && d?.length > 0) {
