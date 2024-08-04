@@ -117,7 +117,7 @@
             </div>
           </template>
 
-          <div v-if="file_input?.files?.length === 0" class="flex flex-col gap-4">
+          <div v-if="true" class="flex flex-col gap-4">
             <UCheckbox
               v-model="ignoreMcuLayout"
               :ui="{
@@ -150,24 +150,44 @@
               color="orange"
               description="Prerelease or release candidate versions might have bugs, if you encounter issues, please join our discord and report them!"
             />
-            <USelectMenu
-              v-model="selectedRelease"
-              searchable
-              searchable-placeholder="Search a release..."
-              :options="releasesOptions"
-              :loading="pending"
-            />
-            <USelectMenu
-              v-model="selectedAsset"
-              searchable
-              searchable-placeholder="Search a hex file..."
-              :options="assets"
-              :disabled="assets?.length === 0 || !ignoreMcuLayout"
-              :loading="pending"
-            />
+            <UTabs
+              v-model="currentTab"
+              :items="[{ label: 'Release', slot: 'release' }, { label: 'Local', slot:'local' }]"
+            >
+              <template #release>
+                <div class="flex flex-col gap-4">
+                  <USelectMenu
+                    v-model="selectedRelease"
+                    searchable
+                    searchable-placeholder="Search a release..."
+                    :options="releasesOptions"
+                    :loading="pending"
+                  />
+                  <USelectMenu
+                    v-model="selectedAsset"
+                    searchable
+                    searchable-placeholder="Search a hex file..."
+                    :options="assets"
+                    :disabled="assets?.length === 0 || !ignoreMcuLayout"
+                    :loading="pending"
+                  />
+                </div>
+              </template>
+              <template #local>
+                <div class="flex flex-col gap-4">
+                  <UInput
+                    type="file"
+                    size="sm"
+                    icon="i-heroicons-folder"
+                    accept=".hex"
+                    @change="selectFile($event)"
+                  />
+                </div>
+              </template>
+            </UTabs>
           </div>
           <div v-else class="text-green-500 text-center">
-            Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
+            Flashing local '{{ fileInput ?? 'UNKNOWN' }}'
           </div>
           <div v-if="serialStore.isFourWay" class="pt-4">
             <div class="text-center mb-2">
@@ -189,25 +209,14 @@
           </div>
           <template #footer>
             <div class="flex flex-col items-end gap-4">
-              <input
-                id="file_input"
-                ref="file_input"
-                accept=".hex"
-                type="file"
-                class="hidden"
-                @change="startLocalFlash"
-              >
               <div v-if="escStore.activeTarget === -1" class="flex gap-4">
                 <UButton
-                  label="Flash local file"
-                  :disabled="escStore.activeTarget > -1 || savingOrApplyingSelectedEscs.length === 0"
-                  color="orange"
-                  @click="file_input?.click()"
-                />
-                <UButton
                   label="Start flash"
-                  :disabled="!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0"
-                  @click="startRemoteFlash"
+                  :disabled="
+                    (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0)) ||
+                      (currentTab === 1 && !fileInput)
+                  "
+                  @click="startModalFlash"
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
@@ -348,7 +357,7 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable camelcase */
+
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
@@ -369,7 +378,8 @@ const flashModalOpen = ref(false);
 const applyDefaultConfigModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
-const file_input = ref<HTMLInputElement>();
+const fileInput = ref<File | null>(null);
+const currentTab = ref(0);
 const applyConfigFile = ref();
 
 const selectedRelease = ref('');
@@ -712,22 +722,59 @@ const disconnectFromDevice = async () => {
     }
 };
 
+/*
 const startLocalFlash = async (event: Event) => {
     if (event.target instanceof HTMLInputElement) {
         const file: File | undefined = event.target.files?.[0];
         if (file) {
-            const logStore = useLogStore();
 
+        }
+    }
+};
+*/
+
+const selectFile = (event: Event) => {
+    if (event.target instanceof HTMLInputElement && event.target.files?.[0]) {
+        fileInput.value = event.target.files[0];
+    }
+};
+
+const startModalFlash = async () => {
+    if (currentTab.value === 0) {
+        const url = releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.find(f => f.name === selectedAsset.value)?.url;
+        if (url) {
+            const dbEntry = await db.downloads.where('url').equals(url).first();
+
+            escStore.activeTarget = 0;
+            escStore.step = 'Downloading';
+
+            if (dbEntry) {
+                return startFlash(dbEntry.text);
+            }
+
+            const { data } = await useFetch(`/api/file/${url}`);
+
+            if (data.value && typeof data.value === 'string') {
+                await db.downloads.add({
+                    url,
+                    text: data.value
+                });
+
+                startFlash(data.value);
+            }
+        }
+    } else {
+        const logStore = useLogStore();
+        if (fileInput.value) {
             if (!ignoreMcuLayout.value && escStore.firstValidEscData) {
                 const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
                 const eepromOffset = mcu.getEepromOffset();
                 const offset = 0x8000000;
                 const fileNamePlaceOffset = 30;
 
-                const fileFlash = Flash.parseHex(await file.text());
+                const fileFlash = Flash.parseHex(await fileInput.value.text());
                 const findFileNameBlock = fileFlash!.data.find(d =>
-                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) &&
-          (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
+                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) && (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
                 );
                 if (!findFileNameBlock) {
                     logStore.logError('File name not found in hex, probably too old!');
@@ -748,32 +795,7 @@ const startLocalFlash = async (event: Event) => {
                     throw new Error('Layout does not match! Aborting flash!');
                 }
             }
-            startFlash(await file.text());
-        }
-    }
-};
-
-const startRemoteFlash = async () => {
-    const url = releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.find(f => f.name === selectedAsset.value)?.url;
-    if (url) {
-        const dbEntry = await db.downloads.where('url').equals(url).first();
-
-        escStore.activeTarget = 0;
-        escStore.step = 'Downloading';
-
-        if (dbEntry) {
-            return startFlash(dbEntry.text);
-        }
-
-        const { data } = await useFetch(`/api/file/${url}`);
-
-        if (data.value && typeof data.value === 'string') {
-            await db.downloads.add({
-                url,
-                text: data.value
-            });
-
-            startFlash(data.value);
+            startFlash(await fileInput.value.text());
         }
     }
 };
@@ -847,9 +869,9 @@ const startFlash = async (hexString: string) => {
         escStore.totalBytes = 0;
         escStore.activeTarget = -1;
         flashModalOpen.value = false;
-        if (file_input.value) {
+        /* if (file_input.value) {
             file_input.value.value = '';
-        }
+        } */
     }
 };
 
