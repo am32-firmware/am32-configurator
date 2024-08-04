@@ -49,10 +49,10 @@ export default defineEventHandler(async (event) => {
                     cache.prerelease === false
                 )) {
                     if (subParts.length > 0) {
-                        let subfolder = folder.children.find(sf => sf.name === fileOrVersion);
+                        let subfolder = folder.children.find(sf => sf.name === fileOrVersion + (cache?.prerelease ? cache?.name?.split('-').pop() ?? '' : ''));
                         if (!subfolder) {
                             subfolder = {
-                                name: fileOrVersion,
+                                name: fileOrVersion + (cache?.prerelease ? cache?.name?.split('-').pop() ?? '' : ''),
                                 files: [],
                                 children: []
                             };

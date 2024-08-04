@@ -161,6 +161,7 @@ export class Msp {
         }
 
         try {
+            console.log('send');
             return await Serial.write(bufferOut);
         } catch (e: any) {
             this.logError(`MSP command failed: ${e.message}`);
@@ -170,6 +171,7 @@ export class Msp {
 
     async sendWithPromise (command: MSP_COMMANDS, data?: Uint8Array) {
         const result = await this.send(command, data);
+        console.log('result', result);
         if (result) {
             return this.processResponse(result);
         } else {
@@ -191,12 +193,12 @@ export class Msp {
         }
     }
 
-    getTypeMotorCommand(type: "inav" | "bf" | "qs" | "kiss" | null) {
+    getTypeMotorCommand (type: 'inav' | 'bf' | 'qs' | 'kiss' | 'ardu' | null) {
         switch (type) {
-            case 'inav':
-                return MSP_COMMANDS.MSP_MOTOR;
-            default:
-                return MSP_COMMANDS.MSP_MOTOR_CONFIG;
+        case 'inav':
+            return MSP_COMMANDS.MSP_MOTOR;
+        default:
+            return MSP_COMMANDS.MSP_MOTOR_CONFIG;
         }
     }
 

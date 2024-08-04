@@ -1,6 +1,7 @@
-import type { StreamInfo, WebSerial } from 'webserial-wrapper';
-
+import type { WebSerial } from 'webserial-wrapper';
 class Serial {
+    private readBuffer: Uint8Array | null = null;
+    private readBufferTimeout: NodeJS.Timeout | null = null;
     private log: LogFn = (_s: string) => {};
     private logError: LogFn = (_s: string) => {};
     private logWarning: LogFn = (_s: string) => {};
@@ -31,49 +32,77 @@ class Serial {
         this.writer = null;
     }
 
-    public async writeWithResponse (data: ArrayBuffer, timeout = 100) {
+    public writeWithResponse (data: ArrayBuffer, timeout = 50): Promise<Uint8Array | null> {
         if (!this.serial || !this.port) {
             throw new Error('WebSerial or SerialPort instance missing');
         }
-        /* let ret = new Uint8Array();
-        let t: NodeJS.Timeout;
-        let stream: StreamInfo | null = null;
-        const endStream = () => {
-            if (!stream) {
-                return;
-            }
-            stream.running = false;
-            if (stream.port.readable && stream.reader) {
-                try {
-                    stream.reader.releaseLock();
-                } catch (a) {
-                    // console.error(a);
+
+        const serialStore = useSerialStore();
+
+        if (this.readBufferTimeout) {
+            clearTimeout(this.readBufferTimeout);
+        }
+
+        return new Promise((resolve, reject) => {
+            if (this.serial && this.port) {
+                let ret: Uint8Array | null = null;
+                let t: NodeJS.Timeout;
+
+                const endStream = () => {
+                    if (!serialStore.deviceHandles.stream) {
+                        return;
+                    }
+                    if (serialStore.deviceHandles.stream.port.readable && serialStore.deviceHandles.stream.reader) {
+                        try {
+                            // serialStore.deviceHandles.stream.reader.releaseLock();
+                            serialStore.deviceHandles.stream!.ondata = () => {};
+                        } catch (a) {
+                            console.error(a);
+                            reject(a);
+                        } finally {
+                            resolve(ret);
+                        }
+                        if (serialStore.deviceHandles.stream.transforms) {
+                            serialStore.deviceHandles.stream.reader.cancel().catch(() => {});
+                        }
+                    } else {
+                        reject(new Error('port not read or writeable'));
+                    }
+                    // stream.port.close().catch(err => console.error(err));
+                };
+
+                if (!serialStore.deviceHandles.stream) {
+                    serialStore.deviceHandles.stream = this.serial.createStream({
+                        port: this.port,
+                        frequency: 1,
+                        ondata: () => {}
+                    });
                 }
-                if (stream.transforms) {
-                    stream.reader.cancel().catch(() => {});
-                }
-            }
-            // stream.port.close().catch(err => console.error(err));
-        };
-        stream = this.serial.createStream({
-            port: this.port,
-            frequency: 1,
-            ondata: (data) => {
-                ret = mergeUint8Arrays(ret, data);
-                clearTimeout(t);
-                t = setTimeout(endStream, 10);
+
+                serialStore.deviceHandles.stream!.ondata = (data) => {
+                    clearTimeout(t);
+                    ret = mergeUint8Arrays(ret ?? new Uint8Array(), data);
+                    t = setTimeout(endStream, timeout);
+                };
+
+                t = setTimeout(endStream, timeout);
+                // this.serial.writeStream(serialStore.deviceHandles.stream!, data).then(() => {
+                this.serial.writeStream(serialStore.deviceHandles.stream!, [...new Uint8Array(data)]).then(() => {
+                    try {
+                        delay(200).then(() => {
+                            this.serial!.readStream(serialStore.deviceHandles.stream!);
+                        });
+                    } catch (a) {
+                        reject(a);
+                        console.error(a);
+                    }
+                }).catch(() => {});
+            } else {
+                resolve(null);
             }
         });
-        t = setTimeout(endStream, 10);
 
-        await this.serial.writeStream(stream!, data).catch(() => {});
-        try {
-            this.serial.readStream(stream!);
-        } catch {}
-        while (stream!.running) {
-            await delay(5);
-        }
-        return ret; */
+        /*
         console.log('writeWithResponse', data, timeout);
         return this.serial.writePort(this.port, data).then(async (success) => {
             if (success) {
@@ -101,6 +130,7 @@ class Serial {
                         value = mergeUint8Arrays(value, tmp.value);
                     }
                 }
+                console.log(value);
                 return value;
             }
             throw new Error('writing to port not successfull');
@@ -108,6 +138,7 @@ class Serial {
             console.error(err);
             return null;
         });
+        */
     }
 
     public write (data: ArrayBuffer, ms = 100) {
@@ -160,7 +191,7 @@ class Serial {
 
     public read<T = any> (): Promise<ReadableStreamReadResult<T>> {
         if (this.serial && this.port) {
-            return this.serial.readWithTimeout(this.port, 10);
+            return this.serial.readWithTimeout(this.port, 100);
         }
 
         this.logError('Serial not initiated!');

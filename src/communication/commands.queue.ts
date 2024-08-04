@@ -17,7 +17,7 @@ class CommandQueue {
     });
 
     callbackQueue: {
-        [key: string]: [PromiseFn, number]
+        [key: string]: [PromiseFn<any>, number]
     } = {};
 
     constructor () {
@@ -72,6 +72,9 @@ class CommandQueue {
             case 'INAV':
                 serialStore.mspData.type = 'inav';
                 break;
+            case 'ARDU':
+                serialStore.mspData.type = 'ardu';
+                break;
             default:
                 serialStore.mspData.type = null;
                 logStore.logError(`Unknown fc type '${fcType}'`);
@@ -98,7 +101,7 @@ class CommandQueue {
             break;
         case MSP_COMMANDS.MSP_MOTOR:
             serialStore.mspData.motorCount = 0;
-            for (let i = 0; i < data.buffer.byteLength; i+=2) {
+            for (let i = 0; i < data.buffer.byteLength; i += 2) {
                 if (data.getUint16(i) > 0) {
                     serialStore.mspData.motorCount++;
                 }
@@ -116,7 +119,7 @@ class CommandQueue {
         }
     }
 
-    addCommandWithCallback (command: QueueCommand, callback: PromiseFn) {
+    addCommandWithCallback (command: QueueCommand, callback: PromiseFn<any>) {
         this.addCallback(command.commandName, callback);
         this.addCommand(command);
     }
@@ -129,7 +132,7 @@ class CommandQueue {
         });
     }
 
-    addCallback (command: MSP_COMMANDS | FOUR_WAY_COMMANDS, callback: PromiseFn, retries = 0) {
+    addCallback (command: MSP_COMMANDS | FOUR_WAY_COMMANDS, callback: PromiseFn<any>, retries = 0) {
         const e = useSerialStore().isFourWay ? FOUR_WAY_COMMANDS : MSP_COMMANDS;
         this.callbackQueue[enumToString(command, e)] = [callback, retries];
     }

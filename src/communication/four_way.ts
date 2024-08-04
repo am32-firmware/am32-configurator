@@ -226,7 +226,7 @@ export class FourWay {
         }
     }
 
-    sendWithCallback (command: FOUR_WAY_COMMANDS, callback: PromiseFn, params: number[] = [0], address = 0, retries = 0) {
+    sendWithCallback (command: FOUR_WAY_COMMANDS, callback: PromiseFn<any>, params: number[] = [0], address = 0, retries = 0) {
         CommandQueue.addCallback(command, callback, retries);
         return this.send(command, params, address);
     }
@@ -234,13 +234,13 @@ export class FourWay {
     sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200): Promise<FourWayResponse | null> {
         let currentTry = 0;
 
-        const callback: (resolve: PromiseFn, reject: PromiseFn) => void = async (resolve, reject) => {
+        const callback: (resolve: PromiseFn<any>, reject: PromiseFn<any>) => void = async (resolve, reject) => {
             while (currentTry++ < retries) {
                 const result = await this.send(command, params, address, timeout).catch((err) => {
                     console.log(err);
                     return null;
                 });
-                console.log(params, enumToString(command, FOUR_WAY_COMMANDS), result);
+                console.log(currentTry, params, enumToString(command, FOUR_WAY_COMMANDS), result);
                 if (command === FOUR_WAY_COMMANDS.cmd_InterfaceExit) {
                     resolve(null);
                     break;

@@ -117,9 +117,10 @@
             </div>
           </template>
 
-          <div v-if="file_input?.files?.length === 0" class="flex flex-col gap-4">
+          <div v-if="true" class="flex flex-col gap-4">
             <UCheckbox
               v-model="ignoreMcuLayout"
+              :disabled="isFlashingActive"
               :ui="{
                 label: 'text-sm font-medium text-red-700 dark:text-red-500',
               }"
@@ -136,6 +137,7 @@
             />
             <UCheckbox
               v-model="includePrerelease"
+              :disabled="isFlashingActive"
               :ui="{
                 label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
               }"
@@ -150,24 +152,49 @@
               color="orange"
               description="Prerelease or release candidate versions might have bugs, if you encounter issues, please join our discord and report them!"
             />
-            <USelectMenu
-              v-model="selectedRelease"
-              searchable
-              searchable-placeholder="Search a release..."
-              :options="releasesOptions"
-              :loading="pending"
-            />
-            <USelectMenu
-              v-model="selectedAsset"
-              searchable
-              searchable-placeholder="Search a hex file..."
-              :options="assets"
-              :disabled="assets?.length === 0 || !ignoreMcuLayout"
-              :loading="pending"
-            />
+            <UTabs
+              v-model="currentTab"
+              :items="flashTabs"
+            >
+              <template #release>
+                <div class="flex flex-col gap-4">
+                  <USelectMenu
+                    v-model="selectedRelease"
+                    searchable
+                    searchable-placeholder="Search a release..."
+                    :disabled="isFlashingActive"
+                    :options="releasesOptions"
+                    :loading="pending"
+                  />
+                  <USelectMenu
+                    v-model="selectedAsset"
+                    searchable
+                    searchable-placeholder="Search a hex file..."
+                    :options="assets"
+                    :disabled="assets?.length === 0 || !ignoreMcuLayout || isFlashingActive"
+                    :loading="pending"
+                  />
+                </div>
+              </template>
+              <template #local>
+                <div class="flex flex-col gap-4">
+                  <UInput
+                    type="file"
+                    size="sm"
+                    icon="i-heroicons-folder"
+                    accept=".hex"
+                    :disabled="isFlashingActive"
+                    @change="selectFile($event)"
+                  />
+                  <div v-if="isFlashingActive" class="text-green-500 text-center">
+                    Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
+                  </div>
+                </div>
+              </template>
+            </UTabs>
           </div>
           <div v-else class="text-green-500 text-center">
-            Flashing local '{{ file_input?.files?.[0].name ?? 'UNKNOWN' }}'
+            Flashing local '{{ fileInput ?? 'UNKNOWN' }}'
           </div>
           <div v-if="serialStore.isFourWay" class="pt-4">
             <div class="text-center mb-2">
@@ -189,25 +216,14 @@
           </div>
           <template #footer>
             <div class="flex flex-col items-end gap-4">
-              <input
-                id="file_input"
-                ref="file_input"
-                accept=".hex"
-                type="file"
-                class="hidden"
-                @change="startLocalFlash"
-              >
               <div v-if="escStore.activeTarget === -1" class="flex gap-4">
                 <UButton
-                  label="Flash local file"
-                  :disabled="escStore.activeTarget > -1 || savingOrApplyingSelectedEscs.length === 0"
-                  color="orange"
-                  @click="file_input?.click()"
-                />
-                <UButton
                   label="Start flash"
-                  :disabled="!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0"
-                  @click="startRemoteFlash"
+                  :disabled="
+                    (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0)) ||
+                      (currentTab === 1 && !fileInput)
+                  "
+                  @click="startModalFlash"
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
@@ -348,7 +364,7 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable camelcase */
+
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, DIRECT_RESPONSES, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
@@ -363,13 +379,14 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 const { escData } = storeToRefs(escStore);
 const { log, logWarning, logError } = useLogStore();
-const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A];
-const usbDirectVendorIds = [0x1A86, 0x0403];
+const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A, 0x1209, 0x26AC, 0x27AC, 0x2DAE, 0x3162, 0x35A7];
+const usbDirectVendorIds = [0x1A86, 0x0403, 0x4348, 0x26BA];
 const flashModalOpen = ref(false);
 const applyDefaultConfigModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
 const applyConfigModalOpen = ref(false);
-const file_input = ref<HTMLInputElement>();
+const fileInput = ref<File | null>(null);
+const currentTab = ref(0);
 const applyConfigFile = ref();
 
 const selectedRelease = ref('');
@@ -377,6 +394,7 @@ const selectedAsset = ref('');
 const ignoreMcuLayout = ref(false);
 const includePrerelease = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
+const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
@@ -389,6 +407,8 @@ const releases = computed(() => ((data.value?.data as unknown as { data: BlobFol
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
 const releasesOptions = computed(() => (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a)));
+
+const flashTabs = computed(() => [{ label: 'Release', disabled: isFlashingActive.value, slot: 'release' }, { label: 'Local', disabled: isFlashingActive.value, slot: 'local' }]);
 
 watch(releasesOptions, (d) => {
     if (!selectedRelease.value && d?.length > 0) {
@@ -418,7 +438,8 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
 watchEffect(() => {
     if (assets.value && escStore.escData.length > 0) {
         const tag = selectedRelease.value;
-        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${tag.substring(1)}.hex`);
+        const cleanTag = tag.substring(1).replace(/rc[1-9][0-9]*/gi, '');
+        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`); 
         selectedAsset.value = currentAsset ?? 'NOT FOUND';
     }
 });
@@ -541,6 +562,8 @@ const connectToDevice = async () => {
 
                     escStore.count = 1;
                     escStore.expectedCount = 1;
+
+                    await delay(200);
 
                     const info = await Direct.getInstance().init();
                     const newEscData = {
@@ -668,16 +691,12 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        console.log(mcu.getEepromOffset());
         const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
-        console.log(setAddress);
         if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([Mcu.LAYOUT_SIZE]));
             const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.firstValidEscData.data.settings));
-            console.log(sendBuffer);
             if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                const writeFlash = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                console.log(writeFlash);
+                await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
                 escStore.firstValidEscData.data.settingsDirty = false;
                 escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
             }
@@ -693,9 +712,18 @@ const disconnectFromDevice = async () => {
 
         Serial.deinit();
 
+        /*
+        console.log(serialStore.deviceHandles);
         serialStore.deviceHandles.reader?.releaseLock();
         serialStore.deviceHandles.writer?.releaseLock();
         await serialStore.deviceHandles.port.close();
+        */
+
+        if (serialStore.deviceHandles.stream) {
+            serialStore.deviceHandles.stream.reader?.releaseLock();
+            serialStore.deviceHandles.stream.writer?.releaseLock();
+            serialStore.deviceHandles.stream.port.close();
+        }
 
         serialStore.$reset();
 
@@ -705,22 +733,59 @@ const disconnectFromDevice = async () => {
     }
 };
 
+/*
 const startLocalFlash = async (event: Event) => {
     if (event.target instanceof HTMLInputElement) {
         const file: File | undefined = event.target.files?.[0];
         if (file) {
-            const logStore = useLogStore();
 
+        }
+    }
+};
+*/
+
+const selectFile = (event: Event) => {
+    if (event.target instanceof HTMLInputElement && event.target.files?.[0]) {
+        fileInput.value = event.target.files[0];
+    }
+};
+
+const startModalFlash = async () => {
+    if (currentTab.value === 0) {
+        const url = releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.find(f => f.name === selectedAsset.value)?.url;
+        if (url) {
+            const dbEntry = await db.downloads.where('url').equals(url).first();
+
+            escStore.activeTarget = 0;
+            escStore.step = 'Downloading';
+
+            if (dbEntry) {
+                return startFlash(dbEntry.text);
+            }
+
+            const { data } = await useFetch(`/api/file/${url}`);
+
+            if (data.value && typeof data.value === 'string') {
+                await db.downloads.add({
+                    url,
+                    text: data.value
+                });
+
+                startFlash(data.value);
+            }
+        }
+    } else {
+        const logStore = useLogStore();
+        if (fileInput.value) {
             if (!ignoreMcuLayout.value && escStore.firstValidEscData) {
                 const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
                 const eepromOffset = mcu.getEepromOffset();
                 const offset = 0x8000000;
                 const fileNamePlaceOffset = 30;
 
-                const fileFlash = Flash.parseHex(await file.text());
+                const fileFlash = Flash.parseHex(await fileInput.value.text());
                 const findFileNameBlock = fileFlash!.data.find(d =>
-                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) &&
-          (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
+                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) && (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
                 );
                 if (!findFileNameBlock) {
                     logStore.logError('File name not found in hex, probably too old!');
@@ -741,32 +806,7 @@ const startLocalFlash = async (event: Event) => {
                     throw new Error('Layout does not match! Aborting flash!');
                 }
             }
-            startFlash(await file.text());
-        }
-    }
-};
-
-const startRemoteFlash = async () => {
-    const url = releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.find(f => f.name === selectedAsset.value)?.url;
-    if (url) {
-        const dbEntry = await db.downloads.where('url').equals(url).first();
-
-        escStore.activeTarget = 0;
-        escStore.step = 'Downloading';
-
-        if (dbEntry) {
-            return startFlash(dbEntry.text);
-        }
-
-        const { data } = await useFetch(`/api/file/${url}`);
-
-        if (data.value && typeof data.value === 'string') {
-            await db.downloads.add({
-                url,
-                text: data.value
-            });
-
-            startFlash(data.value);
+            startFlash(await fileInput.value.text());
         }
     }
 };
@@ -820,7 +860,7 @@ const startFlash = async (hexString: string) => {
         for (const n of savingOrApplyingSelectedEscs.value) {
             const i = n - 1;
             escStore.activeTarget = i;
-            await FourWay.getInstance().writeHex(i, hexString, 100);
+            await FourWay.getInstance().writeHex(i, hexString, 200);
             await delay(200);
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);
@@ -840,9 +880,9 @@ const startFlash = async (hexString: string) => {
         escStore.totalBytes = 0;
         escStore.activeTarget = -1;
         flashModalOpen.value = false;
-        if (file_input.value) {
+        /* if (file_input.value) {
             file_input.value.value = '';
-        }
+        } */
     }
 };
 
