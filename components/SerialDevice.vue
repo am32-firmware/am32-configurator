@@ -438,7 +438,8 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
 watchEffect(() => {
     if (assets.value && escStore.escData.length > 0) {
         const tag = selectedRelease.value;
-        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${tag.substring(1)}.hex`);
+        const cleanTag = tag.substring(1).replace(/rc[1-9][0-9]*/gi, '');
+        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`); 
         selectedAsset.value = currentAsset ?? 'NOT FOUND';
     }
 });
