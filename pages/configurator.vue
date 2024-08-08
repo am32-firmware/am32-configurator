@@ -119,7 +119,7 @@
                       :step="7.5"
                       :display-factor="7.5"
                       unit="°"
-                      :disabled="() => escStore.firstValidEscData?.data.settings.AUTO_TIMING === 0"
+                      :disabled="(v: number) => escStore.firstValidEscData?.data.settings.AUTO_TIMING === 1"
                       @change="onSettingsChange"
                     />
                     <SettingField
@@ -182,7 +182,7 @@
                           {{ value }}kHz - {{ value as number * 2 }}kHz
                         </div>
                         <div v-else>
-                          {{ value }}
+                          {{ value }}kHz
                         </div>
                       </template>
                     </SettingField>
