@@ -85,6 +85,7 @@
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Motor"
+                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
                     :cols="3"
                     :switches="[{
                       field: 'STUCK_ROTOR_PROTECTION',
@@ -101,6 +102,10 @@
                     }, {
                       field: 'COMPLEMENTARY_PWM',
                       name: 'Complementary PWM'
+                    }, {
+                      field: 'AUTO_TIMING',
+                      name: 'Auto timing advance',
+                      minEepromVersion: 3
                     }]"
                     @change="onSettingsChange"
                   >
@@ -114,6 +119,7 @@
                       :step="7.5"
                       :display-factor="7.5"
                       unit="°"
+                      :disabled="() => escStore.firstValidEscData?.data.settings.AUTO_TIMING === 0"
                       @change="onSettingsChange"
                     />
                     <SettingField

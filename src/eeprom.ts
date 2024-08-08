@@ -155,6 +155,10 @@ export const EepromLayout = {
     STARTUP_MELODY: {
         offset: 0x30,
         size: 128
+    },
+    AUTO_TIMING: {
+        offset: 0xB0,
+        size: 1
     }
 };
 

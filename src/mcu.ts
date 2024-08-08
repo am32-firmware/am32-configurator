@@ -73,7 +73,7 @@ class Mcu {
     };
 
     static RESET_DELAY_MS = 5000;
-    static LAYOUT_SIZE = 0xB0;
+    static LAYOUT_SIZE = 0xB8;
 
     static BOOT_LOADER_VERSION_OFFSET = 0x00C0;
     static BOOT_LOADER_VERSION_SIZE = 1;

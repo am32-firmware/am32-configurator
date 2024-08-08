@@ -439,7 +439,7 @@ watchEffect(() => {
     if (assets.value && escStore.escData.length > 0) {
         const tag = selectedRelease.value;
         const cleanTag = tag.substring(1).replace(/rc[1-9][0-9]*/gi, '');
-        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`); 
+        const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`);
         selectedAsset.value = currentAsset ?? 'NOT FOUND';
     }
 });
@@ -892,6 +892,8 @@ const applyDefaultConfig = async () => {
     if (file) {
         const buffer = new Uint8Array(await file.arrayBuffer());
         const settings = bufferToSettings(buffer);
+
+        settings.STARTUP_MELODY = (new Array(128)).fill(0xFF);
 
         for (const n of savingOrApplyingSelectedEscs.value) {
             escStore.escData[n - 1].data.settings = settings;

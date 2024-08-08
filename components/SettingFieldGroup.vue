@@ -5,12 +5,12 @@
     </div>
     <div class="flex">
       <div v-if="switches.length > 0" class="p-4">
-        <div v-for="{ field, name } of switches" :key="field">
+        <div v-for="{ field, name } of filteredSwitches" :key="field">
           <UCheckbox :label="name" v-model="model(field).value"/>
         </div>
       </div>
       <div class="flex-grow grid gap-4 p-4" :class="`grid-cols-${cols}`">
-        <slot></slot>
+        <slot />
       </div>
     </div>
   </div>
@@ -23,21 +23,26 @@ const escStore = useEscStore();
 interface SwitchType {
   field: EepromLayoutKeys;
   name: string;
+  minEepromVersion?: number;
 }
 
 interface SettingFieldGroupProps {
     title: string;
     cols: number;
+    eepromVersion?: number;
     switches?: SwitchType[];
 }
 
 const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number }): void}>();
 
-withDefaults(defineProps<SettingFieldGroupProps>(), {
+const props = withDefaults(defineProps<SettingFieldGroupProps>(), {
     title: '',
     cols: 3,
+    eepromVersion: 0,
     switches: () => []
 });
+
+const filteredSwitches = computed(() => props.switches.filter(s => !s.minEepromVersion || props.eepromVersion >= s.minEepromVersion));
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
