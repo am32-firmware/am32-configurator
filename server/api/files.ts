@@ -1,6 +1,6 @@
 import { getStore, listStores } from '@netlify/blobs';
 import { Octokit } from 'octokit';
-import * as Minio from 'minio';
+    import * as Minio from 'minio';
 import dayjs from 'dayjs';
 
 export default defineEventHandler(async (event) => {
@@ -135,11 +135,10 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    // console.log(tools, folders);
     folders.push({
         name: 'tools',
         children: [],
-        files: minioCache.map(t => ({
+        files: tools.map(t => ({
             name: t.name,
             url: t.url
         }))
