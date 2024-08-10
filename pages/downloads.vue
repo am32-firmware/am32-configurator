@@ -57,7 +57,7 @@
               <div class="grid grid-cols-4">
                 <div v-for="file of getFolder('tools').value?.files ?? []" :key="file.url" class="py-1">
                   <ULink
-                    :to="`api/file/${file.url}`"
+                    :to="`${file.url}`"
                     external
                     :download="file.name"
                     class="transition-all hover:text-green-500"

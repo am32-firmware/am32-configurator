@@ -14,14 +14,16 @@ import 'dotenv';
         token: process.env.NETLIFY_TOKEN
     });
 
+    /*
     const toolsStore = getStore({
         name: 'tools',
         siteID: process.env.NETLIFY_SITE_ID,
         token: process.env.NETLIFY_TOKEN
     });
+    */
 
     const bootloader = fs.readdirSync(path.resolve(__dirname, 'bootloader'));
-    const tools = fs.readdirSync(path.resolve(__dirname, 'tools'));
+    // const tools = fs.readdirSync(path.resolve(__dirname, 'tools'));
 
     console.log('bootloader:');
 
@@ -38,6 +40,7 @@ import 'dotenv';
         }
     }
 
+    /*
     console.log('tools:');
 
     for (const tool of tools) {
@@ -50,8 +53,9 @@ import 'dotenv';
             await toolsStore.set(tool, file);
         } else {
             console.log(`\tskip ${tool}`);
-        }
+       }
     }
+    */
 
     await fetchReleases('v2.08');
 

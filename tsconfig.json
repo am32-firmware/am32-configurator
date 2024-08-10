@@ -3,6 +3,8 @@
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
     "module": "ES2022",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "types": [
       "@types/w3c-web-serial"
     ]
