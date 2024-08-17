@@ -6,6 +6,18 @@
           <UCard>
             <div class="container">
               <h1 class="text-3xl font-bold mb-4">
+                Active financial supporters
+              </h1>
+              <div class="flex justify-center gap-4">
+                <a class="border border-black bg-black/30 rounded-lg overflow-hidden p-1" href="https://skystars-rc.com/" target="_blank">
+                  <img class="grayscale invert max-w-[400px] h-auto" src="https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png">
+                </a>
+              </div>
+            </div>
+          </UCard>
+          <UCard>
+            <div class="container">
+              <h1 class="text-3xl font-bold mb-4">
                 AM32 MultiRotor ESC Firmware
               </h1>
               <p class="text-lg mb-8">
