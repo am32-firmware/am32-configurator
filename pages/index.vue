@@ -9,8 +9,11 @@
                 Active financial supporters
               </h1>
               <div class="flex justify-center gap-4">
-                <a class="border border-black bg-black/30 rounded-lg overflow-hidden p-1" href="https://skystars-rc.com/" target="_blank">
-                  <img class="grayscale invert max-w-[400px] h-auto" src="https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png">
+                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://store.airbot.racing/" target="_blank">
+                  <img class="grayscale invert max-h-[100px] h-auto" src="https://store.airbot.racing/cdn/shop/files/Airbot_Logo.jpg">
+                </a>
+                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://skystars-rc.com/" target="_blank">
+                  <img class="grayscale invert max-h-[100px] h-auto" src="https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png">
                 </a>
               </div>
             </div>
