@@ -33,6 +33,10 @@ export default defineNuxtConfig({
     colorMode: {
         preference: 'dark'
     },
+    svgo: {
+        autoImportPath: false,
+        explicitImportsOnly: true
+    },
     pwa: {
         registerType: 'autoUpdate',
         manifest: {

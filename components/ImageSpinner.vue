@@ -1,7 +1,7 @@
 <template>
   <div v-if="isStatic" class="flex justify-center gap-4">
-    <a v-for="e of randomImages" :key="e.url" class="border border-black bg-black rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
-      <img class="grayscale invert max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
+    <a v-for="e of randomImages" :key="e.url" class="ring ring-green-600 bg-green-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
+      <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
     </a>
   </div>
   <div v-else class="flex justify-center gap-4 relative">
@@ -24,8 +24,8 @@
       :duration="{ appear: 'auto', in: 'auto', out: 0 }"
       class="flex justify-center gap-4"
     >
-      <a v-for="e of imagePage" :key="e.url" class="border border-black bg-black rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
-        <img class="grayscale invert max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
+      <a v-for="e of imagePage" :key="e.url" class="ring ring-green-600 bg-green-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
+        <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
       </a>
     </XyzTransitionGroup>
   </div>

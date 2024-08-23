@@ -134,15 +134,19 @@
 </template>
 <script setup lang="ts">
 import holybroImage from '~/assets/logos/holybro.png';
+import skystars from '~/assets/logos/skystars.png';
+import airbotImage from '~/assets/logos/Airbot_Logo.svg';
 
 const images = [{
-    path: 'https://store.airbot.racing/cdn/shop/files/Airbot_Logo.jpg',
-    url: 'https://store.airbot.racing/'
+    path: airbotImage,
+    url: 'https://store.airbot.racing/',
+    class: 'invert'
 }, {
-    path: 'https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png',
+    path: skystars,
     url: 'https://skystars-rc.com/'
 }, {
     path: holybroImage,
-    url: 'https://holybro.com/'
+    url: 'https://holybro.com/',
+    class: 'invert'
 }];
 </script>
