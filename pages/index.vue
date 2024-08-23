@@ -8,17 +8,9 @@
               <h1 class="text-3xl font-bold mb-4">
                 Active financial supporters
               </h1>
-              <div class="flex justify-center gap-4">
-                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://store.airbot.racing/" target="_blank">
-                  <img class="grayscale invert max-h-[100px] h-auto" src="https://store.airbot.racing/cdn/shop/files/Airbot_Logo.jpg">
-                </a>
-                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://skystars-rc.com/" target="_blank">
-                  <img class="grayscale invert max-h-[100px] h-auto" src="https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png">
-                </a>
-                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://holybro.com/" target="_blank">
-                  <img class="grayscale invert max-h-[100px] h-auto" src="~/assets/logos/holybro.png">
-                </a>
-              </div>
+              <image-spinner
+                :images="images"
+              />
             </div>
           </UCard>
           <UCard>
@@ -69,7 +61,11 @@
                 <p class="mb-4">
                   Visit the <a href="#">latest release</a> for firmware updates.
                 </p>
-                <p>Download the Multi_ESC config tool under the <NuxtLink class="underline text-green-400" to="/downloads">Downloads</NuxtLink> section.</p>
+                <p>
+                  Download the Multi_ESC config tool under the <NuxtLink class="underline text-green-400" to="/downloads">
+                    Downloads
+                  </NuxtLink> section.
+                </p>
               </div>
 
               <div class="mb-8">
@@ -137,4 +133,16 @@
   </div>
 </template>
 <script setup lang="ts">
+import holybroImage from '~/assets/logos/holybro.png';
+
+const images = [{
+    path: 'https://store.airbot.racing/cdn/shop/files/Airbot_Logo.jpg',
+    url: 'https://store.airbot.racing/'
+}, {
+    path: 'https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png',
+    url: 'https://skystars-rc.com/'
+}, {
+    path: holybroImage,
+    url: 'https://holybro.com/'
+}];
 </script>

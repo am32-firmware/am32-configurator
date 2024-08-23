@@ -3,7 +3,10 @@ import { iconsPlugin, getIconCollections } from '@egoist/tailwindcss-icons';
 import typography from '@tailwindcss/typography';
 
 export default {
-    content: [],
+    content: [
+        './pages/**/*.{html,js,vue}',
+        './components/**/*.{html,js,vue}'
+    ],
     theme: {
         extend: {
         },

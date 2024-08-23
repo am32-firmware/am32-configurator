@@ -34,6 +34,8 @@
     "vue-tsc": "^1.2.0"
   },
   "dependencies": {
+    "@animxyz/core": "^0.6.6",
+    "@animxyz/vue3": "^0.6.7",
     "@netlify/blobs": "^7.0.1",
     "@netlify/functions": "^2.6.0",
     "@nuxt/ui": "^2.11.1",
