@@ -15,6 +15,9 @@
                 <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://skystars-rc.com/" target="_blank">
                   <img class="grayscale invert max-h-[100px] h-auto" src="https://skystars-rc.com/wp-content/uploads/2022/09/logo1.png">
                 </a>
+                <a class="border border-black bg-black rounded-lg overflow-hidden p-4" href="https://holybro.com/" target="_blank">
+                  <img class="grayscale invert max-h-[100px] h-auto" src="~/assets/logos/holybro.png">
+                </a>
               </div>
             </div>
           </UCard>
