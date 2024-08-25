@@ -7,11 +7,14 @@ export default defineNuxtConfig({
             enabled: true
         }
     },
+
     typescript: {
         shim: false,
         typeCheck: true
     },
+
     ssr: false,
+
     modules: [
         '@vite-pwa/nuxt',
         'nuxt-svgo',
@@ -25,18 +28,23 @@ export default defineNuxtConfig({
                 'Nunito Sans': true
             }
         }],
-        '@nuxt/content'
+        '@nuxt/content',
+        '@nuxt/image'
     ],
+
     pinia: {
         storesDirs: ['./stores/**']
     },
+
     colorMode: {
         preference: 'dark'
     },
+
     svgo: {
         autoImportPath: false,
         explicitImportsOnly: true
     },
+
     pwa: {
         registerType: 'autoUpdate',
         manifest: {
@@ -91,5 +99,7 @@ export default defineNuxtConfig({
             navigateFallbackAllowlist: [/^\/$/],
             type: 'module'
         }
-    }
+    },
+
+    compatibilityDate: '2024-08-25'
 });

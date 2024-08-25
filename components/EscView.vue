@@ -11,7 +11,7 @@
     <div class="h-full">
       <div class="text-gray-400 mb-4 flex gap-2">
         <div>
-          <UBadge :color="badgeColor">
+          <UBadge :color="!esc || isEscError ? 'red' : (isLoading ? 'yellow' : 'green')">
             <UIcon :name="iconName" dynamic class="text-white h-[20px] w-[20px]" />
           </UBadge>
         </div>
@@ -104,17 +104,7 @@ const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLay
 
 const iconName = computed(() => `i-material-symbols-counter-${props.index + 1}-outline`);
 
-const badgeColor = computed(() => {
-    let color = 'green';
-    if (!props.esc) {
-        color = 'red';
-    } else if (props.esc.isError) {
-        color = 'red';
-    } else if (props.isLoading) {
-        color = 'yellow';
-    }
-    return color;
-});
+const isEscError = computed(() => props.esc?.isError);
 
 const mcu = computed(() => props.esc?.data);
 

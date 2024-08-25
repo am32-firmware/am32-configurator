@@ -1,0 +1,23 @@
+FROM node:lts-alpine AS base
+WORKDIR /usr/src/app
+
+FROM base AS install
+RUN mkdir -p /temp
+COPY package.json yarn.lock /temp/
+RUN cd /temp && yarn install
+
+FROM base AS prerelease
+COPY --from=install /temp/node_modules node_modules
+COPY . .
+
+ENV NODE_ENV=production
+RUN yarn run build
+
+FROM base AS release
+COPY --chown=node:node --from=install /temp/node_modules node_modules
+COPY --chown=node:node --from=prerelease /usr/src/app/.output .
+
+USER node
+ENV HOST 0.0.0.0
+EXPOSE 3000
+ENTRYPOINT [ "node", "server/index.mjs" ]
