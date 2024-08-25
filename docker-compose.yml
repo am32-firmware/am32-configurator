@@ -3,10 +3,14 @@ services:
     build:
       context: ./
       dockerfile: docker/Dockerfile
+    environment:
+      - LETSENCRYPT_HOST=new.am32.ca
+      - VIRTUAL_HOST=new.am32.ca
+      - VIRTUAL_PORT=3000
     ports:
       - "3000:3000"
     networks:
       - proxy
-networks:
+networks: 
   proxy:
     external: true
