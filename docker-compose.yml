@@ -5,4 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "3000:3000"
-    
+    networks:
+      - proxy
+networks:
+  proxy:
+    external: true
