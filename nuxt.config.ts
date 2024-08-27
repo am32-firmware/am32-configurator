@@ -25,7 +25,8 @@ export default defineNuxtConfig({
                 'Nunito Sans': true
             }
         }],
-        '@nuxt/content'
+        '@nuxt/content',
+        '@nuxt/image'
     ],
     pinia: {
         storesDirs: ['./stores/**']

@@ -1,17 +1,19 @@
 <template>
   <div
-    class="min-h-[150px] min-w-[400px] p-4 border bg-slate-500 border-slate-900 rounded-xl cursor-pointer ring-4"
+    class="min-h-[150px] min-w-[400px] p-4 border border-slate-900 rounded-xl cursor-pointer ring-4"
     :class="{
       'ring-red-500': mcu?.isSelected && mcu.settingsDirty,
       'ring-green-500': mcu?.isSelected && !mcu.settingsDirty,
-      'ring-gray-500': !mcu?.isSelected
+      'ring-gray-500': !mcu?.isSelected,
+      'bg-slate-500': !isEscError,
+      'bg-red-100': isEscError
     }"
     @click="toggleSelected"
   >
     <div class="h-full">
       <div class="text-gray-400 mb-4 flex gap-2">
         <div>
-          <UBadge :color="badgeColor">
+          <UBadge :color="!esc || isEscError ? 'red' : (isLoading ? 'yellow' : 'green')">
             <UIcon :name="iconName" dynamic class="text-white h-[20px] w-[20px]" />
           </UBadge>
         </div>
@@ -77,12 +79,21 @@
       <div v-if="esc?.isLoading" class="flex justify-center items-center h-[calc(100%-46px)]">
         <UIcon class="text-gray-700 w-[40px] h-[40px]" name="i-svg-spinners-blocks-wave" dynamic />
       </div>
-      <div v-else-if="mcu">
-        <div>
-          <UCheckbox v-model="isReversed" label="Reversed" />
+      <div v-else-if="mcu" class="">
+        <div v-if="mcu?.settingsBuffer[0] === 0x01">
+          <div>
+            <UCheckbox v-model="isReversed" label="Reversed" />
+          </div>
+          <div>
+            <UCheckbox v-model="is3DMode" label="3D mode" />
+          </div>
         </div>
-        <div>
-          <UCheckbox v-model="is3DMode" label="3D mode" />
+        <div v-if="mcu?.settingsBuffer[0] === 0x00" class="flex items-center justify-center gap-4">
+          <UIcon name="i-heroicons-exclamation-triangle-16-solid" class="w-10 h-10 text-red-700" /> 
+          <div class="text-red-700 font-bold">
+            <p>Flash was unsuccessfull.</p>
+            <p>Reflash firmware to fix</p>
+          </div>
         </div>
       </div>
     </div>
@@ -103,18 +114,7 @@ const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLay
 }>();
 
 const iconName = computed(() => `i-material-symbols-counter-${props.index + 1}-outline`);
-
-const badgeColor = computed(() => {
-    let color = 'green';
-    if (!props.esc) {
-        color = 'red';
-    } else if (props.esc.isError) {
-        color = 'red';
-    } else if (props.isLoading) {
-        color = 'yellow';
-    }
-    return color;
-});
+const isEscError = computed(() => props.esc?.isError || props.esc?.data.settingsBuffer[0] === 0x00);
 
 const mcu = computed(() => props.esc?.data);
 

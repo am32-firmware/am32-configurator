@@ -1,8 +1,8 @@
 <template>
   <div ref="wrapper" class="p-2 overflow-auto">
-    <div v-for="entry of logStore.entries" class="flex flex-row gap-2">
+    <div v-for="(entry, i) of logStore.entries" :key="i" class="flex flex-row gap-2">
       <div class="text-white">
-        {{ $dayjs(entry[0]).format('HH:mm:ss') }}
+        {{ dayjs(entry[0]).format('HH:mm:ss') }}
       </div>
       <div v-if="entry[2]">
         <div v-if="entry[2] === 'warning'">
@@ -19,6 +19,7 @@
   </div>
 </template>
 <script setup lang="ts">
+const dayjs = useDayjs();
 const logStore = useLogStore();
 const lastLogLength = ref(0);
 const wrapper = ref<HTMLDivElement>();
