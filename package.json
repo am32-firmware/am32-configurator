@@ -44,6 +44,7 @@
     "bluejay-rtttl-parse": "^2.0.2",
     "dayjs": "^1.11.12",
     "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
     "minio": "^8.0.1",
     "nuxt-svgo": "^4.0.3",
     "octokit": "^3.1.2",

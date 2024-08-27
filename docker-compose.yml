@@ -3,6 +3,7 @@ services:
     build:
       context: ./
       dockerfile: docker/Dockerfile
+    restart: unless-stopped
     environment:
       - LETSENCRYPT_HOST=new.am32.ca
       - VIRTUAL_HOST=new.am32.ca
@@ -11,6 +12,17 @@ services:
       - "3000:3000"
     networks:
       - proxy
-networks: 
+      - conf
+  cache:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - cache:/data
+networks:
+  conf:
   proxy:
     external: true
+volumes:
+  cache:
