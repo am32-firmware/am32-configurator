@@ -1,6 +1,6 @@
 import { getStore, listStores } from '@netlify/blobs';
 import { Octokit } from 'octokit';
-    import * as Minio from 'minio';
+import * as Minio from 'minio';
 import dayjs from 'dayjs';
 
 export default defineEventHandler(async (event) => {

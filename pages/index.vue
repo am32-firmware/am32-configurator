@@ -135,6 +135,7 @@
 <script setup lang="ts">
 import holybroImage from '~/assets/logos/holybro.png';
 import skystars from '~/assets/logos/skystars.png';
+import rushfpv from '~/assets/logos/rushfpv.png';
 import airbotImage from '~/assets/logos/Airbot_Logo.svg';
 
 const images = [{
@@ -147,6 +148,10 @@ const images = [{
 }, {
     path: holybroImage,
     url: 'https://holybro.com/',
+    class: 'invert'
+}, {
+    path: rushfpv,
+    url: 'https://rushfpv.net/',
     class: 'invert'
 }];
 </script>
