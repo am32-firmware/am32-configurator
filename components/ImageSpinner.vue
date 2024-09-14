@@ -59,7 +59,7 @@ const currentStep = ref(0);
 
 useIntervalFn(() => {
     if ((currentStep.value + 1) % 5 === 0) {
-        if (++currentPage.value > props.images.length / pageSize) {
+        if ((++currentPage.value + 1) > (props.images.length / pageSize)) {
             currentPage.value = 0;
         }
         currentStep.value = -1;

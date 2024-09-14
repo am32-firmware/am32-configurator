@@ -137,6 +137,8 @@ import holybroImage from '~/assets/logos/holybro.png';
 import skystars from '~/assets/logos/skystars.png';
 import rushfpv from '~/assets/logos/rushfpv.png';
 import airbotImage from '~/assets/logos/Airbot_Logo.svg';
+import sequreImage from '~/assets/logos/sequre.png';
+import brotherHobbyImage from '~/assets/logos/brotherhobby.png';
 
 const images = [{
     path: airbotImage,
@@ -152,6 +154,14 @@ const images = [{
 }, {
     path: rushfpv,
     url: 'https://rushfpv.net/',
+    class: 'invert'
+}, {
+    path: sequreImage,
+    url: 'https://sequremall.com/',
+    class: 'grayscale'
+}, {
+    path: brotherHobbyImage,
+    url: 'https://www.brotherhobbystore.com/',
     class: 'invert'
 }];
 </script>
