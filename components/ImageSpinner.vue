@@ -1,6 +1,6 @@
 <template>
   <div v-if="isStatic" class="flex justify-center gap-4">
-    <a v-for="e of randomImages" :key="e.url" class="ring ring-green-600 bg-green-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
+    <a v-for="e of randomImages" :key="e.url" class="ring ring-red-600 bg-red-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
       <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
     </a>
   </div>
@@ -24,7 +24,7 @@
       :duration="{ appear: 'auto', in: 'auto', out: 0 }"
       class="flex justify-center gap-4"
     >
-      <a v-for="e of imagePage" :key="e.url" class="ring ring-green-600 bg-green-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
+      <a v-for="e of imagePage" :key="e.url" class="ring ring-red-600 bg-red-800/20 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
         <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
       </a>
     </XyzTransitionGroup>
@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<ImageSpinnerProps>(), {
     rotationTime: 5
 });
 
-const pageSize = 3;
+const pageSize = 6;
 
 const isStatic = computed(() => props.images.length < (pageSize + 1));
 

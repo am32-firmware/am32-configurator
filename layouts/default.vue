@@ -3,7 +3,9 @@
     <div>
       <div class="grid grid-cols-12 text-white ">
         <div class="col-span-2 flex justify-center items-center">
-          <svgo-logo-full class="text-white text-[150px]" />
+          <div class="bg-red-800 max-h-[180px] rounded-2xl">
+            <img :src="logo" class="max-h-[180px] w-auto">
+          </div>
         </div>
         <div class="col-span-8 h-[200px] max-h-[200px]">
           <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
@@ -48,6 +50,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import logo from '~/assets/icons/am32-logo.svg';
 const serialStore = useSerialStore();
 const logStore = useLogStore();
 </script>

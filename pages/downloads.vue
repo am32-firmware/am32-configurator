@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="p-4 max-w-[1400px] m-auto">
-      <div v-if="pending" class="text-4xl text-center text-green-500 p-5">
+      <div v-if="pending" class="text-4xl text-center text-red-500 p-5">
         <UIcon name="i-svg-spinners-blocks-wave" />
       </div>
       <div v-else-if="links">
@@ -35,7 +35,7 @@
                         :to="`api/file/${file.url}`"
                         external
                         :download="file.name"
-                        class="transition-all hover:text-green-500"
+                        class="transition-all hover:text-red-500"
                         :class="{
                           'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
                           'text-red-500': filter && file.name.toLowerCase().includes(filter.toLowerCase())
