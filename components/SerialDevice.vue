@@ -251,7 +251,7 @@
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
-                Flashing ESC #{{ (escStore.activeTarget + 1) }} of {{ savingOrApplyingSelectedEscs.length }}
+                Flashing ESC #{{ (escStore.activeTarget + 1) }}
                 <UProgress
                   :value="progressIsIntermediate ? undefined : (escStore.bytesWritten / escStore.totalBytes) * 100"
                   :indicator="!progressIsIntermediate"
@@ -925,15 +925,23 @@ const startFlash = async (hexString: string) => {
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);
             await delay(5000);
-            escStore.step = 'Read ESC';
-            try {
-                const result = await FourWay.getInstance().getInfo(i, 20);
+            if (currentTab.value === 2) {
+                escStore.step = 'Done';
+            } else {
+                escStore.step = 'Read ESC';
+                try {
+                    const result = await FourWay.getInstance().getInfo(i, 20);
 
-                escStore.escData[i].data = result;
-                escStore.escData[i].isLoading = false;
-            } catch (e) {
-                console.error(e);
+                    escStore.escData[i].data = result;
+                    escStore.escData[i].isLoading = false;
+                } catch (e) {
+                    console.error(e);
+                }
             }
+        }
+        if (currentTab.value === 2) {
+            escStore.step = 'Sending default config';
+            await applyDefaultConfig();
         }
         escStore.step = '';
         escStore.bytesWritten = 0;
