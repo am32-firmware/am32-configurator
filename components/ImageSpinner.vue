@@ -1,8 +1,10 @@
 <template>
-  <div v-if="isStatic" class="flex justify-center gap-4">
-    <a v-for="e of randomImages" :key="e.url" class="ring ring-red-600 bg-red-800/20 transition-all hover:bg-red-600/40 hover:scale-105 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
-      <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
-    </a>
+  <div v-if="isStatic" class="flex flex-wrap justify-center items-center gap-6">
+    <div v-for="e of randomImages" :key="e.url">
+      <a class="block ring ring-red-600 bg-red-800/20 transition-all hover:bg-red-600/40 hover:scale-105 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
+        <img class="grayscale max-h-[50px] w-auto" :class="e.class" :src="e.path" :alt="e.url">
+      </a>
+    </div>
   </div>
   <div v-else class="flex justify-center gap-4 relative">
     <div class="absolute top-[-50px] right-[5px] p-4">
@@ -22,10 +24,10 @@
       appear
       xyz="fade small stagger"
       :duration="{ appear: 'auto', in: 'auto', out: 0 }"
-      class="flex justify-center gap-4"
+      class="w-full flex flex-wrap justify-evenly gap-4"
     >
       <a v-for="e of imagePage" :key="e.url" class="ring ring-red-600 bg-red-800/20 transition-all hover:bg-red-600/40 hover:scale-105 rounded-lg overflow-hidden p-4" :href="e.url" target="_blank">
-        <img class="grayscale max-h-[100px] h-auto" :class="e.class" :src="e.path" :alt="e.url">
+        <img class="grayscale h-[50px] w-auto" :class="e.class" :src="e.path" :alt="e.url">
       </a>
     </XyzTransitionGroup>
   </div>

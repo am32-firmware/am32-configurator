@@ -243,8 +243,9 @@
                 <UButton
                   label="Start flash"
                   :disabled="
-                    (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0)) ||
-                      (currentTab === 1 && !fileInput)
+                    (savingOrApplyingSelectedEscs.length === 0) ||
+                      (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND')) ||
+                      (currentTab > 0 && !fileInput)
                   "
                   @click="startModalFlash"
                 />
@@ -689,6 +690,7 @@ const connectToEsc = async () => {
 
             try {
                 const result = await FourWay.getInstance().getInfo(i);
+                console.log(result, escStore.escData);
                 escStore.escData[i].data = result;
                 escStore.count += 1;
             } catch (e) {
@@ -771,9 +773,11 @@ const startLocalFlash = async (event: Event) => {
 };
 */
 
-const selectFile = (event: Event) => {
-    if (event.target instanceof HTMLInputElement && event.target.files?.[0]) {
+const selectFile = (event: Event | FileList) => {
+    if (event instanceof Event && event.target instanceof HTMLInputElement && event.target.files?.[0]) {
         fileInput.value = event.target.files[0];
+    } else if (event instanceof FileList) {
+        fileInput.value = event[0];
     }
 };
 
@@ -841,11 +845,7 @@ const startModalFlash = async () => {
     } else if (currentTab.value === 2) {
         const logStore = useLogStore();
         if (fileInput.value && escStore.firstValidEscData) {
-            const amj: {
-                mcuType: string,
-                pin: string,
-                hex: string
-            } = await fileInput.value.text().then((text: string) => {
+            const amj: AmjType = await fileInput.value.text().then((text: string) => {
                 const parsed = JSON.parse(text);
                 return {
                     ...parsed,
@@ -857,8 +857,8 @@ const startModalFlash = async () => {
             const tmp = escStore.firstValidEscData.data;
             if (fileFlash && tmp.meta?.am32?.mcuType && tmp.meta?.am32?.fileName) {
                 if (amj.mcuType !== tmp.meta.am32.mcuType) {
-                    logStore.logError('Invalid MCU type in hex file.');
-                    throw new Error('Invalid MCU type in hex file.');
+                    logStore.logError('Invalid MCU type in amj file.');
+                    throw new Error('Invalid MCU type in amj file.');
                 }
 
                 if (amj.pin !== tmp.bootloader.pin) {

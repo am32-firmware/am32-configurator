@@ -139,6 +139,7 @@ import holybroImage from '~/assets/logos/holybro.png';
 import skystars from '~/assets/logos/skystars.png';
 import rushfpv from '~/assets/logos/rushfpv.png';
 import airbotImage from '~/assets/logos/Airbot_Logo.svg';
+import kissUltraImage from '~/assets/logos/kiss-ultra.svg';
 import sequreImage from '~/assets/logos/sequre.png';
 import brotherHobbyImage from '~/assets/logos/brotherhobby.png';
 
@@ -164,6 +165,10 @@ const images = [{
 }, {
     path: brotherHobbyImage,
     url: 'https://www.brotherhobbystore.com/',
+    class: 'invert'
+}, {
+    path: kissUltraImage,
+    url: 'https://store.kiss-ultra.com/',
     class: 'invert'
 }];
 </script>
