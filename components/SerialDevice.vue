@@ -192,13 +192,14 @@
                 </div>
               </template>
               <template #bootloader>
-                <div>
+                <div class="">
                   <UAlert
                     color="red"
                     variant="soft"
                     icon=""
                     title="Attention!"
                     description="Flashing the bootloader will erase all settings and data on the mcu and if you flash the wrong bootloader, it will only be recoverable via SWD, are you sure you want to continue?"
+                    class="mb-2"
                   />
                   <UInput
                     type="file"
@@ -243,7 +244,7 @@
                   label="Start flash"
                   :disabled="
                     (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0)) ||
-                      (currentTab > 0 && !fileInput)
+                      (currentTab === 1 && !fileInput)
                   "
                   @click="startModalFlash"
                 />
@@ -840,11 +841,6 @@ const startModalFlash = async () => {
     } else if (currentTab.value === 2) {
         const logStore = useLogStore();
         if (fileInput.value && escStore.firstValidEscData) {
-            const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-            const eepromOffset = mcu.getEepromOffset();
-            const offset = 0x8000000;
-            const fileNamePlaceOffset = 30;
-
             const amj: {
                 mcuType: string,
                 pin: string,
@@ -870,7 +866,7 @@ const startModalFlash = async () => {
                     throw new Error('Pin does not match! Aborting flash!');
                 }
             }
-            startFlash(await fileInput.value.text());
+            startFlash(amj.hex);
         }
     }
 };
@@ -888,7 +884,7 @@ const startFlash = async (hexString: string) => {
             if (parsed.bytes < 27 * 1024 - 1 + 32) {
                 const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
                 const highIndex = parsed.data.findIndex(d => d.bytes > 32);
-                filled.set(parsed!.data[highIndex].data);
+                filled.set(parsed.data[highIndex].data);
                 parsed.data[highIndex].data = Array.from(filled);
                 parsed.data[highIndex].bytes = filled.length;
                 parsed.bytes = filled.length + 32;
