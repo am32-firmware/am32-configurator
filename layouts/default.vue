@@ -24,7 +24,7 @@
         <div class="text-center min-w-[200px]">
           AM32 Configurator
         </div>
-        <div class="text-center min-w-[300px] flex gap-4">
+        <div class="text-center min-w-[300px] flex items-center gap-4">
           <div>
             <img src="https://api.netlify.com/api/v1/badges/1735dfe5-3b7a-45c7-932a-0787e682b1b9/deploy-status" alt="netlify status">
           </div>
