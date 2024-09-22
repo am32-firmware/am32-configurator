@@ -3,9 +3,18 @@ import { iconsPlugin, getIconCollections } from '@egoist/tailwindcss-icons';
 import typography from '@tailwindcss/typography';
 
 export default {
-    content: [
-        './pages/**/*.{html,js,vue}',
-        './components/**/*.{html,js,vue}'
+    content: {
+        relative: true,
+        files: [
+            './pages/**/*.{html,js,vue}',
+            './components/**/*.{html,js,vue}'
+        ]
+    },
+    safelist: [
+        'invert',
+        'grayscale',
+        'contrast-200',
+        'brightness-200'
     ],
     theme: {
         extend: {

@@ -3,7 +3,9 @@
     <div>
       <div class="grid grid-cols-12 text-white ">
         <div class="col-span-2 flex justify-center items-center">
-          <svgo-logo-full class="text-white text-[150px]" />
+          <div class="bg-red-800 max-h-[180px] rounded-2xl">
+            <img :src="logo" class="max-h-[180px] w-auto">
+          </div>
         </div>
         <div class="col-span-8 h-[200px] max-h-[200px]">
           <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
@@ -22,7 +24,10 @@
         <div class="text-center min-w-[200px]">
           AM32 Configurator
         </div>
-        <div class="text-center min-w-[300px] flex gap-4">
+        <div class="text-center min-w-[300px] flex items-center gap-4">
+          <div>
+            <img :src="badgeUrl" alt="netlify status">
+          </div>
           <div>
             <NuxtLink class="underline" to="https://github.com/am32-firmware/am32" target="_blank" external>
               Repository
@@ -48,6 +53,11 @@
   </div>
 </template>
 <script setup lang="ts">
+import logo from '~/assets/icons/am32-logo.svg';
+const location = useBrowserLocation();
+const badgeUrl = computed(() =>
+    `https://api.netlify.com/api/v1/badges/1735dfe5-3b7a-45c7-932a-0787e682b1b9/deploy-status${location.value.href?.includes('develop') ? '?branch=develop' : ''}`
+);
 const serialStore = useSerialStore();
 const logStore = useLogStore();
 </script>

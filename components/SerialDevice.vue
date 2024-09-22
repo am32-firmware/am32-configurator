@@ -191,6 +191,29 @@
                   </div>
                 </div>
               </template>
+              <template #bootloader>
+                <div class="">
+                  <UAlert
+                    color="red"
+                    variant="soft"
+                    icon=""
+                    title="Attention!"
+                    description="Flashing the bootloader will erase all settings and data on the mcu and if you flash the wrong bootloader, it will only be recoverable via SWD, are you sure you want to continue?"
+                    class="mb-2"
+                  />
+                  <UInput
+                    type="file"
+                    size="sm"
+                    icon="i-heroicons-folder"
+                    accept=".amj"
+                    :disabled="isFlashingActive"
+                    @change="selectFile($event)"
+                  />
+                  <div v-if="isFlashingActive" class="text-green-500 text-center">
+                    Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
+                  </div>
+                </div>
+              </template>
             </UTabs>
           </div>
           <div v-else class="text-green-500 text-center">
@@ -220,14 +243,15 @@
                 <UButton
                   label="Start flash"
                   :disabled="
-                    (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND' || savingOrApplyingSelectedEscs.length === 0)) ||
-                      (currentTab === 1 && !fileInput)
+                    (savingOrApplyingSelectedEscs.length === 0) ||
+                      (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND')) ||
+                      (currentTab > 0 && !fileInput)
                   "
                   @click="startModalFlash"
                 />
               </div>
               <div v-if="escStore.activeTarget > -1" class="w-full">
-                Flashing ESC #{{ (escStore.activeTarget + 1) }} of {{ savingOrApplyingSelectedEscs.length }}
+                Flashing ESC #{{ (escStore.activeTarget + 1) }}
                 <UProgress
                   :value="progressIsIntermediate ? undefined : (escStore.bytesWritten / escStore.totalBytes) * 100"
                   :indicator="!progressIsIntermediate"
@@ -408,7 +432,11 @@ const assets = computed(() => (releases.value?.[0].children.find(c => c.name ===
 
 const releasesOptions = computed(() => (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a)));
 
-const flashTabs = computed(() => [{ label: 'Release', disabled: isFlashingActive.value, slot: 'release' }, { label: 'Local', disabled: isFlashingActive.value, slot: 'local' }]);
+const flashTabs = computed(() => [
+    { label: 'Release', disabled: isFlashingActive.value, slot: 'release' },
+    { label: 'Local', disabled: isFlashingActive.value, slot: 'local' },
+    { label: 'Bootloader', disabled: isFlashingActive.value, slot: 'bootloader' }
+]);
 
 watch(releasesOptions, (d) => {
     if (!selectedRelease.value && d?.length > 0) {
@@ -662,6 +690,7 @@ const connectToEsc = async () => {
 
             try {
                 const result = await FourWay.getInstance().getInfo(i);
+                console.log(result, escStore.escData);
                 escStore.escData[i].data = result;
                 escStore.count += 1;
             } catch (e) {
@@ -744,9 +773,11 @@ const startLocalFlash = async (event: Event) => {
 };
 */
 
-const selectFile = (event: Event) => {
-    if (event.target instanceof HTMLInputElement && event.target.files?.[0]) {
+const selectFile = (event: Event | FileList) => {
+    if (event instanceof Event && event.target instanceof HTMLInputElement && event.target.files?.[0]) {
         fileInput.value = event.target.files[0];
+    } else if (event instanceof FileList) {
+        fileInput.value = event[0];
     }
 };
 
@@ -774,7 +805,7 @@ const startModalFlash = async () => {
                 startFlash(data.value);
             }
         }
-    } else {
+    } else if (currentTab.value === 1) {
         const logStore = useLogStore();
         if (fileInput.value) {
             if (!ignoreMcuLayout.value && escStore.firstValidEscData) {
@@ -784,29 +815,58 @@ const startModalFlash = async () => {
                 const fileNamePlaceOffset = 30;
 
                 const fileFlash = Flash.parseHex(await fileInput.value.text());
-                const findFileNameBlock = fileFlash!.data.find(d =>
-                    (eepromOffset - fileNamePlaceOffset) > (d.address - offset) && (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
-                );
-                if (!findFileNameBlock) {
-                    logStore.logError('File name not found in hex, probably too old!');
-                    throw new Error('File name not found in hex file.');
-                }
+                const tmp = escStore.firstValidEscData.data.meta.am32;
+                if (fileFlash && tmp.mcuType && tmp.fileName) {
+                    const findFileNameBlock = fileFlash.data.find(d =>
+                        (eepromOffset - fileNamePlaceOffset) > (d.address - offset) && (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
+                    );
+                    if (!findFileNameBlock) {
+                        logStore.logError('File name not found in hex, probably too old!');
+                        throw new Error('File name not found in hex file.');
+                    }
 
-                const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
-                if (!hexFileName.endsWith(escStore.firstValidEscData.data.meta.am32.mcuType!)) {
-                    logStore.logError('Invalid MCU type in hex file.');
-                    throw new Error('Invalid MCU type in hex file.');
-                }
+                    const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
+                    if (!hexFileName.endsWith(tmp.mcuType)) {
+                        logStore.logError('Invalid MCU type in hex file.');
+                        throw new Error('Invalid MCU type in hex file.');
+                    }
 
-                const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
-                const expectedFileName = escStore.firstValidEscData.data.meta.am32.fileName!.slice(0, escStore.firstValidEscData.data.meta.am32.fileName!.lastIndexOf('_'));
-                if (currentFileName !== expectedFileName) {
-                    logStore.logError('Layout does not match! Aborting flash!');
-                    logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
-                    throw new Error('Layout does not match! Aborting flash!');
+                    const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
+                    const expectedFileName = tmp.fileName.slice(0, tmp.fileName.lastIndexOf('_'));
+                    if (currentFileName !== expectedFileName) {
+                        logStore.logError('Layout does not match! Aborting flash!');
+                        logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
+                        throw new Error('Layout does not match! Aborting flash!');
+                    }
                 }
             }
             startFlash(await fileInput.value.text());
+        }
+    } else if (currentTab.value === 2) {
+        const logStore = useLogStore();
+        if (fileInput.value && escStore.firstValidEscData) {
+            const amj: AmjType = await fileInput.value.text().then((text: string) => {
+                const parsed = JSON.parse(text);
+                return {
+                    ...parsed,
+                    hex: atob(parsed.hex)
+                };
+            });
+
+            const fileFlash = Flash.parseHex(amj.hex);
+            const tmp = escStore.firstValidEscData.data;
+            if (fileFlash && tmp.meta?.am32?.mcuType && tmp.meta?.am32?.fileName) {
+                if (amj.mcuType !== tmp.meta.am32.mcuType) {
+                    logStore.logError('Invalid MCU type in amj file.');
+                    throw new Error('Invalid MCU type in amj file.');
+                }
+
+                if (amj.pin !== tmp.bootloader.pin) {
+                    logStore.logError('Pin does not match! Aborting flash!');
+                    throw new Error('Pin does not match! Aborting flash!');
+                }
+            }
+            startFlash(amj.hex);
         }
     }
 };
@@ -824,7 +884,7 @@ const startFlash = async (hexString: string) => {
             if (parsed.bytes < 27 * 1024 - 1 + 32) {
                 const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
                 const highIndex = parsed.data.findIndex(d => d.bytes > 32);
-                filled.set(parsed!.data[highIndex].data);
+                filled.set(parsed.data[highIndex].data);
                 parsed.data[highIndex].data = Array.from(filled);
                 parsed.data[highIndex].bytes = filled.length;
                 parsed.bytes = filled.length + 32;
@@ -865,15 +925,23 @@ const startFlash = async (hexString: string) => {
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);
             await delay(5000);
-            escStore.step = 'Read ESC';
-            try {
-                const result = await FourWay.getInstance().getInfo(i, 20);
+            if (currentTab.value === 2) {
+                escStore.step = 'Done';
+            } else {
+                escStore.step = 'Read ESC';
+                try {
+                    const result = await FourWay.getInstance().getInfo(i, 20);
 
-                escStore.escData[i].data = result;
-                escStore.escData[i].isLoading = false;
-            } catch (e) {
-                console.error(e);
+                    escStore.escData[i].data = result;
+                    escStore.escData[i].isLoading = false;
+                } catch (e) {
+                    console.error(e);
+                }
             }
+        }
+        if (currentTab.value === 2) {
+            escStore.step = 'Sending default config';
+            await applyDefaultConfig();
         }
         escStore.step = '';
         escStore.bytesWritten = 0;

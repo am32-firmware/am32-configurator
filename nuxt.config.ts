@@ -55,12 +55,12 @@ export default defineNuxtConfig({
             description: 'Configurator for the ESC firmware AM32',
             icons: [
                 {
-                    src: 'assets/images/144x144.png',
+                    src: 'assets/images/am32-logo.svg',
                     sizes: '288x288',
-                    type: 'image/png'
+                    type: 'image/svg'
                 },
                 {
-                    src: 'assets/images/square_logo.svg',
+                    src: 'assets/images/am32-logo.svg',
                     sizes: '144x144',
                     type: 'image/svg',
                     purpose: 'any'
@@ -101,5 +101,5 @@ export default defineNuxtConfig({
         }
     },
 
-    compatibilityDate: '2024-08-25'
+    compatibilityDate: '2024-09-16'
 });

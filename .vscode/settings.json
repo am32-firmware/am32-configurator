@@ -4,5 +4,6 @@
   "tailwindCSS.includeLanguages": {
 		"vue": "html",
 		"vue-html": "html"
-	},
+  },
+  "git.useIntegratedAskPass": false,
 }

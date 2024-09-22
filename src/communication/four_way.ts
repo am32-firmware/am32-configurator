@@ -404,7 +404,7 @@ export class FourWay {
         throw new Error('EscInitError');
     }
 
-    async writeHex (target: number, hex: string, timout: number) { // }, force: boolean, migrate: boolean) {
+    async writeHex (target: number, hex: string, timeout: number) { // }, force: boolean, migrate: boolean) {
         const escStore = useEscStore();
         const parsed = Flash.parseHex(hex);
         if (parsed) {
@@ -426,13 +426,13 @@ export class FourWay {
                 if (message) {
                     const originalSettings = message.params;
 
-                    const eepromInfo = new Uint8Array(17).fill(0x00);
-                    eepromInfo.set([originalSettings[1], originalSettings[2]], 1);
-                    eepromInfo.set(asciiToBuffer('FLASH FAIL  '), 5);
+                    originalSettings[0] = 0x00;
+                    originalSettings.fill(0x00, 3, 5);
+                    originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
 
-                    await this.write(eepromOffset, eepromInfo, timout);
+                    await this.write(eepromOffset, originalSettings, timeout);
 
-                    await this.writePages(0x04, 0x40, pageSize, flash, timout);
+                    await this.writePages(0x04, 0x40, pageSize, flash, timeout);
                     /* try {
                         escStore.step = 'Verifing';
                         await delay(200);
