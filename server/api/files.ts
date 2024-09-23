@@ -1,5 +1,3 @@
-import { getStore, listStores } from '@netlify/blobs';
-import { Octokit } from 'octokit';
 import * as Minio from 'minio';
 
 import { promiseTimeout } from '@vueuse/core';
