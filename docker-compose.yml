@@ -3,6 +3,7 @@ services:
     build:
       context: ./
       dockerfile: docker/Dockerfile
+    pull_policy: build
     restart: unless-stopped
     env_file: stack.env
     ports:
