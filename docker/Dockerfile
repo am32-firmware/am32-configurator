@@ -4,7 +4,7 @@ WORKDIR /usr/src/app
 FROM base AS install
 RUN mkdir -p /temp
 COPY package.json yarn.lock /temp/
-WORKDIR /tmp
+WORKDIR /temp
 RUN yarn install
 
 FROM base AS prerelease
