@@ -1,33 +1,22 @@
 import { getStore, listStores } from '@netlify/blobs';
 import { Octokit } from 'octokit';
 import * as Minio from 'minio';
-import dayjs from 'dayjs';
+
+import { promiseTimeout } from '@vueuse/core';
+
+function delay (ms: number) {
+    return promiseTimeout(ms);
+}
 
 export default defineEventHandler(async (event) => {
-    const octo = new Octokit();
-
     const query = getQuery(event);
 
-    const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader'];
+    const toolsCache = useStorage('tools');
+    const releasesCache = useStorage('releases');
+    const bootloadersCache = useStorage('bootloaders');
+
+    const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader', 'tools'];
     const includePrereleases = query.prereleases !== undefined;
-
-    const githubStore = getStore({
-        name: 'github-releases-cache',
-        siteID: process.env.NETLIFY_SITE_ID,
-        token: process.env.NETLIFY_TOKEN
-    });
-
-    const minioCacheStore = getStore({
-        name: 'minio-cache',
-        siteID: process.env.NETLIFY_SITE_ID,
-        token: process.env.NETLIFY_TOKEN
-    });
-
-    let minioCache: {
-        name: string,
-        url: string,
-        expireAt: string
-    }[] = (await minioCacheStore.get('url-cache', { type: 'json' })) ?? [];
 
     const minioClient = new Minio.Client({
         endPoint: 's3.am32.ca',
@@ -37,112 +26,218 @@ export default defineEventHandler(async (event) => {
         secretKey: process.env.MINIO_SECRET_KEY ?? ''
     });
 
-    const toolsStream = minioClient.listObjectsV2('am32-tools', '', true, '');
-
-    const getTools = (): Promise<{
-        name: string,
-        url: string
-    }[]> => new Promise((resolve) => {
-        let minioCacheChanged = false;
-
-        toolsStream.on('data', (obj) => {
-            if (obj.name) {
-                console.log(obj.name);
-                const entry = minioCache.find(n => n.name === obj.name);
-                if (!entry || dayjs(entry.expireAt).isBefore(dayjs())) {
-                    if (entry) {
-                        minioCache = minioCache.filter(n => n.name !== obj.name);
-                    }
-
-                    minioCache.push({
-                        name: obj.name,
-                        expireAt: dayjs().add((24 * 60 * 60) - 1, 'seconds').format(),
-                        url: ''
-                    });
-                    minioCacheChanged = true;
-                }
-            }
-        });
-
-        toolsStream.on('end', async () => {
-            for (const cache of minioCache.filter(c => c.url === '')) {
-                cache.url = await minioClient.presignedUrl('get', 'am32-tools', cache.name, 24 * 60 * 60);
-            }
-            if (minioCacheChanged) {
-                await minioCacheStore.setJSON('url-cache', minioCache);
-            }
-            resolve(minioCache);
-        });
-    });
-
-    const tools = await getTools();
-
-    const githubReleasesCache: Awaited<ReturnType<typeof octo.rest.repos.listReleases>> | null = await githubStore.get('releases-cache', { type: 'json' });
-
-    const { stores } = await listStores({
-        siteID: process.env.NETLIFY_SITE_ID,
-        token: process.env.NETLIFY_TOKEN
-    });
-
     const folders: BlobFolder[] = [];
 
-    for (const name of stores) {
-        if (filter.includes(name)) {
-            const store = getStore({
-                name,
-                siteID: process.env.NETLIFY_SITE_ID,
-                token: process.env.NETLIFY_TOKEN
-            });
-            folders.push({
-                name,
-                children: [],
-                files: []
-            });
+    if (filter.includes('releases')) {
+        const releasesStream = minioClient.listObjectsV2('releases', '', true, '');
 
-            for (const file of (await store.list()).blobs) {
-                const [fileOrVersion, ...subParts] = file.key.split('/').filter(Boolean);
-
-                const cache = githubReleasesCache?.data.find(r => r.tag_name === fileOrVersion);
-
-                const folder = folders.find(f => f.name === name);
-                if (folder && (
-                    !cache ||
-                    includePrereleases ||
-                    cache.prerelease === false
-                )) {
-                    if (subParts.length > 0) {
-                        let subfolder = folder.children.find(sf => sf.name === fileOrVersion + (cache?.prerelease ? cache?.name?.split('-').pop() ?? '' : ''));
-                        if (!subfolder) {
-                            subfolder = {
-                                name: fileOrVersion + (cache?.prerelease ? cache?.name?.split('-').pop() ?? '' : ''),
-                                files: [],
-                                children: []
-                            };
-                            folder.children.push(subfolder);
-                        }
-                        subfolder.files.push({
-                            name: subParts[0],
-                            url: Buffer.from(`${name}:${file.key}`, 'ascii').toString('base64')
-                        });
-                    } else {
-                        folder.files.push({
-                            name: fileOrVersion,
-                            url: Buffer.from(`${name}:${file.key}`, 'ascii').toString('base64')
-                        });
+        const getReleases = (): Promise<{
+            key: string,
+            value: string | null
+        }[]> => new Promise((resolve) => {
+            releasesStream.on('data', async (obj) => {
+                if (obj.name) {
+                    if (!(await releasesCache.hasItem(`releases:${obj.name}`))) {
+                        const url = await minioClient.presignedUrl('get', 'releases', obj.name, 24 * 60 * 60);
+                        await releasesCache.setItem(
+                            `releases:${obj.name}`,
+                            `${url}`,
+                            {
+                                ttl: (24 * 60 * 60) - 1
+                            }
+                        );
                     }
+                }
+            });
+
+            releasesStream.on('end', async () => {
+                await delay(200);
+                const keys = await releasesCache.getKeys('releases');
+                const result: {
+                    key: string,
+                    value: string | null
+                }[] = [];
+                for (const key of keys) {
+                    result.push({
+                        key,
+                        value: await releasesCache.getItem(key)
+                    });
+                }
+                resolve(result);
+            });
+        });
+
+        const releases = await getReleases();
+
+        const releasesFolder = {
+            name: 'releases',
+            children: [] as BlobFolder[],
+            files: [] as BlobFolderFile[]
+        };
+
+        folders.push(releasesFolder);
+
+        for (const release of releases) {
+            const [, fileOrVersion, ...subParts] = release.key.split(':').filter(Boolean);
+
+            if (
+                !includePrereleases ||
+                fileOrVersion.endsWith('-rc')
+            ) {
+                if (subParts.length > 0) {
+                    let subfolder = releasesFolder.children.find(sf => sf.name === fileOrVersion);
+                    if (!subfolder) {
+                        subfolder = {
+                            name: fileOrVersion,
+                            files: [],
+                            children: []
+                        };
+                        releasesFolder.children.push(subfolder);
+                    }
+                    subfolder.files.push({
+                        name: subParts[0],
+                        url: release.value ?? ''
+                    });
+                } else {
+                    releasesFolder.files.push({
+                        name: fileOrVersion,
+                        url: release.value ?? ''
+                    });
                 }
             }
         }
     }
 
-    folders.push({
-        name: 'tools',
-        children: [],
-        files: tools.map(t => ({
-            name: t.name,
-            url: t.url
-        }))
-    });
+    if (filter.includes('bootloader')) {
+        const bootloadersStream = minioClient.listObjectsV2('bootloaders', '', true, '');
+
+        const getBootloaders = (): Promise<{
+            key: string,
+            value: string | null
+        }[]> => new Promise((resolve) => {
+            bootloadersStream.on('data', async (obj) => {
+                if (obj.name) {
+                    if (!(await bootloadersCache.hasItem(`bootloaders:${obj.name}`))) {
+                        const url = await minioClient.presignedUrl('get', 'bootloaders', obj.name, 24 * 60 * 60);
+                        await bootloadersCache.setItem(
+                            `bootloaders:${obj.name}`,
+                            `${url}`,
+                            {
+                                ttl: (24 * 60 * 60) - 1
+                            }
+                        );
+                    }
+                }
+            });
+
+            bootloadersStream.on('end', async () => {
+                await delay(200);
+                const keys = await bootloadersCache.getKeys('bootloaders');
+                console.log(keys);
+                const result: {
+                    key: string,
+                    value: string | null
+                }[] = [];
+                for (const key of keys) {
+                    result.push({
+                        key,
+                        value: await bootloadersCache.getItem(key)
+                    });
+                }
+                resolve(result);
+            });
+        });
+
+        const bootloaders = await getBootloaders();
+
+        const bootloadersFolder = {
+            name: 'bootloader',
+            children: [] as BlobFolder[],
+            files: [] as BlobFolderFile[]
+        };
+
+        folders.push(bootloadersFolder);
+
+        for (const bootloader of bootloaders) {
+            const [, fileOrVersion, ...subParts] = bootloader.key.split(':').filter(Boolean);
+
+            if (
+                !includePrereleases ||
+                fileOrVersion.endsWith('-rc')
+            ) {
+                if (subParts.length > 0) {
+                    let subfolder = bootloadersFolder.children.find(sf => sf.name === fileOrVersion);
+                    if (!subfolder) {
+                        subfolder = {
+                            name: fileOrVersion,
+                            files: [],
+                            children: []
+                        };
+                        bootloadersFolder.children.push(subfolder);
+                    }
+                    subfolder.files.push({
+                        name: subParts[0],
+                        url: bootloader.value ?? ''
+                    });
+                } else {
+                    bootloadersFolder.files.push({
+                        name: fileOrVersion,
+                        url: bootloader.value ?? ''
+                    });
+                }
+            }
+        }
+    }
+
+    if (filter.includes('bootloader')) {
+        const toolsStream = minioClient.listObjectsV2('am32-tools', '', true, '');
+
+        const getTools = (): Promise<{
+            key: string,
+            value: string | null
+        }[]> => new Promise((resolve) => {
+            toolsStream.on('data', async (obj) => {
+                if (obj.name) {
+                    if (!(await toolsCache.hasItem(`tools:${obj.name}`))) {
+                        const url = await minioClient.presignedUrl('get', 'am32-tools', obj.name, 24 * 60 * 60);
+                        await toolsCache.setItem(
+                            `tools:${obj.name}`,
+                            `${url}`,
+                            {
+                                ttl: (24 * 60 * 60) - 1
+                            }
+                        );
+                    }
+                }
+            });
+
+            toolsStream.on('end', async () => {
+                await delay(200);
+                const keys = await toolsCache.getKeys('tools');
+                const result: {
+                    key: string,
+                    value: string | null
+                }[] = [];
+                for (const key of keys) {
+                    result.push({
+                        key,
+                        value: await toolsCache.getItem(key)
+                    });
+                }
+                resolve(result);
+            });
+        });
+
+        const tools = await getTools();
+        folders.push({
+            name: 'tools',
+            children: [],
+            files: tools.filter(t => t.value).map(t => ({
+                name: t.key.split(':').pop() ?? t.key,
+                url: t.value ?? ''
+            }))
+        });
+    }
 
     return {
         data: folders

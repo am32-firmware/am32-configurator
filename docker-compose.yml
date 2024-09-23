@@ -4,25 +4,34 @@ services:
       context: ./
       dockerfile: docker/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - LETSENCRYPT_HOST=new.am32.ca
       - VIRTUAL_HOST=new.am32.ca
       - VIRTUAL_PORT=3000
     ports:
-      - "3000:3000"
+      - "8080:3000"
     networks:
       - proxy
       - conf
+  redisinsight:
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight:/data
   cache:
     image: redis:7
     restart: unless-stopped
     ports:
       - '6379:6379'
-    volumes:
-      - cache:/data
+    #volumes:
+      #- cache:/data
 networks:
   conf:
   proxy:
     external: true
 volumes:
   cache:
+  redisinsight:

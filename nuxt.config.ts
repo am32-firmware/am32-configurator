@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+console.log(process.env.REDIS_HOST);
+
 export default defineNuxtConfig({
     devtools: {
         enabled: true,
@@ -14,6 +16,14 @@ export default defineNuxtConfig({
     },
 
     ssr: false,
+
+    runtimeConfig: {
+        redis: { // Default values
+            host: process.env.REDIS_HOST,
+            port: 6379
+            /* other redis connector options */
+        }
+    },
 
     modules: [
         '@vite-pwa/nuxt',

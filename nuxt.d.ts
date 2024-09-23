@@ -60,7 +60,13 @@ type AmjType = {
     hex: string
 };
 
+type CacheEntry = {
+    name: string,
+    url: string
+};
+
 declare module 'bluejay-rtttl-parse' {
+    // biome-ignore lint/complexity/noStaticOnlyClass: <explanation>
     export default class Rtttl {
         static fromBluejayStartupMelody(startUpMelody: Uint8Array, name?: string): string;
         static toBluejayStartupMelody(rtttl: string, length?: number): {

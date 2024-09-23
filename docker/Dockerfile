@@ -4,9 +4,11 @@ WORKDIR /usr/src/app
 FROM base AS install
 RUN mkdir -p /temp
 COPY package.json yarn.lock /temp/
-RUN cd /temp && yarn install
+WORKDIR /tmp
+RUN yarn install
 
 FROM base AS prerelease
+WORKDIR /usr/src/app
 COPY --from=install /temp/node_modules node_modules
 COPY . .
 

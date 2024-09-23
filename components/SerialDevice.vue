@@ -794,9 +794,12 @@ const startModalFlash = async () => {
                 return startFlash(dbEntry.text);
             }
 
-            const { data } = await useFetch(`/api/file/${url}`);
+            const file: Response = await fetch(url);
+            console.log(file);
+            /*
+            const blob = await file.blob();
 
-            if (data.value && typeof data.value === 'string') {
+            if (blob && typeof data.value === 'string') {
                 await db.downloads.add({
                     url,
                     text: data.value
@@ -804,6 +807,7 @@ const startModalFlash = async () => {
 
                 startFlash(data.value);
             }
+            */
         }
     } else if (currentTab.value === 1) {
         const logStore = useLogStore();
