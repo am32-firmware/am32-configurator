@@ -4,13 +4,7 @@ services:
       context: ./
       dockerfile: docker/Dockerfile
     restart: unless-stopped
-    environment:
-      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST:-am32.ca}
-      - VIRTUAL_HOST=${VIRTUAL_HOST:-am32.ca}
-      - VIRTUAL_PORT=${VIRTUAL_PORT:-3000}
-      - REDIS_HOST=${REDIS_HOST:-cache}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+    env_file: stack.env
     ports:
       - "8080:3000"
     networks:
