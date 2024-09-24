@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     const includePrereleases = query.prereleases !== undefined;
 
     const minioClient = new Minio.Client({
-        endPoint: 's3.am32.ca',
+        endPoint: process.env.MINIO_URL ?? '',
         port: 443,
         useSSL: true,
         accessKey: process.env.MINIO_ACCESS_KEY ?? '',

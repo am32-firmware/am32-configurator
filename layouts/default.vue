@@ -26,9 +26,6 @@
         </div>
         <div class="text-center min-w-[300px] flex items-center gap-4">
           <div>
-            <img :src="badgeUrl" alt="netlify status">
-          </div>
-          <div>
             <NuxtLink class="underline" to="https://github.com/am32-firmware/am32" target="_blank" external>
               Repository
             </NuxtLink>
@@ -36,13 +33,11 @@
           <div>
             powered by <NuxtLink class="underline" to="https://nuxt.com/" target="_blank" external>
               Nuxt
-            </NuxtLink> and <NuxtLink class="underline" to="https://netlify.com" target="_blank" external>
-              Netlify
             </NuxtLink>
           </div>
         </div>
         <div class="text-center min-w-[200px]">
-          v0.0.2
+          v0.1.0
         </div>
       </div>
     </div>
@@ -54,10 +49,6 @@
 </template>
 <script setup lang="ts">
 import logo from '~/assets/icons/am32-logo.svg';
-const location = useBrowserLocation();
-const badgeUrl = computed(() =>
-    `https://api.netlify.com/api/v1/badges/1735dfe5-3b7a-45c7-932a-0787e682b1b9/deploy-status${location.value.href?.includes('develop') ? '?branch=develop' : ''}`
-);
 const serialStore = useSerialStore();
 const logStore = useLogStore();
 </script>

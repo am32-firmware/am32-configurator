@@ -18,7 +18,7 @@ export default async function (minTag?: string) {
     const semverMinTag = minTag?.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2') ?? 'v0.0';
 
     const minioClient = new Minio.Client({
-        endPoint: 's3.am32.ca',
+        endPoint: process.env.MINIO_URL ?? '',
         port: 443,
         useSSL: true,
         accessKey: process.env.MINIO_ACCESS_KEY ?? '',
