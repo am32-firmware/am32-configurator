@@ -10,22 +10,28 @@ services:
       - "3000:3000"
     networks:
       - proxy
-      - conf
+      - redis-net
   redisinsight:
     image: redis/redisinsight:latest
     ports:
       - "5540:5540"
     volumes:
       - redisinsight:/data
+    networks:
+      - redis-net
   cache:
     image: redis:7
     restart: unless-stopped
     ports:
       - '6379:6379'
-    #volumes:
-      #- cache:/data
+    networks:
+      - redis-net
+    volumes:
+      - cache:/data
 networks:
   conf:
+  redis-net:
+    external: true
   proxy:
     external: true
 volumes:
