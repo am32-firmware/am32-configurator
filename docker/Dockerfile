@@ -21,7 +21,7 @@ COPY --chown=node:node --from=install /temp/node_modules node_modules
 COPY --chown=node:node --from=prerelease /usr/src/app/.output .
 
 USER node
-ENV HOST 0.0.0.0
-ENV REDIS_HOST cache
+ENV HOST=0.0.0.0
+ENV REDIS_HOST=cache
 EXPOSE 3000
 ENTRYPOINT [ "node", "server/index.mjs" ]

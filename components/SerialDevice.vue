@@ -422,11 +422,11 @@ const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
-const { data, status } = useAsyncData('get-releases', () => $fetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
+const { data, status } = useAsyncData('get-releases', () => useFetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
     watch: [includePrerelease]
 });
 
-const releases = computed(() => data.value?.data);
+const releases = computed(() => data.value?.data.value?.data);
 
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
