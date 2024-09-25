@@ -164,7 +164,7 @@
                     searchable-placeholder="Search a release..."
                     :disabled="isFlashingActive"
                     :options="releasesOptions"
-                    :loading="pending"
+                    :loading="status === 'pending'"
                   />
                   <USelectMenu
                     v-model="selectedAsset"
@@ -172,7 +172,7 @@
                     searchable-placeholder="Search a hex file..."
                     :options="assets"
                     :disabled="assets?.length === 0 || !ignoreMcuLayout || isFlashingActive"
-                    :loading="pending"
+                    :loading="status === 'pending'"
                   />
                 </div>
               </template>
@@ -422,11 +422,11 @@ const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
-const { data, pending } = useAsyncData('get-releases', () => useLazyFetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
+const { data, status } = useAsyncData('get-releases', () => $fetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
     watch: [includePrerelease]
 });
 
-const releases = computed(() => ((data.value?.data as unknown as { data: BlobFolder[]})?.data));
+const releases = computed(() => data.value?.data);
 
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
@@ -466,7 +466,8 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
 watchEffect(() => {
     if (assets.value && escStore.escData.length > 0) {
         const tag = selectedRelease.value;
-        const cleanTag = tag.substring(1).replace(/rc[1-9][0-9]*/gi, '');
+        const cleanTag = tag.substring(1).replace(/-rc[1-9]*[0-9]*/gi, '');
+        console.log(`AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`);
         const currentAsset = assets.value?.find(a => a === `AM32_${escStore.firstValidEscData?.data.meta.am32.fileName ?? 'ERROR'}_${cleanTag}.hex`);
         selectedAsset.value = currentAsset ?? 'NOT FOUND';
     }
