@@ -77,7 +77,6 @@ export default defineEventHandler(async (event) => {
 
         for (const release of releases) {
             const [, fileOrVersion, ...subParts] = release.key.split(':').filter(Boolean);
-            
             if (
                 includePrereleases ||
                 !fileOrVersion.endsWith('-rc')
@@ -147,6 +146,8 @@ export default defineEventHandler(async (event) => {
 
         const bootloaders = await getBootloaders();
 
+        console.log(bootloaders);
+
         const bootloadersFolder = {
             name: 'bootloader',
             children: [] as BlobFolder[],
@@ -158,32 +159,28 @@ export default defineEventHandler(async (event) => {
         for (const bootloader of bootloaders) {
             const [, fileOrVersion, ...subParts] = bootloader.key.split(':').filter(Boolean);
 
-            if (
-                !includePrereleases ||
-                fileOrVersion.endsWith('-rc')
-            ) {
-                if (subParts.length > 0) {
-                    let subfolder = bootloadersFolder.children.find(sf => sf.name === fileOrVersion);
-                    if (!subfolder) {
-                        subfolder = {
-                            name: fileOrVersion,
-                            files: [],
-                            children: []
-                        };
-                        bootloadersFolder.children.push(subfolder);
-                    }
-                    subfolder.files.push({
-                        name: subParts[0],
-                        url: bootloader.value ?? ''
-                    });
-                } else {
-                    bootloadersFolder.files.push({
+            if (subParts.length > 0) {
+                let subfolder = bootloadersFolder.children.find(sf => sf.name === fileOrVersion);
+                if (!subfolder) {
+                    subfolder = {
                         name: fileOrVersion,
-                        url: bootloader.value ?? ''
-                    });
+                        files: [],
+                        children: []
+                    };
+                    bootloadersFolder.children.push(subfolder);
                 }
+                subfolder.files.push({
+                    name: subParts[0],
+                    url: bootloader.value ?? ''
+                });
+            } else {
+                bootloadersFolder.files.push({
+                    name: fileOrVersion,
+                    url: bootloader.value ?? ''
+                });
             }
         }
+        console.log(bootloadersFolder);
     }
 
     if (filter.includes('bootloader')) {
