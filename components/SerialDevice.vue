@@ -795,19 +795,16 @@ const startModalFlash = async () => {
             }
 
             const file: Response = await fetch(url);
-            console.log(file);
-            /*
             const blob = await file.blob();
-
-            if (blob && typeof data.value === 'string') {
+            const data = await blob.text();
+            if (blob && typeof data === 'string') {
                 await db.downloads.add({
                     url,
-                    text: data.value
+                    text: data
                 });
 
-                startFlash(data.value);
+                startFlash(data);
             }
-            */
         }
     } else if (currentTab.value === 1) {
         const logStore = useLogStore();

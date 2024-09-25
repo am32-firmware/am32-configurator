@@ -77,10 +77,10 @@ export default defineEventHandler(async (event) => {
 
         for (const release of releases) {
             const [, fileOrVersion, ...subParts] = release.key.split(':').filter(Boolean);
-
+            
             if (
-                !includePrereleases ||
-                fileOrVersion.endsWith('-rc')
+                includePrereleases ||
+                !fileOrVersion.endsWith('-rc')
             ) {
                 if (subParts.length > 0) {
                     let subfolder = releasesFolder.children.find(sf => sf.name === fileOrVersion);
@@ -131,7 +131,6 @@ export default defineEventHandler(async (event) => {
             bootloadersStream.on('end', async () => {
                 await delay(200);
                 const keys = await bootloadersCache.getKeys('bootloaders');
-                console.log(keys);
                 const result: {
                     key: string,
                     value: string | null

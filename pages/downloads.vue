@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="p-4 max-w-[1400px] m-auto">
-      <div v-if="pending" class="text-4xl text-center text-red-500 p-5">
+      <div v-if="status === 'pending'" class="text-4xl text-center text-red-500 p-5">
         <UIcon name="i-svg-spinners-blocks-wave" />
       </div>
       <div v-else-if="links">
@@ -102,12 +102,12 @@
   </div>
 </template>
 <script setup lang="ts">
-const { data, pending } = await useLazyFetch('/api/files');
+const { data, status } = await useLazyFetch('/api/files?prereleases');
 
 const filter = ref('');
 
 watchEffect(() => {
-    if (!pending.value && data.value) {
+    if (status.value !== 'pending' && data.value) {
         links.value = data.value.data;
         rootFolders.value = data.value.data.map((f) => {
             return {
