@@ -11,9 +11,15 @@
         />
       </div>
       <div class="flex justify-between gap-2">
-        <UButton size="2xs" @click="requestSerialDevices">
-          Port select
-        </UButton>
+        <div class="flex gap-6 items-center">
+          <UButton size="2xs" @click="requestSerialDevices">
+            Port select
+          </UButton>
+          <label class="flex items-center gap-2">
+            Direct
+            <UCheckbox v-model="isForceDirectConnect" :disabled="isDirectConnectDevice || serialStore.hasConnection" />
+          </label>
+        </div>
         <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">
           Connect
         </UButton>
@@ -504,6 +510,7 @@ const requestSerialDevices = async () => {
     await fetchPairedDevices();
 };
 
+const isForceDirectConnect = ref(false);
 const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])));
 
 const fetchPairedDevices = async () => {
@@ -513,10 +520,12 @@ const fetchPairedDevices = async () => {
     if (pairedDevices.length > 0) {
         if (serialStore.selectedDevice.id === '-1') {
             serialStore.selectLastDevice();
-            if (serialStore.selectedDevice) {
-                if (isDirectConnectDevice.value) {
-                    baudrate.value = '19200';
-                }
+        }
+
+        if (serialStore.selectedDevice) {
+            if (isDirectConnectDevice.value || isForceDirectConnect.value) {
+                isForceDirectConnect.value = true;
+                baudrate.value = '19200';
             }
         }
     } else {
@@ -589,7 +598,7 @@ const connectToDevice = async () => {
 
                 log('Connected to device');
 
-                if (isDirectConnectDevice.value) {
+                if (isDirectConnectDevice.value || isForceDirectConnect.value) {
                     serialStore.isDirectConnect = true;
 
                     savingOrApplyingSelectedEscs.value = [0];
@@ -661,7 +670,7 @@ const connectToEsc = async () => {
             path: '/configurator'
         });
     }
-    if (isDirectConnectDevice.value) {
+    if (isDirectConnectDevice.value || isForceDirectConnect.value) {
         if (serialStore.isDirectConnect) {
             serialStore.isDirectConnect = true;
 
