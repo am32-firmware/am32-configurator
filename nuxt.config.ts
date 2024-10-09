@@ -1,6 +1,4 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-console.log(process.env.REDIS_HOST);
-
 export default defineNuxtConfig({
     devtools: {
         enabled: true,

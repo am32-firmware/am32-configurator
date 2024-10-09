@@ -428,7 +428,7 @@ const { data, status } = useAsyncData('get-releases', () => useFetch(`/api/files
 
 const releases = computed(() => {
     const tmp = data.value?.data as unknown as { data: BlobFolder[] };
-    return tmp.data;
+    return tmp?.data ?? [];
 });
 
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
