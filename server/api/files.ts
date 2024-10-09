@@ -180,7 +180,6 @@ export default defineEventHandler(async (event) => {
                 });
             }
         }
-        console.log(bootloadersFolder);
     }
 
     if (filter.includes('bootloader')) {

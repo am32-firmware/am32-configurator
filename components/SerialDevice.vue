@@ -426,11 +426,17 @@ const { data, status } = useAsyncData('get-releases', () => useFetch(`/api/files
     watch: [includePrerelease]
 });
 
-const releases = computed(() => data.value?.data.value?.data);
+const releases = computed(() => {
+    const tmp = data.value?.data as unknown as { data: BlobFolder[] };
+    return tmp.data;
+});
 
 const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
-const releasesOptions = computed(() => (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a)));
+const releasesOptions = computed(() => {
+    console.log(releases.value?.[0]);
+    return (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a));
+});
 
 const flashTabs = computed(() => [
     { label: 'Release', disabled: isFlashingActive.value, slot: 'release' },
