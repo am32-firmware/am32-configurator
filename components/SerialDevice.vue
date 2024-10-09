@@ -431,11 +431,10 @@ const releases = computed(() => {
     return tmp?.data ?? [];
 });
 
-const assets = computed(() => (releases.value?.[0].children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
+const assets = computed(() => (releases.value?.[0]?.children.find(c => c.name === selectedRelease.value)?.files.map(f => f.name)));
 
 const releasesOptions = computed(() => {
-    console.log(releases.value?.[0]);
-    return (releases.value?.[0].children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a));
+    return (releases.value?.[0]?.children.map(c => c.name) ?? []).sort((a, b) => b.localeCompare(a));
 });
 
 const flashTabs = computed(() => [
