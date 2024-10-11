@@ -41,9 +41,9 @@ interface ImageSpinnerImage {
 
 interface ImageSpinnerProps {
     images: ImageSpinnerImage[];
-    rotationTime: number;
-
+    rotationTime?: number;
 }
+
 const props = withDefaults(defineProps<ImageSpinnerProps>(), {
     images: () => [],
     rotationTime: 5

@@ -114,7 +114,7 @@ const emit = defineEmits<{(e: 'change', value: { index: number, field: EepromLay
 }>();
 
 const iconName = computed(() => `i-material-symbols-counter-${props.index + 1}-outline`);
-const isEscError = computed(() => props.esc?.isError || props.esc?.data.settingsBuffer[0] === 0x00);
+const isEscError = computed(() => props.esc?.isError || props.esc?.data?.settingsBuffer[0] === 0x00);
 
 const mcu = computed(() => props.esc?.data);
 

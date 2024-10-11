@@ -929,6 +929,10 @@ const startFlash = async (hexString: string) => {
             escStore.activeTarget = i;
             await FourWay.getInstance().writeHex(i, hexString, 200);
             await delay(200);
+            if (currentTab.value === 2) {
+                escStore.step = 'Sending default config';
+                await applyDefaultConfig();
+            }
             escStore.step = 'Resetting';
             await FourWay.getInstance().reset(i);
             await delay(5000);
@@ -945,10 +949,6 @@ const startFlash = async (hexString: string) => {
                     console.error(e);
                 }
             }
-        }
-        if (currentTab.value === 2) {
-            escStore.step = 'Sending default config';
-            await applyDefaultConfig();
         }
         escStore.step = '';
         escStore.bytesWritten = 0;
