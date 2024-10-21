@@ -53,15 +53,15 @@ const pageSize = 4;
 
 const isStatic = computed(() => props.images.length < (pageSize + 1));
 
-const randomImages = computed<ImageSpinnerImage[]>(() => shuffle(props.images));
+const randomImages: ImageSpinnerImage[] = shuffle(props.images);
 
 const intervalTime = 5000;
 const currentPage = ref(0);
 const currentStep = ref(0);
 
 useIntervalFn(() => {
-    if ((currentStep.value + 1) % 5 === 0) {
-        if ((++currentPage.value) > (props.images.length / pageSize)) {
+    if ((currentStep.value + 1) % pageSize === 0) {
+        if ((++currentPage.value * pageSize) >= props.images.length) {
             currentPage.value = 0;
         }
         currentStep.value = -1;
@@ -73,5 +73,5 @@ useIntervalFn(() => {
     }
 }, intervalTime / 5);
 
-const imagePage = computed<ImageSpinnerImage[]>(() => randomImages.value.slice(currentPage.value * pageSize, currentPage.value * pageSize + pageSize));
+const imagePage = computed<ImageSpinnerImage[]>(() => randomImages.slice(currentPage.value * pageSize, currentPage.value * pageSize + pageSize));
 </script>
