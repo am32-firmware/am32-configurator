@@ -152,13 +152,13 @@ export const EepromLayout = {
         offset: 0x2E,
         size: 1
     },
+    AUTO_ADVANCE: {
+        offset: 0x2F,
+        size: 1
+    },
     STARTUP_MELODY: {
         offset: 0x30,
         size: 128
-    },
-    AUTO_TIMING: {
-        offset: 0xB0,
-        size: 1
     }
 };
 

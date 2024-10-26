@@ -16,6 +16,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { coerce, compare } from 'semver';
 import type { EepromLayoutKeys } from '~/src/eeprom';
 
 const escStore = useEscStore();
@@ -24,12 +25,14 @@ interface SwitchType {
   field: EepromLayoutKeys;
   name: string;
   minEepromVersion?: number;
+  minFirmwareVersion?: string;
 }
 
 interface SettingFieldGroupProps {
     title: string;
     cols: number;
     eepromVersion?: number;
+    firmwareVersion?: string;
     switches?: SwitchType[];
 }
 
@@ -39,10 +42,16 @@ const props = withDefaults(defineProps<SettingFieldGroupProps>(), {
     title: '',
     cols: 3,
     eepromVersion: 0,
+    firmwareVersion: '',
     switches: () => []
 });
 
-const filteredSwitches = computed(() => props.switches.filter(s => !s.minEepromVersion || props.eepromVersion >= s.minEepromVersion));
+const semverFirmwareVersion = props.firmwareVersion?.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2') ?? '0.0';
+
+const filteredSwitches = computed(() => props.switches
+    .filter(s => (!s.minEepromVersion || props.eepromVersion >= s.minEepromVersion) &&
+                (!s.minFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.minFirmwareVersion)!) >= 0))
+);
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
@@ -50,7 +59,7 @@ const model = (field: EepromLayoutKeys) => computed({
     },
     set: (_val) => {
         emits('change', {
-            value: escStore.firstValidEscData?.data.settings[field] === 0 ? 1 : 0,
+            value: [0, 255].includes(escStore.firstValidEscData?.data.settings[field] as number) ? 1 : 0,
             field
         });
     }

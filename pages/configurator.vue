@@ -86,6 +86,7 @@
                   <SettingFieldGroup
                     title="Motor"
                     :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
+                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
                     :cols="3"
                     :switches="[{
                       field: 'STUCK_ROTOR_PROTECTION',
@@ -103,9 +104,9 @@
                       field: 'COMPLEMENTARY_PWM',
                       name: 'Complementary PWM'
                     }, {
-                      field: 'AUTO_TIMING',
+                      field: 'AUTO_ADVANCE',
                       name: 'Auto timing advance',
-                      minEepromVersion: 3
+                      minFirmwareVersion: 'v2.16'
                     }]"
                     @change="onSettingsChange"
                   >
@@ -119,7 +120,7 @@
                       :step="7.5"
                       :display-factor="7.5"
                       unit="°"
-                      :disabled="(v: number) => escStore.firstValidEscData?.data.settings.AUTO_TIMING === 1"
+                      :disabled="(v: number) => escStore.firstValidEscData?.data.settings.AUTO_ADVANCE === 1"
                       @change="onSettingsChange"
                     />
                     <SettingField
@@ -415,6 +416,7 @@ const onSettingsChange = ({ field, value, individual }: { field: EepromLayoutKey
         for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
             escStore.selectedEscInfo[i].settings[field] = value;
             escStore.selectedEscInfo[i].settingsDirty = true;
+            console.log(field, value, individual, escStore.selectedEscInfo[0].settings[field]);
         }
     }
 };
