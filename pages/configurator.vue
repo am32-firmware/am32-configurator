@@ -253,7 +253,7 @@
                       type="number"
                       :min="5"
                       :max="25"
-                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0 || escStore.firstValidEscData?.data.settings.RC_CAR_REVERSING !== 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -264,7 +264,7 @@
                       type="number"
                       :min="1"
                       :max="10"
-                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.SINUSOIDAL_STARTUP === 0 || escStore.firstValidEscData?.data.settings.RC_CAR_REVERSING !== 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -275,6 +275,9 @@
                     :switches="[{
                       field: 'BRAKE_ON_STOP',
                       name: 'Brake on stop'
+                    }, {
+                      field: 'RC_CAR_REVERSING',
+                      name: 'Car type reverse breaking'
                     }]"
                     @change="onSettingsChange"
                   >
@@ -286,7 +289,7 @@
                       :min="1"
                       :max="10"
                       :step="1"
-                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP === 0"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP === 0 || escStore.firstValidEscData?.data.settings.RC_CAR_REVERSING !== 0"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -298,6 +301,7 @@
                       :min="1"
                       :max="10"
                       :step="1"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.RC_CAR_REVERSING !== 0"
                       show-value
                       @change="onSettingsChange"
                     />
