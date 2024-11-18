@@ -94,7 +94,7 @@ export class Direct {
         const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
         ]);
-        const result = await serial.write(init, 2000);
+        const result = await serial.write(init.buffer, 2000);
         if (result) {
             const infoBuffer = result.subarray(init.length);
             const message: FourWayResponse = {
@@ -134,10 +134,34 @@ export class Direct {
 
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
-                    const eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset);
+                    let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset);
                     if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                         await delay(200);
-                        const settingsArray = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([info.layoutSize]));
+                        let settingsArray = new Uint8Array(info.layoutSize);
+                        if (info.layoutSize > 128) {
+                            let currentLayoutSize = 0;
+                            while (currentLayoutSize < info.layoutSize) {
+                                const clampedLayoutSize = Math.min(128, info.layoutSize - currentLayoutSize);
+                                const settingsPart = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([clampedLayoutSize]));
+                                if (!settingsPart) {
+                                    this.logError('Failed to read settings part');
+                                    throw new Error('Failed to read settings part');
+                                }
+                                settingsArray = mergeUint8Arrays(settingsArray, (settingsPart as Uint8Array)) as Uint8Array;
+
+                                currentLayoutSize += 128;
+
+                                eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset + currentLayoutSize);
+                                if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                                    this.logError('Failed to set address');
+                                    throw new Error('Failed to set address');
+                                }
+                                await delay(200);
+                            }
+                        } else {
+                            const tmp = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([info.layoutSize]));
+                            settingsArray = new Uint8Array(tmp?.buffer as ArrayBuffer ?? new ArrayBuffer(0));
+                        }
                         info.settings = bufferToSettings(settingsArray!);
                         info.settingsBuffer = settingsArray!;
 
@@ -187,14 +211,14 @@ export class Direct {
             buffer = Array.from(payload!);
             break;
         case DIRECT_COMMANDS.cmd_Reset:
-            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00])).then(() => delay(5000));
+            return serial.write(new Uint8Array([0x00, 0x00, 0x00, 0x00]).buffer).then(() => delay(5000));
         default:
             break;
         }
         const crc = this.makeCRC(buffer);
         buffer.push(crc & 0xFF);
         buffer.push(crc >> 8 & 0xFF);
-        return serial.write(new Uint8Array(buffer)).then(result => result?.subarray(buffer.length));
+        return serial.write(new Uint8Array(buffer).buffer).then(result => result?.subarray(buffer.length));
     }
 
     async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {

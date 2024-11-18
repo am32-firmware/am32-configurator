@@ -25,3 +25,4 @@ logs
 
 # Local Netlify folder
 .netlify
+stack.env
