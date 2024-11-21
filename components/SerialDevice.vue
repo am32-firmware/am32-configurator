@@ -1,27 +1,49 @@
 <template>
-  <div class="min-w-[320px]">
-    <div class="p-4 grid grid-cols-1 gap-2">
-      <div class="flex flex-column gap-2">
-        <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
+  <div>
+    <div class="p-4 grid grid-cols-1 2xl:grid-cols-2 gap-2">
+      <div class="flex flex-col">
+        <USelectMenu
+          v-model="serialStore.selectedDevice"
+          class="flex-grow"
+          :disabled="serialStore.hasConnection"
+          :options="serialStore.pairedDevicesOptions"
+          placeholder="Select device"
+        />
+        <UButton
+          size="2xs"
+          class="mt-2 mr-auto"
+          @click="requestSerialDevices"
+        >
+          Port select
+        </UButton>
+      </div>
+      <div class="flex flex-col">
         <USelectMenu
           v-model="baudrate"
           class="flex-grow"
           :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice"
           :options="baudrateOptions"
         />
-      </div>
-      <div class="flex justify-between gap-2">
-        <UButton size="2xs" @click="requestSerialDevices">
-          Port select
-        </UButton>
-        <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">
+        <UButton
+          v-if="!serialStore.hasConnection"
+          :disabled="serialStore.selectedDevice.id === '-1'"
+          size="2xs"
+          class="mt-2 mr-auto 2xl:ml-auto 2xl:mr-0"
+          @click="connectToDevice"
+        >
           Connect
         </UButton>
-        <UButton v-else size="2xs" color="red" @click="disconnectFromDevice">
+        <UButton
+          v-else
+          size="2xs"
+          class="mt-2 mr-auto 2xl:ml-auto 2xl:mr-0"
+          color="red"
+          @click="disconnectFromDevice"
+        >
           Disconnect
         </UButton>
       </div>
-      <div class="flex gap-4 pt-2">
+      <div class="flex flex-col mb-auto ml:flex-row gap-4 pt-2">
         <div class="flex gap-2 items-center">
           <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
         </div>
@@ -46,22 +68,22 @@
               />
             </UChip>
           </div>
-          <div class="flex gap-2">
-            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
-              Read
-            </UButton>
-            <UButton
-              icon="i-material-symbols-save"
-              color="blue"
-              size="2xs"
-              :disabled="!isAnySettingsDirty || escStore.isSaving"
-              :loading="escStore.isSaving"
-              @click="writeConfig"
-            >
-              Save
-            </UButton>
-          </div>
         </div>
+      </div>
+      <div class="flex flex-col mr-auto ml:flex-row ml:mr-0 2xl:flex-col 2xl:ml-auto 3xl:flex-row 3xl:justify-end gap-2">
+        <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
+          Read
+        </UButton>
+        <UButton
+          icon="i-material-symbols-save"
+          color="blue"
+          size="2xs"
+          :disabled="!isAnySettingsDirty || escStore.isSaving"
+          :loading="escStore.isSaving"
+          @click="writeConfig"
+        >
+          Save
+        </UButton>
       </div>
       <div v-if="false && serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
         <UKbd>

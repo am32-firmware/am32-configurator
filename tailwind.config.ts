@@ -18,6 +18,10 @@ export default {
     ],
     theme: {
         extend: {
+            screens: {
+                ml: '994px',
+                '3xl': '1855px'
+            }
         },
         fontFamily: {
             sans: ["'Nunito Sans'"]
