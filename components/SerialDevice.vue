@@ -225,7 +225,7 @@
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
-                v-for="n of escStore.selectedEscInfo.length"
+                v-for="n of escStore.selectedEscInfo.map(e => e.index + 1)"
                 :key="n"
                 class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                 :class="{
@@ -284,7 +284,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
+                  v-for="n of escStore.selectedEscInfo.map(e => e.index + 1)"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -323,7 +323,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
+                  v-for="n of escStore.selectedEscInfo.map(e => e.index + 1)"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
@@ -363,7 +363,7 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
+                  v-for="n of escStore.selectedEscInfo.map(e => e.index + 1)"
                   :key="n"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{

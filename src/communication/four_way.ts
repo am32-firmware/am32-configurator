@@ -390,7 +390,14 @@ export class FourWay {
                 readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
+                    // The bootloader writes it revision number so we can't compare it
+                    // as it could be different.
+                    readbackSettings.params[2] = newSettingsArray[2]
+
                     if (!compare(newSettingsArray, readbackSettings.params)) {
+                        console.error('SettingsVerificationError');
+                        console.error(newSettingsArray);
+                        console.error(readbackSettings.params);
                         throw new Error('SettingsVerificationError(newSettingsArray, readbackSettings)');
                     }
 
