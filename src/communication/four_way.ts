@@ -147,7 +147,8 @@ export class FourWay {
         const eepromOffset = mcu.getEepromOffset();
 
         try {
-            const fileNameRead = await this.readAddress(eepromOffset - 32, 32);
+            const fileNameOffset = (eepromOffset - 32) >> mcu.getEepromAddressShift();
+            const fileNameRead = await this.readAddress(fileNameOffset, 32);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -162,7 +163,8 @@ export class FourWay {
 
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
-            const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
+            const settingsArrayOffset = eepromOffset >> mcu.getEepromAddressShift();
+            const settingsArray = (await this.readAddress(settingsArrayOffset, mcu.getInfo().layoutSize))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray);
             mcu.getInfo().settingsBuffer = settingsArray;
 
