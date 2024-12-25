@@ -144,6 +144,7 @@ import flashhobbyImage from '~/assets/logos/flashhobby2.svg';
 import sequreImage from '~/assets/logos/sequre.png';
 import brotherHobbyImage from '~/assets/logos/brotherhobby.png';
 import vimdronesImage from '~/assets/logos/vimdrones_logo_white.png';
+import gnbImage from '~/assets/logos/gnb.png';
 
 const images = [{
     path: airbotImage,
@@ -179,5 +180,8 @@ const images = [{
     path: flashhobbyImage,
     url: 'https://www.flashhobby.com/',
     class: 'invert'
+}, {
+    path: gnbImage,
+    url: 'https://www.gaoneng.shop'
 }];
 </script>
