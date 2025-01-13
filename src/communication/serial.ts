@@ -106,7 +106,7 @@ class Serial {
                     } else {
                         console.log('Parsing 4way response of size ' + ret.length);
 
-                        if (ret.length < 9) {
+                        if (ret.length < 7) {
                             console.log('Not enough data');
                             t = setTimeout(endStream, timeout); // to short to be reply
                         } else {

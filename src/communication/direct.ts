@@ -134,47 +134,19 @@ export class Direct {
 
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
-                    let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset);
-                    if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                        await delay(200);
-                        let settingsArray = new Uint8Array(info.layoutSize);
-                        if (info.layoutSize > 128) {
-                            let currentLayoutSize = 0;
-                            while (currentLayoutSize < info.layoutSize) {
-                                const clampedLayoutSize = Math.min(128, info.layoutSize - currentLayoutSize);
-                                const settingsPart = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([clampedLayoutSize]));
-                                if (!settingsPart) {
-                                    this.logError('Failed to read settings part');
-                                    throw new Error('Failed to read settings part');
-                                }
-                                settingsArray = mergeUint8Arrays(settingsArray, (settingsPart as Uint8Array)) as Uint8Array;
+                    const settingsArray = await this.readChunked(eepromOffset, info.layoutSize);
+                    info.settings = bufferToSettings(settingsArray!);
+                    info.settingsBuffer = settingsArray!;
 
-                                currentLayoutSize += 128;
-
-                                eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset + currentLayoutSize);
-                                if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
-                                    this.logError('Failed to set address');
-                                    throw new Error('Failed to set address');
-                                }
-                                await delay(200);
-                            }
-                        } else {
-                            const tmp = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([info.layoutSize]));
-                            settingsArray = new Uint8Array(tmp?.buffer as ArrayBuffer ?? new ArrayBuffer(0));
+                    for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
+                        if (value === info.bootloader.input) {
+                            info.bootloader.valid = true;
+                            info.bootloader.pin = key;
+                            info.bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
                         }
-                        info.settings = bufferToSettings(settingsArray!);
-                        info.settingsBuffer = settingsArray!;
-
-                        for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                            if (value === info.bootloader.input) {
-                                info.bootloader.valid = true;
-                                info.bootloader.pin = key;
-                                info.bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
-                            }
-                        }
-
-                        return info;
                     }
+
+                    return info;
                 }
             } catch (e: any) {
                 console.error(e);
@@ -219,6 +191,67 @@ export class Direct {
         buffer.push(crc & 0xFF);
         buffer.push(crc >> 8 & 0xFF);
         return serial.write(new Uint8Array(buffer).buffer).then(result => result?.subarray(buffer.length));
+    }
+
+    async readChunked (address: number, expected: number, chunkSize = 64) {
+        let response: Uint8Array = new Uint8Array();
+        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+        if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+            if (expected > chunkSize) {
+                let currentLayoutSize = 0;
+                while (currentLayoutSize < chunkSize) {
+                    const clampedLayoutSize = Math.min(chunkSize, chunkSize - currentLayoutSize);
+                    const settingsPart = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([clampedLayoutSize]));
+
+                    if (!settingsPart) {
+                        this.logError('Failed to read settings part');
+                        throw new Error('Failed to read settings part');
+                    }
+                    response = mergeUint8Arrays(response, settingsPart);
+
+                    currentLayoutSize += chunkSize;
+
+                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address + currentLayoutSize);
+                    if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
+                        this.logError('Failed to set address');
+                        throw new Error('Failed to set address');
+                    }
+                    await delay(200);
+                }
+            } else {
+                const tmp = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([expected]));
+                response = new Uint8Array(tmp?.buffer as ArrayBuffer ?? new ArrayBuffer(0));
+            }
+        }
+        return response;
+    }
+
+    async writeChunked (address: number, payload: Uint8Array, chunkSize = 64) {
+        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+        await delay(200);
+        if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+            if (payload.length > chunkSize) {
+                let currentLayoutSize = 0;
+                while (currentLayoutSize < chunkSize) {
+                    const clampedLayoutSize = Math.min(chunkSize, chunkSize - currentLayoutSize);
+                    await this.writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([clampedLayoutSize]));
+                    const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload.subarray(currentLayoutSize, clampedLayoutSize));
+                    if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                        await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
+                    } else {
+                        this.logError('Failed to send buffer');
+                        throw new Error('Failed to send buffer');
+                    }
+                    currentLayoutSize += chunkSize;
+                }
+            } else {
+                await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
+                const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload);
+                if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                    await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
+                }
+            }
+        }
     }
 
     async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {

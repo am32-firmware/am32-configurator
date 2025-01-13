@@ -726,16 +726,9 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getEepromOffset());
-        if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([Mcu.LAYOUT_SIZE]));
-            const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, objectToSettingsArray(escStore.firstValidEscData.data.settings));
-            if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                escStore.firstValidEscData.data.settingsDirty = false;
-                escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
-            }
-        }
+        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings));
+        escStore.firstValidEscData.data.settingsDirty = false;
+        escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
     }
 };
 
@@ -903,13 +896,14 @@ const startFlash = async (hexString: string) => {
             for (const start of parsed.data) {
                 i = 0;
                 logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
+                const CHUNK_SIZE = 64;
                 while (true) {
-                    logStore.log(`... 0x${((start.address - mcu.getFlashOffset()) + (i * 128)).toString(16)} - 0x${((start.address - mcu.getFlashOffset()) + ((i + 1) * 128) - 1).toString(16)}`);
-                    const chunk = new Uint8Array(start.data.slice(i * 128, ((i + 1) * 128 > start.data.length ? start.data.length - 1 : (i + 1) * 128)));
-                    await Direct.getInstance().writeBufferToAddress((start.address - mcu.getFlashOffset()) + (i * 128), chunk);
-                    escStore.bytesWritten += 128;
+                    logStore.log(`... 0x${((start.address - mcu.getFlashOffset()) + (i * CHUNK_SIZE)).toString(16)} - 0x${((start.address - mcu.getFlashOffset()) + ((i + 1) * CHUNK_SIZE) - 1).toString(16)}`);
+                    const chunk = new Uint8Array(start.data.slice(i * CHUNK_SIZE, ((i + 1) * CHUNK_SIZE > start.data.length ? start.data.length - 1 : (i + 1) * CHUNK_SIZE)));
+                    await Direct.getInstance().writeBufferToAddress((start.address - mcu.getFlashOffset()) + (i * CHUNK_SIZE), chunk);
+                    escStore.bytesWritten += CHUNK_SIZE;
                     i += 1;
-                    if ((i + 1) * 128 > start.data.length) {
+                    if ((i + 1) * CHUNK_SIZE > start.data.length) {
                         break;
                     }
                 }
