@@ -47,7 +47,7 @@
             </UChip>
           </div>
           <div class="flex gap-2">
-            <UButton v-if="!serialStore.isDirectConnect" icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
+            <UButton icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
               Read
             </UButton>
             <UButton
@@ -537,6 +537,13 @@ useIntervalFn(() => {
 }, 500);
 
 const connectToDevice = async () => {
+    const router = useRouter();
+    console.log(router);
+    if (!router.currentRoute.value.fullPath.startsWith('/configurator')) {
+        router.push({
+            path: '/configurator'
+        });
+    }
     const portTmp: string[] | undefined = serialStore.selectedDevice?.id.split(':');
     if (portTmp) {
         const ports = await navigator.serial.getPorts();
@@ -590,24 +597,7 @@ const connectToDevice = async () => {
                 log('Connected to device');
 
                 if (isDirectConnectDevice.value) {
-                    serialStore.isDirectConnect = true;
-
-                    savingOrApplyingSelectedEscs.value = [0];
-
-                    escStore.count = 1;
-                    escStore.expectedCount = 1;
-
-                    await delay(200);
-
-                    const info = await Direct.getInstance().init();
-                    const newEscData = {
-                        isLoading: true,
-                        data: info!
-                    } as EscData;
-
-                    escData.value.push(newEscData);
-
-                    newEscData.isLoading = false;
+                    connectToEsc();
                 } else {
                     const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
                         logError(`${err.message}, trying to exit fourway and try again.`);
@@ -655,21 +645,25 @@ const connectToDevice = async () => {
 };
 
 const connectToEsc = async () => {
-    const router = useRouter();
-    if (!router.currentRoute.value.fullPath.startsWith('/configurator')) {
-        router.push({
-            path: '/configurator'
-        });
-    }
     if (isDirectConnectDevice.value) {
-        if (serialStore.isDirectConnect) {
-            serialStore.isDirectConnect = true;
+        serialStore.isDirectConnect = true;
 
-            escStore.expectedCount = 1;
-            escStore.count = 1;
+        savingOrApplyingSelectedEscs.value = [0];
 
-            escStore.escData = [];
-        }
+        escStore.count = 1;
+        escStore.expectedCount = 1;
+
+        await delay(200);
+
+        const info = await Direct.getInstance().init();
+        const newEscData = {
+            isLoading: true,
+            data: info!
+        } as EscData;
+
+        escData.value = [newEscData];
+
+        newEscData.isLoading = false;
     } else {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
