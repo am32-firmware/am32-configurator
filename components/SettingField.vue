@@ -27,7 +27,7 @@
           :min="min"
           :max="max"
           :step="step"
-          :color="value === disabledValue ? 'orange' : 'primary'"
+          :color="value >= disabledValue ? 'orange' : 'primary'"
         />
       </div>
       <div v-else-if="type === 'rtttl'">
@@ -35,7 +35,7 @@
       </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">
-          <div v-if="value === disabledValue">
+          <div v-if="value >= disabledValue">
             DISABLED
           </div>
           <div v-else>

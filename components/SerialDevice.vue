@@ -278,7 +278,10 @@
             </div>
           </template>
           <div>
-            <div class="flex flex-col gap-2">
+            <div v-if="serialStore.isDirectConnect" class="text-center">
+              Do you want to overwrite the current config with default settings?
+            </div>
+            <div v-else class="flex flex-col gap-2">
               <div class="text-center">
                 Select ESC(s) to apply:
               </div>
@@ -299,7 +302,7 @@
           </div>
           <template #footer>
             <div class="text-right">
-              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="applyDefaultConfig" />
+              <UButton color="green" :label="serialStore.isDirectConnect ? 'Yes' : 'Apply'" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="applyDefaultConfig" />
             </div>
           </template>
         </UCard>
@@ -393,6 +396,7 @@ import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
+import serial from '~/src/communication/serial';
 import Serial from '~/src/communication/serial';
 import db from '~/src/db';
 import Flash from '~/src/flash';
@@ -538,7 +542,6 @@ useIntervalFn(() => {
 
 const connectToDevice = async () => {
     const router = useRouter();
-    console.log(router);
     if (!router.currentRoute.value.fullPath.startsWith('/configurator')) {
         router.push({
             path: '/configurator'
@@ -646,12 +649,16 @@ const connectToDevice = async () => {
 
 const connectToEsc = async () => {
     if (isDirectConnectDevice.value) {
+        escStore.isLoading = true;
+
         serialStore.isDirectConnect = true;
 
-        savingOrApplyingSelectedEscs.value = [0];
+        savingOrApplyingSelectedEscs.value = [1];
 
         escStore.count = 1;
         escStore.expectedCount = 1;
+
+        escData.value = [];
 
         await delay(200);
 
@@ -664,6 +671,7 @@ const connectToEsc = async () => {
         escData.value = [newEscData];
 
         newEscData.isLoading = false;
+        escStore.isLoading = false;
     } else {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
@@ -702,6 +710,18 @@ const connectToEsc = async () => {
         }
 
         escStore.isLoading = false;
+    }
+
+    if (escStore.escData.filter(e => !e.data.settingsBuffer.some(s => s !== 255) || e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0).length > 0) {
+        toast.add({
+            title: 'Error',
+            color: 'red',
+            description: 'Found empty settings, flashing default settings now!'
+        });
+
+        savingOrApplyingSelectedEscs.value = escStore.escData.map((_, i) => i + 1);
+
+        applyDefaultConfig();
     }
 };
 
@@ -964,6 +984,10 @@ const applyDefaultConfig = async () => {
         }
 
         await writeConfig();
+
+        if (applyDefaultConfigModalOpen.value) {
+            applyDefaultConfigModalOpen.value = false;
+        }
     }
 
     if (applyConfigFile.value) {
