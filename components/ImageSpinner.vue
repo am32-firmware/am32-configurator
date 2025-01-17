@@ -51,7 +51,7 @@ const props = withDefaults(defineProps<ImageSpinnerProps>(), {
 
 const pageSize = 4;
 
-const isStatic = true;// computed(() => props.images.length < (pageSize + 1));
+const isStatic = false;// computed(() => props.images.length < (pageSize + 1));
 
 const randomImages: ImageSpinnerImage[] = shuffle(props.images);
 

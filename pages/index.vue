@@ -141,6 +141,7 @@ import rushfpv from '~/assets/logos/rushfpv.png';
 import airbotImage from '~/assets/logos/Airbot_Logo.svg';
 import kissUltraImage from '~/assets/logos/kiss-ultra.svg';
 import flashhobbyImage from '~/assets/logos/flashhobby2.svg';
+import tbsImage from '~/assets/logos/tbs_logo.svg';
 import sequreImage from '~/assets/logos/sequre.png';
 import brotherHobbyImage from '~/assets/logos/brotherhobby.png';
 import vimdronesImage from '~/assets/logos/vimdrones_logo_white.png';
@@ -183,5 +184,8 @@ const images = [{
 }, {
     path: gnbImage,
     url: 'https://www.gaoneng.shop'
+}, {
+    path: tbsImage,
+    url: 'https://www.team-blacksheep.com/'
 }];
 </script>
