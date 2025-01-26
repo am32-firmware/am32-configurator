@@ -6,7 +6,12 @@ export const useEscStore = defineStore('esc', () => {
 
     const escData = ref<EscData[]>([]);
 
-    const selectedEscInfo = computed(() => escData.value.filter(e => !e.isError && e.data?.isSelected).map(e => e.data) ?? []);
+    const selectedEscInfo = computed(() =>
+        escData.value
+            .map((e, index) => ({ ...e, index }))
+            .filter(e => !e.isError && e.data?.isSelected)
+            .map(e => ({ ...e.data, index: e.index })) ?? []
+    );
     const firstValidEscData = computed(() => escData.value?.find(d => !d.isError && d.data));
 
     const settingsDirty = ref(false);
