@@ -146,6 +146,7 @@ import sequreImage from '~/assets/logos/sequre.png';
 import brotherHobbyImage from '~/assets/logos/brotherhobby.png';
 import vimdronesImage from '~/assets/logos/vimdrones_logo_white.png';
 import gnbImage from '~/assets/logos/gnb.png';
+import flytexImage from '~/assets/logos/flytex_logo_full_white.svg';
 
 const images = [{
     path: airbotImage,
@@ -187,5 +188,8 @@ const images = [{
 }, {
     path: tbsImage,
     url: 'https://www.team-blacksheep.com/'
+}, {
+    path: flytexImage,
+    url: 'https://flytex.pro/'
 }];
 </script>

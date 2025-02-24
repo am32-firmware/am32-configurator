@@ -159,6 +159,10 @@ export const EepromLayout = {
     STARTUP_MELODY: {
         offset: 0x30,
         size: 128
+    },
+    CAN_SETTINGS: {
+        offset: 0xB0,
+        size: 16
     }
 };
 
