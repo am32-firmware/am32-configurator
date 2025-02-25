@@ -1,9 +1,10 @@
-import type { McuSettings } from './../src/eeprom';
+import type { EepromField, McuSettings } from './../src/eeprom';
 import { EepromLayout } from './../src/eeprom';
 export default function (buffer: Uint8Array, eepromVersion: number) {
     const object: McuSettings = {};
+    const entries: [string, EepromField][] = Object.entries(EepromLayout);
 
-    for (const [prop, setting] of Object.entries(EepromLayout)) {
+    for (const [prop, setting] of entries) {
         const {
             size,
             offset

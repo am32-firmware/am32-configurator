@@ -740,9 +740,9 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings));
+        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number));
         escStore.firstValidEscData.data.settingsDirty = false;
-        escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
+        escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
     }
 };
 
@@ -974,7 +974,7 @@ const applyDefaultConfig = async () => {
 
     if (file) {
         const buffer = new Uint8Array(await file.arrayBuffer());
-        const settings = bufferToSettings(buffer);
+        const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
 
         settings.STARTUP_MELODY = (new Array(128)).fill(0xFF);
 
@@ -1013,7 +1013,7 @@ const applyConfig = async () => {
         const file: File = applyConfigFile.value.input.files[0];
         if (file) {
             const buffer = new Uint8Array(await file.arrayBuffer());
-            const settings = bufferToSettings(buffer);
+            const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
 
             for (const n of savingOrApplyingSelectedEscs.value) {
                 escStore.escData[n - 1].data.settings = settings;

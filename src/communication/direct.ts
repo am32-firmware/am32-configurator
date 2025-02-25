@@ -135,7 +135,7 @@ export class Direct {
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
                     const settingsArray = await this.readChunked(eepromOffset, info.layoutSize);
-                    info.settings = bufferToSettings(settingsArray!);
+                    info.settings = bufferToSettings(settingsArray!, info.settings.LAYOUT_REVISION as number);
                     info.settingsBuffer = settingsArray!;
 
                     for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {

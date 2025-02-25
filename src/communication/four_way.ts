@@ -163,7 +163,7 @@ export class FourWay {
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
             const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
-            mcu.getInfo().settings = bufferToSettings(settingsArray);
+            mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
             for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
@@ -373,7 +373,7 @@ export class FourWay {
         const flash = await this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target]);
 
         if (flash) {
-            const newSettingsArray = objectToSettingsArray(esc.settings);
+            const newSettingsArray = objectToSettingsArray(esc.settings, esc.settings.LAYOUT_REVISION as number);
             if (newSettingsArray.length !== esc.settingsBuffer.length) {
                 throw new Error('settings length mismatch');
             }

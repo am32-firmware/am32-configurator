@@ -13,12 +13,9 @@
       </div>
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
         <UTabs
-          :items="[
-            { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' },
-            (escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION ?? 255) < 3 ? { label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' } : null
-          ]"
+          :items="tabs"
         >
-          <template v-if="(escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION ?? 255) < 3" #tune>
+          <template v-if="(escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION as number) < 3" #tune>
             <div class="pt-4 flex flex-col gap-4">
               <div class="flex gap-4 w-full justify-center">
                 <div v-for="(info, n) of escStore.escData" :key="n">
@@ -399,11 +396,20 @@ const onChange = (payload: { index: number, field: EepromLayoutKeys, value: bool
 };
 
 const onToggle = (index: number) => {
-    console.log(escStore.escData, index);
     if (escStore.escData[index].data) {
         escStore.escData[index].data.isSelected = !escStore.escData[index].data.isSelected;
     }
 };
+
+const tabs = computed(() => {
+    const ret = [
+        { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }
+    ];
+    if (escStore.firstValidEscData?.data.settings && escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number < 3) {
+        ret.push({ label: 'Tune', slot: 'tune', icon: 'i-material-symbols-music-note' });
+    }
+    return ret;
+});
 
 const protocolOptions = [
     {
