@@ -1,6 +1,8 @@
 export interface EepromField {
     offset: number;
     size: number;
+    minEepromVersion?: number;
+    maxEepromVersion?: number;
 }
 
 export type EepromLayoutField = {
@@ -158,7 +160,13 @@ export const EepromLayout = {
     },
     STARTUP_MELODY: {
         offset: 0x30,
-        size: 128
+        size: 128,
+        maxEepromVersion: 2
+    },
+    RAMP_RATE: {
+        offset: 0x30,
+        size: 1,
+        minEepromVersion: 3
     },
     CAN_SETTINGS: {
         offset: 0xB0,

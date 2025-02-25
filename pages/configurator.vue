@@ -12,8 +12,13 @@
         </div>
       </div>
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
-        <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
-          <template #tune>
+        <UTabs
+          :items="[
+            { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' },
+            (escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION ?? 255) < 3 ? { label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' } : null
+          ]"
+        >
+          <template v-if="(escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION ?? 255) < 3" #tune>
             <div class="pt-4 flex flex-col gap-4">
               <div class="flex gap-4 w-full justify-center">
                 <div v-for="(info, n) of escStore.escData" :key="n">
@@ -233,6 +238,17 @@
                       :offset="250"
                       :display-factor="1"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF === 0"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="RAMP_RATE"
+                      name="Ramp rate (ms)"
+                      type="number"
+                      :min="1"
+                      :max="20"
+                      :step="1"
                       show-value
                       @change="onSettingsChange"
                     />

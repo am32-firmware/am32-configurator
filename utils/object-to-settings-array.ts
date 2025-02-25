@@ -2,7 +2,7 @@ import { EepromLayout } from './../src/eeprom';
 import Mcu from '~/src/mcu';
 import type { McuSettings } from '~/src/eeprom';
 
-export default function (settingsObject: McuSettings) {
+export default function (settingsObject: McuSettings, eepromVersion: number) {
     const array = new Uint8Array(Mcu.LAYOUT_SIZE).fill(0xFF);
 
     for (const [prop, setting] of Object.entries(EepromLayout)) {
@@ -10,6 +10,11 @@ export default function (settingsObject: McuSettings) {
             size,
             offset
         } = setting;
+
+        if ((setting.maxEepromVersion !== undefined && eepromVersion > setting.maxEepromVersion) ||
+            (setting.minEepromVersion !== undefined && eepromVersion < setting.minEepromVersion)) {
+            continue;
+        }
 
         const value: number | number[] | string = settingsObject[prop] as number;
 
