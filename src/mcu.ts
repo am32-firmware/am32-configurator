@@ -8,6 +8,7 @@ export interface McuVariant {
     flash_offset: string;
     firmware_start: string;
     eeprom_offset: string;
+    eeprom_address_shift: number;
 }
 
 export interface McuInfo {
@@ -54,7 +55,8 @@ class Mcu {
                 flash_size: 65536,
                 flash_offset: '0x08000000',
                 firmware_start: '0x1000',
-                eeprom_offset: '0x7c00'
+                eeprom_offset: '0x7c00',
+                eeprom_address_shift: 0,
             },
             3506: {
                 name: 'ARM64K',
@@ -63,7 +65,18 @@ class Mcu {
                 flash_size: 65536,
                 flash_offset: '0x08000000',
                 firmware_start: '0x1000',
-                eeprom_offset: '0xF800'
+                eeprom_offset: '0xF800',
+                eeprom_address_shift: 0,
+            },
+            '2B06': {
+                name: 'STM32G071 128KB',
+                signature: '0x2b06',
+                page_size: 2048,
+                flash_size: 131072,
+                flash_offset: '0x08000000',
+                firmware_start: '0x1000',
+                eeprom_offset: '0x1F800',
+                eeprom_address_shift: 2,
             }
         };
 
@@ -135,6 +148,17 @@ class Mcu {
      */
     getEepromOffset () {
         return parseInt(this.mcu.eeprom_offset, 16);
+    }
+
+    /**
+     * Get shit in number of bits of the EEprom offset for the four way communication.
+     * This is needed because the address is coded on 2 bytes but for large flash
+     * MCUs the address goes beyond the range (e.g. 0x1F800)
+     *
+     * @returns {number}
+     */
+    getEepromAddressShift() {
+        return this.mcu.eeprom_address_shift;
     }
 
     /**
