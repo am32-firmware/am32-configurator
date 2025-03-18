@@ -36,7 +36,7 @@ const links = computed(() => [{
     icon: 'i-heroicons-home',
     to: '/'
 }, {
-    label: 'Configurator',
+    label: 'Configurator123',
     icon: 'i-heroicons-cpu-chip-16-solid',
     to: '/configurator'
 }, {
