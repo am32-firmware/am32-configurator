@@ -1,17 +1,17 @@
 <template>
   <div>
     <div>
-      <div class="max-w-[1400px] p-4 grid grid-rows-[120px_1fr] lg:grid-rows-[200px] grid-cols-[120px_1fr] lg:grid-cols-[180px_1fr_320px] gap-4 mx-auto items-center text-white">
-        <img :src="logo" class="max-h-[180px] col-start-1 col-span-1 aspect-auto rounded-2xl bg-red-800">
+      <div class="max-w-[1400px] p-4 grid grid-rows-[80px_140px_200px] sm:grid-rows-[140px_200px] lg:grid-rows-[200px] grid-cols-1 sm:grid-cols-[auto_1fr] lg:grid-cols-[200px_1fr_320px] gap-y-4 sm:gap-x-4 mx-auto text-white">
+        <img :src="logo" class="h-full col-start-1 aspect-auto rounded-2xl bg-red-800 justify-self-center">
 
-        <div class="h-full col-start-2 col-span-1 flex flex-col text-red-800 font-bold text-3xl">
+        <div class="h-full row-start-3 sm:row-start-2 lg:row-start-1 col-start-1 col-span-2 lg:col-start-2 lg:col-span-1 flex flex-col text-red-800 font-bold text-3xl">
           <span v-if="logStore.entries.length === 0">
             AlkaMotors
           </span>
-          <Log v-else class="h-full overflow-auto" />
+          <Log v-else class="overflow-auto h-full" />
         </div>
 
-        <div v-if="serialStore.hasSerial" class="h-full col-start-2 lg:col-start-3 ">
+        <div v-if="serialStore.hasSerial" class="h-full row-start-2 sm:row-start-1 col-start-1 sm:col-start-2 lg:col-start-3">
           <SerialDevice />
         </div>
       </div>
