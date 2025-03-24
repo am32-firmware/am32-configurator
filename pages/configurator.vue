@@ -109,6 +109,11 @@
                       field: 'AUTO_ADVANCE',
                       name: 'Auto timing advance',
                       minFirmwareVersion: 'v2.16'
+                    }, {
+                      field: 'VARIABLE_PWM_FREQUENCY',
+                      name: 'PWM by RPM',
+                      minFirmwareVersion: 'v2.18',
+                      setValue: 2
                     }]"
                     @change="onSettingsChange"
                   >
@@ -178,6 +183,7 @@
                       :max="48"
                       :step="1"
                       unit="kHz"
+                      :disabled="(v: number) => (escStore.firstValidEscData?.data.settings.VARIABLE_PWM_FREQUENCY as number ?? 0) > 1"
                       @change="onSettingsChange"
                     >
                       <template #unit="{ value }">

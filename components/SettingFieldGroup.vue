@@ -5,8 +5,8 @@
     </div>
     <div class="flex">
       <div v-if="switches.length > 0" class="p-4">
-        <div v-for="{ field, name } of filteredSwitches" :key="field">
-          <UCheckbox :label="name" v-model="model(field).value"/>
+        <div v-for="{ field, name, setValue } of filteredSwitches" :key="field">
+          <UCheckbox :label="name" :model-value="model(field, setValue).value" />
         </div>
       </div>
       <div class="flex-grow grid gap-4 p-4" :class="`grid-cols-${cols}`">
@@ -24,6 +24,7 @@ const escStore = useEscStore();
 interface SwitchType {
   field: EepromLayoutKeys;
   name: string;
+  setValue?: number;
   minEepromVersion?: number;
   minFirmwareVersion?: string;
 }
@@ -53,13 +54,13 @@ const filteredSwitches = computed(() => props.switches
                 (!s.minFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.minFirmwareVersion)!) >= 0))
 );
 
-const model = (field: EepromLayoutKeys) => computed({
+const model = (field: EepromLayoutKeys, setValue?: number) => computed({
     get: () => {
-        return escStore.firstValidEscData?.data.settings[field] === 1;
+        return (escStore.firstValidEscData?.data.settings[field] ?? 0) as number > 0;
     },
     set: (_val) => {
         emits('change', {
-            value: [0, 255].includes(escStore.firstValidEscData?.data.settings[field] as number) ? 1 : 0,
+            value: [0, 255].includes((escStore.firstValidEscData?.data.settings[field] ?? 0) as number) ? (setValue ?? 1) : 0,
             field
         });
     }
