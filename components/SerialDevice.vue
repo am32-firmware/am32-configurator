@@ -1,6 +1,6 @@
 <template>
   <div class="min-w-[320px]">
-    <div class="p-4 grid grid-cols-1 gap-2">
+    <div class="grid grid-cols-1 gap-2">
       <div class="flex flex-column gap-2">
         <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
         <USelectMenu
@@ -396,7 +396,6 @@ import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
-import serial from '~/src/communication/serial';
 import Serial from '~/src/communication/serial';
 import db from '~/src/db';
 import Flash from '~/src/flash';

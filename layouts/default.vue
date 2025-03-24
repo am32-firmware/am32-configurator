@@ -1,22 +1,17 @@
 <template>
   <div>
     <div>
-      <div class="grid grid-cols-12 text-white ">
-        <div class="col-span-2 flex justify-center items-center">
-          <div class="bg-red-800 max-h-[180px] rounded-2xl">
-            <img :src="logo" class="max-h-[180px] w-auto">
-          </div>
-        </div>
-        <div class="col-span-8 h-[200px] max-h-[200px]">
-          <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
-            <div v-if="logStore.entries.length === 0">
-              AlkaMotors
-            </div>
+      <div class="max-w-[1400px] p-4 grid grid-rows-[120px_1fr] lg:grid-rows-[200px] grid-cols-[120px_1fr] lg:grid-cols-[180px_1fr_320px] gap-4 mx-auto items-center text-white">
+        <img :src="logo" class="max-h-[180px] col-start-1 col-span-1 aspect-auto rounded-2xl bg-red-800">
 
-            <Log v-else class="h-full overflow-auto" />
-          </div>
+        <div class="h-full col-start-2 col-span-1 flex flex-col text-red-800 font-bold text-3xl">
+          <span v-if="logStore.entries.length === 0">
+            AlkaMotors
+          </span>
+          <Log v-else class="h-full overflow-auto" />
         </div>
-        <div v-if="serialStore.hasSerial" class="col-span-2">
+
+        <div v-if="serialStore.hasSerial" class="h-full col-start-2 lg:col-start-3 ">
           <SerialDevice />
         </div>
       </div>
