@@ -95,7 +95,7 @@ const boolModel = (field: EepromLayoutKeys, setValue?: number) => computed({
 
 const model = (field: EepromLayoutKeys) => computed({
     get: () => {
-        return escStore.firstValidEscData?.data.settings[field] ?? 0;
+        return (escStore.firstValidEscData?.data.settings[field] ?? 0) as number;
     },
     set: (val: number) => {
         emits('change', { value: val, field });
