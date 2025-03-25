@@ -4,9 +4,13 @@
       {{ title }}
     </div>
     <div class="flex">
-      <div v-if="switches.length > 0" class="p-4">
+      <div v-if="filteredSwitches.length > 0 || filteredRadios.length > 0" class="p-4">
         <div v-for="{ field, name, setValue } of filteredSwitches" :key="field">
-          <UCheckbox :label="name" :model-value="model(field, setValue).value" />
+          <UCheckbox v-model="boolModel(field, setValue).value" :label="name" />
+        </div>
+        <div v-for="{ field, name, values } of filteredRadios" :key="field" :label="name">
+          <div>{{ name }}</div>
+          <URadioGroup v-model="model(field).value" class="ml-2" :options="values.map(v => ({ label: v.name, value: v.value }))" value-key="value" label-key="name" />
         </div>
       </div>
       <div class="flex-grow grid gap-4 p-4" :class="`grid-cols-${cols}`">
@@ -26,7 +30,19 @@ interface SwitchType {
   name: string;
   setValue?: number;
   minEepromVersion?: number;
+  maxEepromVersion?: number;
   minFirmwareVersion?: string;
+  maxFirmwareVersion?: string;
+}
+
+interface RadioType {
+  field: EepromLayoutKeys;
+  name: string;
+  values: { name: string, value: number }[];
+  minEepromVersion?: number;
+  maxEepromVersion?: number;
+  minFirmwareVersion?: string;
+  maxFirmwareVersion?: string;
 }
 
 interface SettingFieldGroupProps {
@@ -35,6 +51,7 @@ interface SettingFieldGroupProps {
     eepromVersion?: number;
     firmwareVersion?: string;
     switches?: SwitchType[];
+    radios?: RadioType[];
 }
 
 const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number }): void}>();
@@ -44,25 +61,44 @@ const props = withDefaults(defineProps<SettingFieldGroupProps>(), {
     cols: 3,
     eepromVersion: 0,
     firmwareVersion: '',
-    switches: () => []
+    switches: () => [],
+    radios: () => []
 });
 
 const semverFirmwareVersion = props.firmwareVersion?.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2') ?? '0.0';
 
 const filteredSwitches = computed(() => props.switches
     .filter(s => (!s.minEepromVersion || props.eepromVersion >= s.minEepromVersion) &&
-                (!s.minFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.minFirmwareVersion)!) >= 0))
+                (!s.maxEepromVersion || props.eepromVersion <= s.maxEepromVersion) &&
+                (!s.minFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.minFirmwareVersion)!) >= 0) &&
+                (!s.maxFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.maxFirmwareVersion)!) <= 0))
 );
 
-const model = (field: EepromLayoutKeys, setValue?: number) => computed({
+const filteredRadios = computed(() => props.radios
+    .filter(s => (!s.minEepromVersion || props.eepromVersion >= s.minEepromVersion) &&
+                (!s.maxEepromVersion || props.eepromVersion <= s.maxEepromVersion) &&
+                (!s.minFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.minFirmwareVersion)!) >= 0) &&
+                (!s.maxFirmwareVersion || compare(coerce(semverFirmwareVersion)!, coerce(s.maxFirmwareVersion)!) <= 0))
+);
+
+const boolModel = (field: EepromLayoutKeys, setValue?: number) => computed({
     get: () => {
-        return (escStore.firstValidEscData?.data.settings[field] ?? 0) as number > 0;
+        return (escStore.firstValidEscData?.data.settings[field] ?? 0) as number === (setValue ?? 1);
     },
     set: (_val) => {
         emits('change', {
             value: [0, 255].includes((escStore.firstValidEscData?.data.settings[field] ?? 0) as number) ? (setValue ?? 1) : 0,
             field
         });
+    }
+});
+
+const model = (field: EepromLayoutKeys) => computed({
+    get: () => {
+        return escStore.firstValidEscData?.data.settings[field] ?? 0;
+    },
+    set: (val: number) => {
+        emits('change', { value: val, field });
     }
 });
 </script>

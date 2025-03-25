@@ -731,9 +731,15 @@ const writeConfig = async () => {
 
         for (let i = 0; i < escStore.escData.length; ++i) {
             if (!escStore.escData[i].isError && escStore.escData[i].data.settingsDirty) {
-                const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data);
-                escStore.escData[i].data.settingsBuffer = result;
-                escStore.escData[i].data.settingsDirty = false;
+                const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data).catch((err) => {
+                    logError(`Error writing settings to ESC #${i + 1}: ${err.message}`);
+                    escStore.escData[i].isError = true;
+                    return null;
+                });
+                if (result) {
+                    escStore.escData[i].data.settingsBuffer = result;
+                    escStore.escData[i].data.settingsDirty = false;
+                }
             }
         }
         escStore.isSaving = false;
@@ -963,6 +969,8 @@ const startFlash = async (hexString: string) => {
         escStore.totalBytes = 0;
         escStore.activeTarget = -1;
         flashModalOpen.value = false;
+
+        await connectToEsc();
         /* if (file_input.value) {
             file_input.value.value = '';
         } */
@@ -983,7 +991,9 @@ const applyDefaultConfig = async () => {
             escStore.escData[n - 1].data.settingsDirty = true;
         }
 
-        await writeConfig();
+        await writeConfig().catch((err) => {
+            logError(err.message);
+        });
 
         if (applyDefaultConfigModalOpen.value) {
             applyDefaultConfigModalOpen.value = false;

@@ -101,7 +101,8 @@
                       name: 'Use hall sensors'
                     }, {
                       field: 'VARIABLE_PWM_FREQUENCY',
-                      name: 'Variable PWM'
+                      name: 'Variable PWM',
+                      maxFirmwareVersion: 'v2.17'
                     }, {
                       field: 'COMPLEMENTARY_PWM',
                       name: 'Complementary PWM'
@@ -109,11 +110,21 @@
                       field: 'AUTO_ADVANCE',
                       name: 'Auto timing advance',
                       minFirmwareVersion: 'v2.16'
-                    }, {
+                    }]"
+                    :radios="[{
                       field: 'VARIABLE_PWM_FREQUENCY',
-                      name: 'PWM by RPM',
+                      name: 'PWM Type',
                       minFirmwareVersion: 'v2.18',
-                      setValue: 2
+                      values: [{
+                        name: 'Fixed',
+                        value: 0
+                      }, {
+                        name: 'Variable',
+                        value: 1
+                      }, {
+                        name: 'by RPM',
+                        value: 2
+                      }]
                     }]"
                     @change="onSettingsChange"
                   >

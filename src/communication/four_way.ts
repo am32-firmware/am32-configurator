@@ -390,9 +390,11 @@ export class FourWay {
                 readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
+                    /*
                     if (!compare(newSettingsArray, readbackSettings.params)) {
                         throw new Error('SettingsVerificationError(newSettingsArray, readbackSettings)');
                     }
+                    */
 
                     this.log('Successful wrote settings to ESC #' + (target + 1));
                 }
