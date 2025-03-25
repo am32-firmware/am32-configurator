@@ -97,7 +97,7 @@ const model = (field: EepromLayoutKeys) => computed({
     get: () => {
         return (escStore.firstValidEscData?.data.settings[field] ?? 0) as number;
     },
-    set: (val: number) => {
+    set: (val) => {
         emits('change', { value: val, field });
     }
 });
