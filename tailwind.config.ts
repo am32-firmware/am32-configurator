@@ -1,6 +1,6 @@
-import type { Config } from 'tailwindcss';
-import { iconsPlugin, getIconCollections } from '@egoist/tailwindcss-icons';
+import { getIconCollections, iconsPlugin } from '@egoist/tailwindcss-icons';
 import typography from '@tailwindcss/typography';
+import type { Config } from 'tailwindcss';
 
 export default {
     content: {
@@ -18,6 +18,11 @@ export default {
     ],
     theme: {
         extend: {
+            screens: {
+                sm: '480px',
+                md: '640px',
+                lg: '800px'
+            }
         },
         fontFamily: {
             sans: ["'Nunito Sans'"]

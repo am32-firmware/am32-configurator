@@ -3,10 +3,8 @@
     <div class="flex flex-col text-sm h-full w-full">
       <LogView />
     </div>
-    <div class="absolute top-0 right-0 w-[60px]">
-      <div class="fixed p-1">
-        <UIcon name="i-ph-arrows-out" class="drop-shadow-sm cursor-pointer transition-all hover:text-red-500 active:text-red-950" @click="logModal = true" />
-      </div>
+    <div class="absolute top-2 right-2">
+      <UIcon name="i-ph-arrows-out" class="drop-shadow-sm cursor-pointer transition-all hover:text-red-500 active:text-red-950" @click="logModal = true" />
     </div>
     <UModal
       v-model="logModal"
