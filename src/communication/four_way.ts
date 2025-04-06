@@ -428,10 +428,11 @@ export class FourWay {
                 if (message) {
                     const originalSettings = message.params;
 
+                    /*
                     originalSettings[0] = 0x00;
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
-
+                    */
                     await this.write(eepromOffset, originalSettings, timeout);
 
                     await this.writePages(0x04, 0x40, pageSize, flash, timeout);
@@ -447,12 +448,11 @@ export class FourWay {
                         } catch (error) {
                             this.logError('flashingVerificationFailed');
                         }
-                    } */
-
+                    } 
                     originalSettings[0] = 0x01;
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('NOT READY   '), 5);
-
+                    */
                     await this.write(eepromOffset, originalSettings);
                 }
             }
