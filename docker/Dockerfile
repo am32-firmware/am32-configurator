@@ -1,24 +1,18 @@
 FROM node:lts-alpine AS base
 WORKDIR /usr/src/app
 
-FROM base AS install
-RUN mkdir -p /temp
-COPY package.json yarn.lock /temp/
-WORKDIR /temp
-
-RUN corepack enable && yarn set version berry && yarn install
-
 FROM base AS prerelease
 WORKDIR /usr/src/app
-COPY --from=install /temp/node_modules node_modules
 COPY . .
 
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
-RUN corepack enable && yarn set version berry && yarn run build
+RUN corepack enable && yarn set version berry
+RUN yarn install
+RUN yarn run build
 
 FROM base AS release
-COPY --chown=node:node --from=install /temp/node_modules node_modules
+COPY --chown=node:node --from=prerelease /usr/src/app/node_modules node_modules
 COPY --chown=node:node --from=prerelease /usr/src/app/.output .
 
 USER node
