@@ -255,18 +255,88 @@
                       show-value
                       @change="onSettingsChange"
                     />
+                  </SettingFieldGroup>
+                  <SettingsFieldGroup
+                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    title="Extended settings"
+                    :cols="2"
+                    :switches="[{
+                      field: 'DISABLE_STICK_CALIBRATION',
+                      name: 'Disable stick calibration'
+                    }]"
+                  >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
-                      field="RAMP_RATE"
-                      name="Ramp rate (ms)"
+                      field="MAX_RAMP"
+                      name="Ramp rate (%)"
+                      help="0.1% per ms to 25% per ms"
                       type="number"
-                      :min="1"
-                      :max="20"
-                      :step="1"
+                      :min="0.1"
+                      :max="25.0"
+                      :step="0.1"
                       show-value
                       @change="onSettingsChange"
                     />
-                  </SettingFieldGroup>
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="MINIMUM_DUTY_CYCLE"
+                      name="Minimum duty cycle"
+                      type="number"
+                      :min="0.2"
+                      :max="51"
+                      :step="0.1"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ABSOLUTE_VOLTAGE_CUTOFF"
+                      name="Absolute voltage cutoff"
+                      type="number"
+                      :min="1"
+                      :max="100"
+                      :step="0.5"
+                      unit="V"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                  </SettingsFieldGroup>
+                  <SettingsFieldGroup
+                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    title="Current control"
+                    :cols="2"
+                  >
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_P"
+                      name="Current P"
+                      type="number"
+                      :min="0"
+                      :max="255"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_I"
+                      name="Current I"
+                      type="number"
+                      :min="0"
+                      :max="255"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_D"
+                      name="Current D"
+                      type="number"
+                      :min="0"
+                      :max="255"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                  </SettingsFieldGroup>
                   <SettingFieldGroup
                     title="Sinusoidal Startup"
                     :cols="2"
@@ -416,6 +486,10 @@ const onToggle = (index: number) => {
     if (escStore.escData[index].data) {
         escStore.escData[index].data.isSelected = !escStore.escData[index].data.isSelected;
     }
+};
+
+const isInEEpromVersion = (escEeepromVersion: number, minVersion?: number, maxVersion?: number) => {
+    return escEeepromVersion >= (minVersion ?? 0) && escEeepromVersion <= (maxVersion ?? 999);
 };
 
 const tabs = computed(() => {

@@ -1,6 +1,5 @@
 import Flash from '../flash';
 import Mcu, { type McuInfo } from '../mcu';
-import asciiToBuffer from '~/utils/ascii-to-buffer';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
 
@@ -201,7 +200,7 @@ export class FourWay {
         try {
             const readerData: ReadableStreamReadResult<Uint8Array> = await Serial.read<Uint8Array>();
             if (readerData.value) {
-                this.parseMessage(readerData.value);
+                this.parseMessage(readerData.value.buffer);
             }
         } catch (err) {
             console.error(`error reading data: ${err}`);
@@ -269,7 +268,7 @@ export class FourWay {
         return new Promise(callback) as Promise<FourWayResponse | null>;
     }
 
-    parseMessage (buffer: ArrayBuffer) {
+    parseMessage (buffer: ArrayBufferLike) {
         const fourWayIf = 0x2E;
 
         const view = new Uint8Array(buffer);
@@ -448,7 +447,7 @@ export class FourWay {
                         } catch (error) {
                             this.logError('flashingVerificationFailed');
                         }
-                    } 
+                    }
                     originalSettings[0] = 0x01;
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('NOT READY   '), 5);

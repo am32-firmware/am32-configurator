@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "@am32/am32-configurator",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "upload:files": "bun deploy-files/upload.ts",
+    "upload:files": "node deploy-files/upload.ts",
     "lint": "eslint --ext .ts,.js,.vue ."
   },
   "devDependencies": {
@@ -30,7 +30,7 @@
     "typescript": "^5.5.4",
     "vue": "^3.4.3",
     "vue-router": "^4.2.5",
-    "vue-tsc": "^2.0.29"
+    "vue-tsc": "^2.2.8"
   },
   "dependencies": {
     "@animxyz/core": "^0.6.6",
@@ -54,5 +54,5 @@
     "vite-plugin-checker": "latest",
     "webserial-wrapper": "^1.0.4"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@4.8.1"
 }
