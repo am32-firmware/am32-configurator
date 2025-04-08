@@ -620,6 +620,8 @@ const connectToDevice = async () => {
                         throw new Error('Cant read or write to device!');
                     }
 
+                    escStore.isLoading = true;
+
                     commandsQueue.processMspResponse(result!.commandName, result!.data);
 
                     await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
@@ -640,6 +642,11 @@ const connectToDevice = async () => {
                 }
 
                 serialStore.hasConnection = true;
+
+                console.log(serialStore.hasConnection, serialStore.mspData.motorCount);
+                if (serialStore.hasConnection && (serialStore.mspData.motorCount > 0)) {
+                    await connectToEsc();
+                }
             } else {
                 logError('Something went wrong!');
             }

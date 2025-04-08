@@ -138,12 +138,14 @@ export class Direct {
                     info.settings = bufferToSettings(settingsArray!, info.settings.LAYOUT_REVISION as number);
                     info.settingsBuffer = settingsArray!;
 
-                    for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                        if (value === info.bootloader.input) {
-                            info.bootloader.valid = true;
-                            info.bootloader.pin = key;
-                            info.bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
-                        }
+                    const [valid, pin] = Mcu.parseBootLoaderPin(info.bootloader.input);
+
+                    if (!valid) {
+                        this.logError(`Invalid bootloader pin ${info.bootloader.input}`);
+                    } else {
+                        info.bootloader.valid = true;
+                        info.bootloader.pin = pin;
+                        info.bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
                     }
 
                     return info;

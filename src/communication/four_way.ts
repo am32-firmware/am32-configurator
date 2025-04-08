@@ -165,18 +165,20 @@ export class FourWay {
             mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
-            for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                if (value === mcu.getInfo().bootloader.input) {
-                    mcu.getInfo().bootloader.valid = true;
-                    mcu.getInfo().bootloader.pin = key;
-                    mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
-                    if (mcu.getInfo().bootloader.version === 0xFF) {
-                        logStore.logWarning('Bootloader version unset, setting to 1');
-                        info.settings.BOOT_LOADER_REVISION = 1;
-                        await this.writeSettings(target, mcu.getInfo());
-                        mcu.getInfo().bootloader.version = 1;
-                    }
-                }
+            const [valid, pin] = Mcu.parseBootLoaderPin(mcu.getInfo().bootloader.input);
+            if (!valid) {
+                this.logError(`Invalid bootloader pin ${mcu.getInfo().bootloader.input}`);
+            } else {
+                mcu.getInfo().bootloader.valid = true;
+                mcu.getInfo().bootloader.pin = pin;
+                mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
+            }
+
+            if (mcu.getInfo().bootloader.version === 0xFF) {
+                logStore.logWarning('Bootloader version unset, setting to 1');
+                info.settings.BOOT_LOADER_REVISION = 1;
+                await this.writeSettings(target, mcu.getInfo());
+                mcu.getInfo().bootloader.version = 1;
             }
         } catch (e: any) {
             console.error(e);
