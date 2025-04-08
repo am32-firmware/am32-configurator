@@ -258,26 +258,30 @@
                       show-value
                       @change="onSettingsChange"
                     />
-                    <SettingField
-                      :esc-info="escStore.selectedEscInfo"
-                      field="ABSOLUTE_VOLTAGE_CUTOFF"
-                      name="Absolute voltage cutoff"
-                      type="number"
-                      :min="1"
-                      :max="101"
-                      :step="0.5"
-                      unit="V"
-                      :disabled-value="101"
-                      show-value
-                      @change="onSettingsChange"
-                    />
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Limits"
                     :cols="3"
+                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
                     :switches="[{
                       field: 'LOW_VOLTAGE_CUTOFF',
-                      name: 'Low voltage cut off'
+                      name: 'Low voltage cut off',
+                      maxFirmwareVersion: 'v2.18'
+                    }]"
+                    :radios="[{
+                      field: 'LOW_VOLTAGE_CUTOFF',
+                      name: 'Low voltage cut off',
+                      minFirmwareVersion: 'v2.19',
+                      values: [{
+                        name: 'Off',
+                        value: 0
+                      }, {
+                        name: 'Cell based',
+                        value: 1
+                      }, {
+                        name: 'Absolute',
+                        value: 2
+                      }]
                     }]"
                     @change="onSettingsChange"
                   >
@@ -307,6 +311,7 @@
                       @change="onSettingsChange"
                     />
                     <SettingField
+                      v-if="(escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) < 2"
                       :esc-info="escStore.selectedEscInfo"
                       field="LOW_VOLTAGE_THRESHOLD"
                       name="Low voltage cut off threshold"
@@ -317,6 +322,21 @@
                       :offset="250"
                       :display-factor="1"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF === 0"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)
+                        && (escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) === 2"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ABSOLUTE_VOLTAGE_CUTOFF"
+                      name="Absolute voltage cutoff"
+                      type="number"
+                      :min="1"
+                      :max="100"
+                      :step="0.5"
+                      unit="V"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF !== 2"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -556,7 +576,6 @@ const onSettingsChange = ({ field, value, individual }: { field: EepromLayoutKey
         for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
             escStore.selectedEscInfo[i].settings[field] = value;
             escStore.selectedEscInfo[i].settingsDirty = true;
-            console.log(field, value, individual, escStore.selectedEscInfo[0].settings[field]);
         }
     }
 };
