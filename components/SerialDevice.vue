@@ -620,8 +620,6 @@ const connectToDevice = async () => {
                         throw new Error('Cant read or write to device!');
                     }
 
-                    escStore.isLoading = true;
-
                     commandsQueue.processMspResponse(result!.commandName, result!.data);
 
                     await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
@@ -639,14 +637,17 @@ const connectToDevice = async () => {
                             commandsQueue.processMspResponse(result!.commandName, result!.data);
                         }
                     });
+
+                    const passthroughResult = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+
+                    await delay(2000);
+
+                    serialStore.isFourWay = true;
+
+                    escStore.expectedCount = passthroughResult?.data.getUint8(0) ?? 0;
                 }
 
                 serialStore.hasConnection = true;
-
-                console.log(serialStore.hasConnection, serialStore.mspData.motorCount);
-                if (serialStore.hasConnection && (serialStore.mspData.motorCount > 0)) {
-                    await connectToEsc();
-                }
             } else {
                 logError('Something went wrong!');
             }
@@ -694,8 +695,6 @@ const connectToEsc = async () => {
         escStore.count = 0;
         escStore.isLoading = true;
 
-        await delay(1000);
-
         for (let i = 0; i < escStore.expectedCount; ++i) {
             const newEscData = {
                 isLoading: true,
@@ -705,7 +704,6 @@ const connectToEsc = async () => {
 
             try {
                 const result = await FourWay.getInstance().getInfo(i);
-                console.log(result, escStore.escData);
                 escStore.escData[i].data = result;
                 escStore.count += 1;
             } catch (e) {
