@@ -13,7 +13,14 @@
           <URadioGroup v-model="model(field).value" class="ml-2" :options="values.map(v => ({ label: v.name, value: v.value }))" value-key="value" label-key="name" />
         </div>
       </div>
-      <div class="flex-grow grid gap-4 p-4" :class="`grid-cols-${cols}`">
+      <div
+        class="flex-grow grid gap-4 p-4"
+        :class="{
+          'grid-cols-1': !cols || cols === 1,
+          'grid-cols-2': cols === 2,
+          'grid-cols-3': cols === 3
+        }"
+      >
         <slot />
       </div>
     </div>

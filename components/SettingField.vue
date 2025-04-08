@@ -39,9 +39,9 @@
             DISABLED
           </div>
           <div v-else>
-            {{ value }}
+            {{ (min || 0).toString().includes('.') ? value.toFixed(1) : value }}
           </div>
-          <div v-if="unit">
+          <div v-if="unit && (!disabledValue || value < disabledValue)">
             {{ unit }}
           </div>
         </div>

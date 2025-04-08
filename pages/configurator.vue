@@ -129,6 +129,22 @@
                     @change="onSettingsChange"
                   >
                     <SettingField
+                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="TIMING_ADVANCE"
+                      name="Timing advance"
+                      type="number"
+                      :min="0"
+                      :max="32"
+                      :step="1"
+                      :display-factor="1"
+                      :offset="-10"
+                      unit="°"
+                      :disabled="(v: number) => escStore.firstValidEscData?.data.settings.AUTO_ADVANCE === 1"
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      v-else
                       :esc-info="escStore.selectedEscInfo"
                       field="TIMING_ADVANCE"
                       name="Timing advance"
@@ -191,7 +207,7 @@
                       name="PWM Frequency"
                       type="number"
                       :min="8"
-                      :max="48"
+                      :max="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3) ? 144 : 48"
                       :step="1"
                       unit="kHz"
                       :disabled="(v: number) => (escStore.firstValidEscData?.data.settings.VARIABLE_PWM_FREQUENCY as number ?? 0) > 1"
@@ -206,6 +222,55 @@
                         </div>
                       </template>
                     </SettingField>
+                  </SettingFieldGroup>
+                  <SettingFieldGroup
+                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    title="Extended settings"
+                    :cols="3"
+                    :switches="[{
+                      field: 'DISABLE_STICK_CALIBRATION',
+                      name: 'Disable stick calibration'
+                    }]"
+                  >
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="MAX_RAMP"
+                      name="Ramp rate"
+                      type="number"
+                      :min=".1"
+                      :max="20"
+                      :step=".1"
+                      unit="% duty cycle per ms"
+                      :display-factor=".1"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="MINIMUM_DUTY_CYCLE"
+                      name="Minimum duty cycle"
+                      type="number"
+                      :min="0"
+                      :max="25"
+                      :step="1"
+                      unit="%"
+                      :display-factor="0.5"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ABSOLUTE_VOLTAGE_CUTOFF"
+                      name="Absolute voltage cutoff"
+                      type="number"
+                      :min="1"
+                      :max="101"
+                      :step="0.5"
+                      unit="V"
+                      :disabled-value="101"
+                      show-value
+                      @change="onSettingsChange"
+                    />
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Limits"
@@ -256,55 +321,13 @@
                       @change="onSettingsChange"
                     />
                   </SettingFieldGroup>
-                  <SettingsFieldGroup
-                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
-                    title="Extended settings"
-                    :cols="2"
-                    :switches="[{
-                      field: 'DISABLE_STICK_CALIBRATION',
-                      name: 'Disable stick calibration'
-                    }]"
-                  >
-                    <SettingField
-                      :esc-info="escStore.selectedEscInfo"
-                      field="MAX_RAMP"
-                      name="Ramp rate (%)"
-                      help="0.1% per ms to 25% per ms"
-                      type="number"
-                      :min="0.1"
-                      :max="25.0"
-                      :step="0.1"
-                      show-value
-                      @change="onSettingsChange"
-                    />
-                    <SettingField
-                      :esc-info="escStore.selectedEscInfo"
-                      field="MINIMUM_DUTY_CYCLE"
-                      name="Minimum duty cycle"
-                      type="number"
-                      :min="0.2"
-                      :max="51"
-                      :step="0.1"
-                      show-value
-                      @change="onSettingsChange"
-                    />
-                    <SettingField
-                      :esc-info="escStore.selectedEscInfo"
-                      field="ABSOLUTE_VOLTAGE_CUTOFF"
-                      name="Absolute voltage cutoff"
-                      type="number"
-                      :min="1"
-                      :max="100"
-                      :step="0.5"
-                      unit="V"
-                      show-value
-                      @change="onSettingsChange"
-                    />
-                  </SettingsFieldGroup>
-                  <SettingsFieldGroup
+                  <SettingFieldGroup
                     v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
                     title="Current control"
-                    :cols="2"
+                    :cols="3"
+                    :class="{
+                      'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': (escStore.firstValidEscData?.data.settings.CURRENT_LIMIT as number) > 100
+                    }"
                   >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
@@ -336,7 +359,7 @@
                       show-value
                       @change="onSettingsChange"
                     />
-                  </SettingsFieldGroup>
+                  </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Sinusoidal Startup"
                     :cols="2"
