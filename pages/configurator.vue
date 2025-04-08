@@ -252,7 +252,7 @@
                       type="number"
                       :min="0"
                       :max="25"
-                      :step="1"
+                      :step=".5"
                       unit="%"
                       :display-factor="0.5"
                       show-value
