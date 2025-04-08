@@ -133,7 +133,7 @@
               title="Alert!"
               variant="subtle"
               color="red"
-              description="If you flash a frong mcu type, you will brick the mcu, recovering from this will take some efford!"
+              description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some efford!"
             />
             <UCheckbox
               v-model="includePrerelease"
