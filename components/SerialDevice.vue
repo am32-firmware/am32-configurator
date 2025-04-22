@@ -717,7 +717,12 @@ const connectToEsc = async () => {
         escStore.isLoading = false;
     }
 
-    if (escStore.escData.filter(e => !e.data.settingsBuffer.some(s => s !== 255) || e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0).length > 0) {
+    if (
+        escStore.escData.filter(
+            e => e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
+                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0
+        ).length > 0
+    ) {
         toast.add({
             title: 'Error',
             color: 'red',
