@@ -1,13 +1,19 @@
-import type { McuSettings } from './../src/eeprom';
+import type { EepromField, McuSettings } from './../src/eeprom';
 import { EepromLayout } from './../src/eeprom';
-export default function (buffer: Uint8Array) {
+export default function (buffer: Uint8Array, eepromVersion: number) {
     const object: McuSettings = {};
+    const entries: [string, EepromField][] = Object.entries(EepromLayout);
 
-    for (const [prop, setting] of Object.entries(EepromLayout)) {
+    for (const [prop, setting] of entries) {
         const {
             size,
             offset
         } = setting;
+
+        if ((setting.maxEepromVersion !== undefined && eepromVersion > setting.maxEepromVersion) ||
+            (setting.minEepromVersion !== undefined && eepromVersion < setting.minEepromVersion)) {
+            continue;
+        }
 
         if (size === 1) {
             object[prop] = buffer[offset];

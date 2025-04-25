@@ -1,6 +1,5 @@
 import Flash from '../flash';
 import Mcu, { type McuInfo } from '../mcu';
-import asciiToBuffer from '~/utils/ascii-to-buffer';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
 
@@ -163,21 +162,23 @@ export class FourWay {
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
             const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
-            mcu.getInfo().settings = bufferToSettings(settingsArray);
+            mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
-            for (const [key, value] of Object.entries(Mcu.BOOT_LOADER_PINS)) {
-                if (value === mcu.getInfo().bootloader.input) {
-                    mcu.getInfo().bootloader.valid = true;
-                    mcu.getInfo().bootloader.pin = key;
-                    mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
-                    if (mcu.getInfo().bootloader.version === 0xFF) {
-                        logStore.logWarning('Bootloader version unset, setting to 1');
-                        info.settings.BOOT_LOADER_REVISION = 1;
-                        await this.writeSettings(target, mcu.getInfo());
-                        mcu.getInfo().bootloader.version = 1;
-                    }
-                }
+            const [valid, pin] = Mcu.parseBootLoaderPin(mcu.getInfo().bootloader.input);
+            if (!valid) {
+                this.logError(`Invalid bootloader pin ${mcu.getInfo().bootloader.input}`);
+            } else {
+                mcu.getInfo().bootloader.valid = true;
+                mcu.getInfo().bootloader.pin = pin;
+                mcu.getInfo().bootloader.version = info.settings.BOOT_LOADER_REVISION as number ?? 0;
+            }
+
+            if (mcu.getInfo().bootloader.version === 0xFF) {
+                logStore.logWarning('Bootloader version unset, setting to 1');
+                info.settings.BOOT_LOADER_REVISION = 1;
+                await this.writeSettings(target, mcu.getInfo());
+                mcu.getInfo().bootloader.version = 1;
             }
         } catch (e: any) {
             console.error(e);
@@ -201,7 +202,7 @@ export class FourWay {
         try {
             const readerData: ReadableStreamReadResult<Uint8Array> = await Serial.read<Uint8Array>();
             if (readerData.value) {
-                this.parseMessage(readerData.value);
+                this.parseMessage(readerData.value.buffer);
             }
         } catch (err) {
             console.error(`error reading data: ${err}`);
@@ -269,7 +270,7 @@ export class FourWay {
         return new Promise(callback) as Promise<FourWayResponse | null>;
     }
 
-    parseMessage (buffer: ArrayBuffer) {
+    parseMessage (buffer: ArrayBufferLike) {
         const fourWayIf = 0x2E;
 
         const view = new Uint8Array(buffer);
@@ -373,7 +374,7 @@ export class FourWay {
         const flash = await this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target]);
 
         if (flash) {
-            const newSettingsArray = objectToSettingsArray(esc.settings);
+            const newSettingsArray = objectToSettingsArray(esc.settings, esc.settings.LAYOUT_REVISION as number);
             if (newSettingsArray.length !== esc.settingsBuffer.length) {
                 throw new Error('settings length mismatch');
             }
@@ -390,9 +391,11 @@ export class FourWay {
                 readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
+                    /*
                     if (!compare(newSettingsArray, readbackSettings.params)) {
                         throw new Error('SettingsVerificationError(newSettingsArray, readbackSettings)');
                     }
+                    */
 
                     this.log('Successful wrote settings to ESC #' + (target + 1));
                 }
@@ -426,10 +429,11 @@ export class FourWay {
                 if (message) {
                     const originalSettings = message.params;
 
+                    /*
                     originalSettings[0] = 0x00;
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
-
+                    */
                     await this.write(eepromOffset, originalSettings, timeout);
 
                     await this.writePages(0x04, 0x40, pageSize, flash, timeout);
@@ -445,12 +449,11 @@ export class FourWay {
                         } catch (error) {
                             this.logError('flashingVerificationFailed');
                         }
-                    } */
-
+                    }
                     originalSettings[0] = 0x01;
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('NOT READY   '), 5);
-
+                    */
                     await this.write(eepromOffset, originalSettings);
                 }
             }

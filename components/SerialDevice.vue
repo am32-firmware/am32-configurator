@@ -133,7 +133,7 @@
               title="Alert!"
               variant="subtle"
               color="red"
-              description="If you flash a frong mcu type, you will brick the mcu, recovering from this will take some efford!"
+              description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some efford!"
             />
             <UCheckbox
               v-model="includePrerelease"
@@ -637,6 +637,14 @@ const connectToDevice = async () => {
                             commandsQueue.processMspResponse(result!.commandName, result!.data);
                         }
                     });
+
+                    const passthroughResult = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+
+                    await delay(2000);
+
+                    serialStore.isFourWay = true;
+
+                    escStore.expectedCount = passthroughResult?.data.getUint8(0) ?? 0;
                 }
 
                 serialStore.hasConnection = true;
@@ -687,8 +695,6 @@ const connectToEsc = async () => {
         escStore.count = 0;
         escStore.isLoading = true;
 
-        await delay(1000);
-
         for (let i = 0; i < escStore.expectedCount; ++i) {
             const newEscData = {
                 isLoading: true,
@@ -698,7 +704,6 @@ const connectToEsc = async () => {
 
             try {
                 const result = await FourWay.getInstance().getInfo(i);
-                console.log(result, escStore.escData);
                 escStore.escData[i].data = result;
                 escStore.count += 1;
             } catch (e) {
@@ -712,7 +717,12 @@ const connectToEsc = async () => {
         escStore.isLoading = false;
     }
 
-    if (escStore.escData.filter(e => !e.data.settingsBuffer.some(s => s !== 255) || e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0).length > 0) {
+    if (
+        escStore.escData.filter(
+            e => e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
+                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0
+        ).length > 0
+    ) {
         toast.add({
             title: 'Error',
             color: 'red',
@@ -731,18 +741,24 @@ const writeConfig = async () => {
 
         for (let i = 0; i < escStore.escData.length; ++i) {
             if (!escStore.escData[i].isError && escStore.escData[i].data.settingsDirty) {
-                const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data);
-                escStore.escData[i].data.settingsBuffer = result;
-                escStore.escData[i].data.settingsDirty = false;
+                const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data).catch((err) => {
+                    logError(`Error writing settings to ESC #${i + 1}: ${err.message}`);
+                    escStore.escData[i].isError = true;
+                    return null;
+                });
+                if (result) {
+                    escStore.escData[i].data.settingsBuffer = result;
+                    escStore.escData[i].data.settingsDirty = false;
+                }
             }
         }
         escStore.isSaving = false;
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings));
+        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number));
         escStore.firstValidEscData.data.settingsDirty = false;
-        escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings);
+        escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
     }
 };
 
@@ -963,6 +979,8 @@ const startFlash = async (hexString: string) => {
         escStore.totalBytes = 0;
         escStore.activeTarget = -1;
         flashModalOpen.value = false;
+
+        await connectToEsc();
         /* if (file_input.value) {
             file_input.value.value = '';
         } */
@@ -974,7 +992,7 @@ const applyDefaultConfig = async () => {
 
     if (file) {
         const buffer = new Uint8Array(await file.arrayBuffer());
-        const settings = bufferToSettings(buffer);
+        const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
 
         settings.STARTUP_MELODY = (new Array(128)).fill(0xFF);
 
@@ -983,7 +1001,9 @@ const applyDefaultConfig = async () => {
             escStore.escData[n - 1].data.settingsDirty = true;
         }
 
-        await writeConfig();
+        await writeConfig().catch((err) => {
+            logError(err.message);
+        });
 
         if (applyDefaultConfigModalOpen.value) {
             applyDefaultConfigModalOpen.value = false;
@@ -1013,7 +1033,7 @@ const applyConfig = async () => {
         const file: File = applyConfigFile.value.input.files[0];
         if (file) {
             const buffer = new Uint8Array(await file.arrayBuffer());
-            const settings = bufferToSettings(buffer);
+            const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
 
             for (const n of savingOrApplyingSelectedEscs.value) {
                 escStore.escData[n - 1].data.settings = settings;

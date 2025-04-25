@@ -1,6 +1,8 @@
 export interface EepromField {
     offset: number;
     size: number;
+    minEepromVersion?: number;
+    maxEepromVersion?: number;
 }
 
 export type EepromLayoutField = {
@@ -28,9 +30,45 @@ export const EepromLayout = {
         offset: 0x04,
         size: 1
     },
-    NAME: {
+    MAX_RAMP: {
         offset: 0x05,
-        size: 12
+        size: 1,
+        minEepromVersion: 3
+    },
+    MINIMUM_DUTY_CYCLE: {
+        offset: 0x06,
+        size: 1,
+        minEepromVersion: 3
+    },
+    DISABLE_STICK_CALIBRATION: {
+        offset: 0x07,
+        size: 1,
+        minEepromVersion: 3
+    },
+    ABSOLUTE_VOLTAGE_CUTOFF: {
+        offset: 0x08,
+        size: 1,
+        minEepromVersion: 3
+    },
+    CURRENT_P: {
+        offset: 0x09,
+        size: 1,
+        minEepromVersion: 3
+    },
+    CURRENT_I: {
+        offset: 0x0A,
+        size: 1,
+        minEepromVersion: 3
+    },
+    CURRENT_D: {
+        offset: 0x0B,
+        size: 1,
+        minEepromVersion: 3
+    },
+    ACTIVE_BRAKE_POWER: {
+        offset: 0x0C,
+        size: 1,
+        minEepromVersion: 3
     },
     MOTOR_DIRECTION: {
         offset: 0x11,

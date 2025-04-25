@@ -67,16 +67,23 @@ class Mcu {
             }
         };
 
-    static BOOT_LOADER_PINS = {
-        PA2: 0x02,
-        PB4: 0x14
-    };
-
     static RESET_DELAY_MS = 5000;
     static LAYOUT_SIZE = 0xB8;
 
     static BOOT_LOADER_VERSION_OFFSET = 0x00C0;
     static BOOT_LOADER_VERSION_SIZE = 1;
+
+    static PORT_CHARACTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    static PIN_CHARACTERS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
+
+    static parseBootLoaderPin (pin: number): [boolean, string] {
+        const port = pin >> 4;
+        const pinNumber = pin & 0xF;
+        if (Mcu.PORT_CHARACTERS[port] && Mcu.PIN_CHARACTERS[pinNumber]) {
+            return [true, `P${Mcu.PORT_CHARACTERS[port]}${Mcu.PIN_CHARACTERS[pinNumber]}`];
+        }
+        return [false, ''];
+    }
 
     static getVariant (signature: number) {
         const mcu = Mcu.variants[signature.toString(16).toUpperCase()];

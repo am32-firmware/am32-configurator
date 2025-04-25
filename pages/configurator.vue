@@ -12,8 +12,10 @@
         </div>
       </div>
       <div v-else-if="serialStore.isFourWay || serialStore.isDirectConnect" class="pt-4 pb-12 h-full">
-        <UTabs :items="[{ label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }, {label: 'Tune', slot:'tune', icon: 'i-material-symbols-music-note' }]">
-          <template #tune>
+        <UTabs
+          :items="tabs"
+        >
+          <template v-if="(escStore.firstValidEscData?.data.settings?.LAYOUT_REVISION as number) < 3" #tune>
             <div class="pt-4 flex flex-col gap-4">
               <div class="flex gap-4 w-full justify-center">
                 <div v-for="(info, n) of escStore.escData" :key="n">
@@ -99,7 +101,8 @@
                       name: 'Use hall sensors'
                     }, {
                       field: 'VARIABLE_PWM_FREQUENCY',
-                      name: 'Variable PWM'
+                      name: 'Variable PWM',
+                      maxFirmwareVersion: 'v2.17'
                     }, {
                       field: 'COMPLEMENTARY_PWM',
                       name: 'Complementary PWM'
@@ -108,9 +111,40 @@
                       name: 'Auto timing advance',
                       minFirmwareVersion: 'v2.16'
                     }]"
+                    :radios="[{
+                      field: 'VARIABLE_PWM_FREQUENCY',
+                      name: 'PWM Type',
+                      minFirmwareVersion: 'v2.18',
+                      values: [{
+                        name: 'Fixed',
+                        value: 0
+                      }, {
+                        name: 'Variable',
+                        value: 1
+                      }, {
+                        name: 'by RPM',
+                        value: 2
+                      }]
+                    }]"
                     @change="onSettingsChange"
                   >
                     <SettingField
+                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="TIMING_ADVANCE"
+                      name="Timing advance"
+                      type="number"
+                      :min="0"
+                      :max="32"
+                      :step="1"
+                      :display-factor="1"
+                      :offset="-10"
+                      unit="°"
+                      :disabled="(v: number) => escStore.firstValidEscData?.data.settings.AUTO_ADVANCE === 1"
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      v-else
                       :esc-info="escStore.selectedEscInfo"
                       field="TIMING_ADVANCE"
                       name="Timing advance"
@@ -173,9 +207,10 @@
                       name="PWM Frequency"
                       type="number"
                       :min="8"
-                      :max="48"
+                      :max="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3) ? 144 : 48"
                       :step="1"
                       unit="kHz"
+                      :disabled="(v: number) => (escStore.firstValidEscData?.data.settings.VARIABLE_PWM_FREQUENCY as number ?? 0) > 1"
                       @change="onSettingsChange"
                     >
                       <template #unit="{ value }">
@@ -189,11 +224,64 @@
                     </SettingField>
                   </SettingFieldGroup>
                   <SettingFieldGroup
-                    title="Limits"
+                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    title="Extended settings"
                     :cols="3"
                     :switches="[{
+                      field: 'DISABLE_STICK_CALIBRATION',
+                      name: 'Disable stick calibration'
+                    }]"
+                  >
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="MAX_RAMP"
+                      name="Ramp rate"
+                      type="number"
+                      :min=".1"
+                      :max="20"
+                      :step=".1"
+                      unit="% duty cycle per ms"
+                      :display-factor=".1"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="MINIMUM_DUTY_CYCLE"
+                      name="Minimum duty cycle"
+                      type="number"
+                      :min="0"
+                      :max="25"
+                      :step=".5"
+                      unit="%"
+                      :display-factor="0.5"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                  </SettingFieldGroup>
+                  <SettingFieldGroup
+                    title="Limits"
+                    :cols="3"
+                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :switches="[{
                       field: 'LOW_VOLTAGE_CUTOFF',
-                      name: 'Low voltage cut off'
+                      name: 'Low voltage cut off',
+                      maxFirmwareVersion: 'v2.18'
+                    }]"
+                    :radios="[{
+                      field: 'LOW_VOLTAGE_CUTOFF',
+                      name: 'Low voltage cut off',
+                      minFirmwareVersion: 'v2.19',
+                      values: [{
+                        name: 'Off',
+                        value: 0
+                      }, {
+                        name: 'Cell based',
+                        value: 1
+                      }, {
+                        name: 'Absolute',
+                        value: 2
+                      }]
                     }]"
                     @change="onSettingsChange"
                   >
@@ -223,6 +311,7 @@
                       @change="onSettingsChange"
                     />
                     <SettingField
+                      v-if="(escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) < 2"
                       :esc-info="escStore.selectedEscInfo"
                       field="LOW_VOLTAGE_THRESHOLD"
                       name="Low voltage cut off threshold"
@@ -233,6 +322,60 @@
                       :offset="250"
                       :display-factor="1"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF === 0"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)
+                        && (escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) === 2"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ABSOLUTE_VOLTAGE_CUTOFF"
+                      name="Absolute voltage cutoff"
+                      type="number"
+                      :min="1"
+                      :max="100"
+                      :step="0.5"
+                      unit="V"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF !== 2"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                  </SettingFieldGroup>
+                  <SettingFieldGroup
+                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    title="Current control"
+                    :cols="3"
+                    :class="{
+                      'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': (escStore.firstValidEscData?.data.settings.CURRENT_LIMIT as number) > 100
+                    }"
+                  >
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_P"
+                      name="Current P"
+                      type="number"
+                      :min="0"
+                      :max="255"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_I"
+                      name="Current I"
+                      type="number"
+                      :min="0"
+                      :max="255"
+                      show-value
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="CURRENT_D"
+                      name="Current D"
+                      type="number"
+                      :min="0"
+                      :max="255"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -383,11 +526,24 @@ const onChange = (payload: { index: number, field: EepromLayoutKeys, value: bool
 };
 
 const onToggle = (index: number) => {
-    console.log(escStore.escData, index);
     if (escStore.escData[index].data) {
         escStore.escData[index].data.isSelected = !escStore.escData[index].data.isSelected;
     }
 };
+
+const isInEEpromVersion = (escEeepromVersion: number, minVersion?: number, maxVersion?: number) => {
+    return escEeepromVersion >= (minVersion ?? 0) && escEeepromVersion <= (maxVersion ?? 999);
+};
+
+const tabs = computed(() => {
+    const ret = [
+        { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }
+    ];
+    if (escStore.firstValidEscData?.data.settings && escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number < 3) {
+        ret.push({ label: 'Tune', slot: 'tune', icon: 'i-material-symbols-music-note' });
+    }
+    return ret;
+});
 
 const protocolOptions = [
     {
@@ -420,7 +576,6 @@ const onSettingsChange = ({ field, value, individual }: { field: EepromLayoutKey
         for (let i = 0; i < escStore.selectedEscInfo.length; ++i) {
             escStore.selectedEscInfo[i].settings[field] = value;
             escStore.selectedEscInfo[i].settingsDirty = true;
-            console.log(field, value, individual, escStore.selectedEscInfo[0].settings[field]);
         }
     }
 };

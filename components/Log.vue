@@ -1,3 +1,7 @@
+
+<script setup lang="ts">
+const logModal = ref(false);
+</script>
 <template>
   <div class="bg-gray-900 p-1 h-full relative">
     <div class="flex flex-col text-sm h-full w-full">
@@ -28,6 +32,3 @@
     </UModal>
   </div>
 </template>
-<script setup lang="ts">
-const logModal = ref(false);
-</script>
