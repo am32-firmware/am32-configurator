@@ -429,6 +429,8 @@ export class FourWay {
                 if (message) {
                     const originalSettings = message.params;
 
+                    // boot bit
+                    originalSettings[0] = 0x00;
                     /*
                     originalSettings[0] = 0x00;
                     originalSettings.fill(0x00, 3, 5);
@@ -454,6 +456,9 @@ export class FourWay {
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('NOT READY   '), 5);
                     */
+
+                    // boot bit
+                    originalSettings[0] = 0x01;
                     await this.write(eepromOffset, originalSettings);
                 }
             }
