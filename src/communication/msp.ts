@@ -52,11 +52,17 @@ export class Msp {
 
     public commandCount = 0;
 
+    private interface: IConnectionInterface | null = null;
+
     constructor (
         private log: (s: string) => void,
         private logWarning: (s: string) => void,
         private logError: (s: string) => void
     ) {}
+
+    setInterface (connectionInterface: IConnectionInterface) {
+        this.interface = connectionInterface;
+    }
 
     /**
    * Calculate the DVB-S2 checksum for a chunk of data
@@ -162,7 +168,7 @@ export class Msp {
 
         try {
             console.log('send');
-            return await Serial.write(bufferOut);
+            return await this.interface!.write(bufferOut);
         } catch (e: any) {
             this.logError(`MSP command failed: ${e.message}`);
             return null;
@@ -180,11 +186,11 @@ export class Msp {
     }
 
     async read (): Promise<void> {
-        if (!Serial.canRead()) {
+        if (!this.interface!.canRead()) {
             return;
         }
         try {
-            const readerData: ReadableStreamReadResult<Uint8Array> = await Serial.read<Uint8Array>();
+            const readerData: ReadableStreamReadResult<Uint8Array> = await this.interface!.read<Uint8Array>();
             if (readerData.value) {
                 this.processResponse(readerData.value);
             }
