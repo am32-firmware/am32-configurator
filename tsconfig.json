@@ -5,8 +5,13 @@
     "module": "ES2022",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@vueuse/core/types"
+    ],
     "types": [
-      "@types/w3c-web-serial"
+      "w3c-web-serial",
+      "web-bluetooth"
     ]
   },
 }

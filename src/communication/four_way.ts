@@ -1,7 +1,8 @@
 import Flash from '../flash';
 import Mcu, { type McuInfo } from '../mcu';
 import CommandQueue from '~/src/communication/commands.queue';
-import Serial from '~/src/communication/serial';
+import type { Serial } from '~/src/communication/serial';
+import type { BLE } from '~/src/communication/bluetooth';
 
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
@@ -54,11 +55,17 @@ export class FourWay {
         return FourWay.instance;
     }
 
+    private interface: Serial | BLE | null = null;
+
     constructor (
       private readonly log: ((s: string) => void),
       private readonly logError: ((s: string) => void),
       private readonly logWarning: ((s: string) => void)
     ) {
+    }
+
+    setInterface (connectionInterface: Serial | BLE) {
+        this.interface = connectionInterface;
     }
 
     makePackage (cmd: FOUR_WAY_COMMANDS, params: number[], address: number) {
@@ -200,7 +207,7 @@ export class FourWay {
 
     async read (): Promise<void> {
         try {
-            const readerData: ReadableStreamReadResult<Uint8Array> = await Serial.read<Uint8Array>();
+            const readerData: ReadableStreamReadResult<Uint8Array> = await this.interface!.read<Uint8Array>();
             if (readerData.value) {
                 this.parseMessage(readerData.value.buffer);
             }
@@ -220,7 +227,7 @@ export class FourWay {
         }
 
         try {
-            return await Serial.write(message, timeout);
+            return await this.interface!.write(message, timeout);
         } catch (e: any) {
             this.logError(`MSP command failed: ${e.message}`);
             return null;
@@ -320,7 +327,7 @@ export class FourWay {
     writeAddress (address: number, data: Uint8Array) {
         console.log(address, data);
     // const message = this.makePackage(FOUR_WAY_COMMANDS.cmd_DeviceWrite, data, address);
-    // return Serial.write(data, address);
+    // return this.interface!.write(data, address);
     }
 
     /**

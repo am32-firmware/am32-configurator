@@ -65,6 +65,12 @@ type CacheEntry = {
     url: string
 };
 
+interface IConnectionInterface {
+    write<T = any> (data: ArrayBuffer, ms = 50): Promise<T | null>;
+    read<T = any> (): Promise<ReadableStreamReadResult<T>>;
+    canRead (): boolean;
+}
+
 declare module 'bluejay-rtttl-parse' {
     // biome-ignore lint/complexity/noStaticOnlyClass: <explanation>
     export default class Rtttl {

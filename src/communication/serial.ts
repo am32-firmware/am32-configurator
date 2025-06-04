@@ -1,5 +1,5 @@
 import type { WebSerial } from 'webserial-wrapper';
-class Serial {
+export class Serial implements IConnectionInterface {
     private readBuffer: Uint8Array | null = null;
     private readBufferTimeout: NodeJS.Timeout | null = null;
     private log: LogFn = (_s: string) => {};
@@ -143,8 +143,8 @@ class Serial {
         });
     }
 
-    public write (data: ArrayBuffer, ms = 50) {
-        return this.writeWithResponse(data, ms);
+    public async write<T = any> (data: ArrayBuffer, ms = 50): Promise<T | null> {
+        return await this.writeWithResponse(data, ms) as T | null;
     }
 
     public canRead (): boolean {

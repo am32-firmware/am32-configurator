@@ -1,20 +1,37 @@
 <template>
   <div class="min-w-[320px]">
+    <div>{{ serialStore.isFourWay }}</div>
     <div class="p-4 grid grid-cols-1 gap-2">
-      <div class="flex flex-column gap-2">
-        <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
+      <div class="flex flex-column items-center gap-2">
         <USelectMenu
+          v-if="!(device?.gatt?.connected ?? false)"
+          v-model="serialStore.selectedDevice"
+          class="flex-grow"
+          :disabled="serialStore.hasConnection"
+          :options="serialStore.pairedDevicesOptions"
+          placeholder="Select device"
+        />
+        <div v-else class="text-sm text-blue-400 flex-grow text-center">
+          Bluetooth: {{ device?.name }}
+        </div>
+        <USelectMenu
+          v-if="!(device?.gatt?.connected ?? false)"
           v-model="baudrate"
           class="flex-grow"
-          :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice"
+          :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice || (device?.gatt?.connected ?? false)"
           :options="baudrateOptions"
         />
       </div>
-      <div class="flex justify-between gap-2">
-        <UButton size="2xs" @click="requestSerialDevices">
-          Port select
-        </UButton>
-        <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">
+      <div class="flex justify-between gap-2" :class="{ '!justify-center': (device?.gatt?.connected ?? false) }">
+        <div v-if="!(device?.gatt?.connected ?? false)" class="flex gap-2">
+          <UButton size="2xs" @click="requestSerialDevices">
+            Port select
+          </UButton>
+          <UButton size="2xs" @click="requestBLEDevices">
+            Bluetooth
+          </UButton>
+        </div>
+        <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1' && !(device?.gatt?.connected ?? false)" size="2xs" @click="connectToDevice">
           Connect
         </UButton>
         <UButton v-else size="2xs" color="red" @click="disconnectFromDevice">
@@ -25,7 +42,7 @@
         <div class="flex gap-2 items-center">
           <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
         </div>
-        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between gap-4">
+        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect || (device?.gatt?.connected ?? false))" class="w-full flex justify-between gap-4">
           <div class="flex gap-2">
             <UChip
               v-for="n of serialStore.mspData.motorCount"
@@ -391,13 +408,13 @@
 </template>
 
 <script setup lang="ts">
-
+import { useBluetooth } from '@vueuse/core';
 import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
-import serial from '~/src/communication/serial';
 import Serial from '~/src/communication/serial';
+import BLE from '~/src/communication/bluetooth';
 import db from '~/src/db';
 import Flash from '~/src/flash';
 import Mcu, { type EscData } from '~/src/mcu';
@@ -423,6 +440,19 @@ const ignoreMcuLayout = ref(false);
 const includePrerelease = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
 const isFlashingActive = computed(() => escStore.activeTarget > -1);
+
+const {
+    isSupported,
+    device,
+    requestDevice
+} = useBluetooth({
+    filters: [
+        {
+            namePrefix: 'AM32'
+        }
+    ],
+    optionalServices: [0x1000]
+});
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
 
@@ -508,6 +538,39 @@ const requestSerialDevices = async () => {
     await fetchPairedDevices();
 };
 
+const requestBLEDevices = async () => {
+    if (isSupported.value) {
+        await requestDevice();
+        if (device.value) {
+            const server = await device.value?.gatt?.connect();
+            console.log('connected', server);
+            const service = await server?.getPrimaryService(0x1000);
+            console.log('service', service);
+            const characteristics = await service?.getCharacteristics();
+            console.log('characteristics', characteristics);
+            if (characteristics) {
+                const read = characteristics.find(c => c.properties.read);
+                const write = characteristics.find(c => c.properties.write);
+                console.log('read', read);
+                console.log('write', write);
+                BLE.init(log, logError, logWarning, read!, write!);
+            }
+        } else {
+            toast.add({
+                title: 'Error',
+                color: 'red',
+                description: 'No device found'
+            });
+        }
+    } else {
+        toast.add({
+            title: 'Error',
+            color: 'red',
+            description: 'BLE not supported'
+        });
+    }
+};
+
 const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])));
 
 const fetchPairedDevices = async () => {
@@ -523,7 +586,7 @@ const fetchPairedDevices = async () => {
                 }
             }
         }
-    } else {
+    } else if (!device.value?.gatt?.connected) {
         if (serialStore.hasConnection) {
             serialStore.$reset();
         }
@@ -547,24 +610,28 @@ const connectToDevice = async () => {
             path: '/configurator'
         });
     }
-    const portTmp: string[] | undefined = serialStore.selectedDevice?.id.split(':');
-    if (portTmp) {
-        const ports = await navigator.serial.getPorts();
-        for (const p of ports) {
-            if (p.getInfo().usbVendorId === +portTmp[0] && p.getInfo().usbProductId === +portTmp[1]) {
-                serialStore.deviceHandles.port = p;
-                break;
+    if (device.value?.gatt?.connected) {
+        Msp.getInstance().setInterface(BLE);
+        FourWay.getInstance().setInterface(BLE);
+    } else {
+        const portTmp: string[] | undefined = serialStore.selectedDevice?.id.split(':');
+        if (portTmp) {
+            const ports = await navigator.serial.getPorts();
+            for (const p of ports) {
+                if (p.getInfo().usbVendorId === +portTmp[0] && p.getInfo().usbProductId === +portTmp[1]) {
+                    serialStore.deviceHandles.port = p;
+                    break;
+                }
             }
-        }
-        if (!serialStore.deviceHandles.port) {
-            logError('Serial port not found');
-        } else {
-            if (!serialStore.deviceHandles.port.readable) {
-                try {
-                    await serialStore.deviceHandles.serial.openPort(
-                        serialStore.deviceHandles.port, {
-                            baudRate: +baudrate.value
-                        } as {
+            if (!serialStore.deviceHandles.port) {
+                logError('Serial port not found');
+            } else {
+                if (!serialStore.deviceHandles.port.readable) {
+                    try {
+                        await serialStore.deviceHandles.serial.openPort(
+                            serialStore.deviceHandles.port, {
+                                baudRate: +baudrate.value
+                            } as {
                           baudRate?: number;
                           stopBits?: 1 | 2;
                           parity?: 'none';
@@ -575,84 +642,87 @@ const connectToDevice = async () => {
                           onconnect?: (ev: any) => void;
                           ondisconnect?: (ev: any) => void;
                       }
-                    );
-                } catch (e: any) {
-                    logError('Port already in use!');
-                    toast.add({
-                        icon: 'i-material-symbols-mimo-disconnect-outline',
-                        title: 'Error',
-                        color: 'red',
-                        description: 'Port already in use, please free device and try again!'
-                    });
-                    throw new Error(`${e.message}`);
+                        );
+                    } catch (e: any) {
+                        logError('Port already in use!');
+                        toast.add({
+                            icon: 'i-material-symbols-mimo-disconnect-outline',
+                            title: 'Error',
+                            color: 'red',
+                            description: 'Port already in use, please free device and try again!'
+                        });
+                        throw new Error(`${e.message}`);
+                    }
                 }
-            }
 
-            if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
+                if (serialStore.deviceHandles.port.readable && serialStore.deviceHandles.port.writable) {
                 /* if (!serialStore.deviceHandles.reader) {
                     serialStore.deviceHandles.reader = await serialStore.deviceHandles.port.readable.getReader();
                 }
                 if (!serialStore.deviceHandles.writer) {
                     serialStore.deviceHandles.writer = await serialStore.deviceHandles.port.writable.getWriter();
                 } */
-                Serial.init(log, logError, logWarning, serialStore.deviceHandles.serial, serialStore.deviceHandles.port);
+                    Serial.init(log, logError, logWarning, serialStore.deviceHandles.serial, serialStore.deviceHandles.port);
 
-                log('Connected to device');
+                    log('Connected to device');
 
-                if (isDirectConnectDevice.value) {
-                    connectToEsc();
-                } else {
-                    const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
-                        logError(`${err.message}, trying to exit fourway and try again.`);
-                        serialStore.isFourWay = true;
-                        await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
-                        await delay(1000);
-                        serialStore.isFourWay = false;
-                        return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
-                            logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
-                            return null;
+                    if (isDirectConnectDevice.value) {
+                        connectToEsc();
+                    } else {
+                        Msp.getInstance().setInterface(Serial);
+
+                        const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(async (err) => {
+                            logError(`${err.message}, trying to exit fourway and try again.`);
+                            serialStore.isFourWay = true;
+                            await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+                            await delay(1000);
+                            serialStore.isFourWay = false;
+                            return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
+                                logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
+                                return null;
+                            });
                         });
-                    });
 
-                    if (result === null) {
-                        await disconnectFromDevice();
+                        if (result === null) {
+                            await disconnectFromDevice();
 
-                        throw new Error('Cant read or write to device!');
+                            throw new Error('Cant read or write to device!');
+                        }
+
+                        commandsQueue.processMspResponse(result!.commandName, result!.data);
                     }
-
-                    commandsQueue.processMspResponse(result!.commandName, result!.data);
-
-                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
-                        if (result) {
-                            commandsQueue.processMspResponse(result!.commandName, result!.data);
-                        }
-                    });
-                    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
-                        if (result) {
-                            commandsQueue.processMspResponse(result!.commandName, result!.data);
-                        }
-                    });
-                    await Msp.getInstance().sendWithPromise(Msp.getInstance().getTypeMotorCommand(serialStore.mspData.type)).then((result) => {
-                        if (result) {
-                            commandsQueue.processMspResponse(result!.commandName, result!.data);
-                        }
-                    });
-
-                    const passthroughResult = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
-
-                    await delay(2000);
-
-                    serialStore.isFourWay = true;
-
-                    escStore.expectedCount = passthroughResult?.data.getUint8(0) ?? 0;
+                } else {
+                    logError('Something went wrong!');
                 }
-
-                serialStore.hasConnection = true;
-            } else {
-                logError('Something went wrong!');
             }
         }
     }
+
+    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_FC_VARIANT).then((result) => {
+        if (result) {
+            commandsQueue.processMspResponse(result!.commandName, result!.data);
+        }
+    });
+    await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_BATTERY_STATE).then((result) => {
+        if (result) {
+            commandsQueue.processMspResponse(result!.commandName, result!.data);
+        }
+    });
+    await Msp.getInstance().sendWithPromise(Msp.getInstance().getTypeMotorCommand(serialStore.mspData.type)).then((result) => {
+        if (result) {
+            commandsQueue.processMspResponse(result!.commandName, result!.data);
+        }
+    });
+
+    const passthroughResult = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
+
+    await delay(2000);
+
+    serialStore.isFourWay = true;
+
+    escStore.expectedCount = passthroughResult?.data.getUint8(0) ?? 0;
+
+    serialStore.hasConnection = true;
 };
 
 const connectToEsc = async () => {
@@ -719,8 +789,8 @@ const connectToEsc = async () => {
 
     if (
         escStore.escData.filter(
-            e => e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
-                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0
+            e => e.data && (e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
+                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0)
         ).length > 0
     ) {
         toast.add({
@@ -737,6 +807,7 @@ const connectToEsc = async () => {
 
 const writeConfig = async () => {
     if (serialStore.isFourWay) {
+        debugger;
         escStore.isSaving = true;
 
         for (let i = 0; i < escStore.escData.length; ++i) {
@@ -763,7 +834,10 @@ const writeConfig = async () => {
 };
 
 const disconnectFromDevice = async () => {
-    if (serialStore.deviceHandles.port) {
+    if (device.value?.gatt?.connected) {
+        console.log('disconnecting from BLE device', device.value);
+        await device.value?.gatt?.disconnect();
+    } else if (serialStore.deviceHandles.port) {
         if (serialStore.isFourWay) {
             await FourWay.getInstance().send(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
         }
