@@ -100,6 +100,9 @@
                       field: 'USE_HALL_SENSORS',
                       name: 'Use hall sensors'
                     }, {
+                      field: 'INTERVAL_TELEMETRY',
+                      name: '30ms interval telemetry'
+                    }, {
                       field: 'VARIABLE_PWM_FREQUENCY',
                       name: 'Variable PWM',
                       maxFirmwareVersion: 'v2.17'
