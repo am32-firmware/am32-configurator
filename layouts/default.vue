@@ -1,22 +1,29 @@
 <template>
   <div>
     <div>
-      <div class="grid grid-cols-12 text-white ">
-        <div class="col-span-2 flex justify-center items-center">
-          <div class="bg-red-800 max-h-[180px] rounded-2xl">
-            <img :src="logo" class="max-h-[180px] w-auto">
-          </div>
+      <div class="text-white flex justify-center p-4 gap-4">
+        <div class="bg-red-800 rounded-xl">
+          <img
+            :src="logo"
+            class="size-[180px]"
+          >
         </div>
-        <div class="col-span-8 h-[200px] max-h-[200px]">
+        <div class="flex-1 h-[180px] max-h-[180px]">
           <div class="h-full font-bold text-3xl text-red-800 flex flex-col">
             <div v-if="logStore.entries.length === 0">
               AlkaMotors
             </div>
 
-            <Log v-else class="h-full overflow-auto" />
+            <Log
+              v-else
+              class="h-full overflow-auto"
+            />
           </div>
         </div>
-        <div v-if="serialStore.hasSerial" class="col-span-2">
+        <div
+          v-if="serialStore.hasSerial"
+          class="min-w-[320px]"
+        >
           <SerialDevice />
         </div>
       </div>

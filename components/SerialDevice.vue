@@ -1,227 +1,288 @@
 <template>
-  <div class="min-w-[320px]">
-    <div class="p-4 grid grid-cols-1 gap-2">
-      <div class="flex flex-column gap-2">
-        <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
-        <USelectMenu
-          v-model="baudrate"
-          class="flex-grow"
-          :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice"
-          :options="baudrateOptions"
+  <div class=" grid grid-cols-1 gap-2">
+    <div class="flex flex-col gap-2">
+      <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
+      <USelectMenu
+        v-model="baudrate"
+        class="flex-grow"
+        :disabled="serialStore.selectedDevice.id === '-1' || serialStore.hasConnection || isDirectConnectDevice"
+        :options="baudrateOptions"
+      />
+    </div>
+    <div class="flex justify-between gap-2">
+      <UButton size="2xs" @click="requestSerialDevices">
+        Port select
+      </UButton>
+      <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">
+        Connect
+      </UButton>
+      <UButton v-else size="2xs" color="red" @click="disconnectFromDevice">
+        Disconnect
+      </UButton>
+    </div>
+    <div class="flex gap-4 pt-2">
+      <div class="flex gap-2 items-center">
+        <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
+      </div>
+      <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between gap-4">
+        <div class="flex gap-2">
+          <UChip
+            v-for="n of serialStore.mspData.motorCount"
+            :key="n"
+            :text="n"
+            size="2xl"
+            color="blue"
+          >
+            <UIcon
+              name="i-heroicons-cpu-chip-16-solid"
+              class="text-xs"
+              :class="{
+                'text-green-500': !escStore.escData[n - 1]?.isLoading && !escStore.escData[n - 1]?.isError,
+                'text-orange-500': escStore.escData[n - 1]?.isLoading,
+                'text-red-500': escStore.escData[n - 1]?.isError,
+                'text-white': !escStore.escData[n - 1]
+              }"
+            />
+          </UChip>
+        </div>
+        <div class="flex gap-2">
+          <UButton icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
+            Read
+          </UButton>
+          <UButton
+            icon="i-material-symbols-save"
+            color="blue"
+            size="2xs"
+            :disabled="!isAnySettingsDirty || escStore.isSaving"
+            :loading="escStore.isSaving"
+            @click="writeConfig"
+          >
+            Save
+          </UButton>
+        </div>
+      </div>
+    </div>
+    <div v-if="false && serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
+      <UKbd>
+        {{ serialStore.mspData.type }}
+      </UKbd>
+      <UKbd>
+        Api: {{ serialStore.mspData.api_version }}
+      </UKbd>
+      <UKbd v-if="serialStore.isFourWay">
+        4way
+      </UKbd>
+    </div>
+    <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4 w-full">
+      <div class="w-full flex flex-col space-y-2">
+        <UButton label="Flash firmware" size="2xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
+        <UButton
+          label="Send default config"
+          size="2xs"
+          icon="i-material-symbols-sim-card-outline"
+          color="green"
+          @click="applyDefaultConfigModalOpen = true"
         />
       </div>
-      <div class="flex justify-between gap-2">
-        <UButton size="2xs" @click="requestSerialDevices">
-          Port select
-        </UButton>
-        <UButton v-if="!serialStore.hasConnection" :disabled="serialStore.selectedDevice.id === '-1'" size="2xs" @click="connectToDevice">
-          Connect
-        </UButton>
-        <UButton v-else size="2xs" color="red" @click="disconnectFromDevice">
-          Disconnect
-        </UButton>
+      <div class="min-w-[112px]">
+        <UButton
+          label="Save config"
+          size="xs"
+          icon="i-material-symbols-sim-card-download-outline"
+          color="red"
+          variant="link"
+          @click="saveConfigModalOpen = true"
+        />
+        <UButton
+          label="Apply config"
+          size="xs"
+          icon="i-material-symbols-upload-file-outline"
+          color="violet"
+          variant="link"
+          @click="applyConfigModalOpen = true"
+        />
       </div>
-      <div class="flex gap-4 pt-2">
-        <div class="flex gap-2 items-center">
-          <UIcon name="i-fluent-serial-port-16-filled" dynamic :class="[serialStore.hasConnection ? 'text-green-500' : 'text-red-500']" />
-        </div>
-        <div v-if="serialStore.hasConnection && (serialStore.mspData.motorCount > 0 || serialStore.isDirectConnect)" class="w-full flex justify-between gap-4">
-          <div class="flex gap-2">
-            <UChip
-              v-for="n of serialStore.mspData.motorCount"
-              :key="n"
-              :text="n"
-              size="2xl"
-              color="blue"
-            >
-              <UIcon
-                name="i-heroicons-cpu-chip-16-solid"
-                class="text-xs"
-                :class="{
-                  'text-green-500': !escStore.escData[n - 1]?.isLoading && !escStore.escData[n - 1]?.isError,
-                  'text-orange-500': escStore.escData[n - 1]?.isLoading,
-                  'text-red-500': escStore.escData[n - 1]?.isError,
-                  'text-white': !escStore.escData[n - 1]
-                }"
-              />
-            </UChip>
-          </div>
-          <div class="flex gap-2">
-            <UButton icon="i-material-symbols-find-in-page-outline" size="2xs" :loading="escStore.isLoading" @click="connectToEsc">
-              Read
-            </UButton>
-            <UButton
-              icon="i-material-symbols-save"
-              color="blue"
-              size="2xs"
-              :disabled="!isAnySettingsDirty || escStore.isSaving"
-              :loading="escStore.isSaving"
-              @click="writeConfig"
-            >
-              Save
-            </UButton>
-          </div>
-        </div>
-      </div>
-      <div v-if="false && serialStore.hasConnection && serialStore.mspData.type" class="flex gap-1">
-        <UKbd>
-          {{ serialStore.mspData.type }}
-        </UKbd>
-        <UKbd>
-          Api: {{ serialStore.mspData.api_version }}
-        </UKbd>
-        <UKbd v-if="serialStore.isFourWay">
-          4way
-        </UKbd>
-      </div>
-      <div v-if="serialStore.hasConnection && escStore.count > 0" class="flex gap-4 w-full">
-        <div class="w-full flex flex-col space-y-2">
-          <UButton label="Flash firmware" size="2xs" icon="i-material-symbols-full-stacked-bar-chart" color="teal" @click="flashModalOpen = true" />
-          <UButton
-            label="Send default config"
-            size="2xs"
-            icon="i-material-symbols-sim-card-outline"
-            color="green"
-            @click="applyDefaultConfigModalOpen = true"
-          />
-        </div>
-        <div class="min-w-[112px]">
-          <UButton
-            label="Save config"
-            size="xs"
-            icon="i-material-symbols-sim-card-download-outline"
-            color="red"
-            variant="link"
-            @click="saveConfigModalOpen = true"
-          />
-          <UButton
-            label="Apply config"
-            size="xs"
-            icon="i-material-symbols-upload-file-outline"
-            color="violet"
-            variant="link"
-            @click="applyConfigModalOpen = true"
-          />
-        </div>
-      </div>
-      <UModal v-model="flashModalOpen" :prevent-close="escStore.activeTarget > -1">
-        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center justify-center gap-2 text-xl">
-                <UIcon name="i-material-symbols-full-stacked-bar-chart" class="h-8 w-8" />
-                <div class="text-2xl">
-                  Flash Firmware
-                </div>
+    </div>
+    <UModal v-model="flashModalOpen" :prevent-close="escStore.activeTarget > -1">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center justify-center gap-2 text-xl">
+              <UIcon name="i-material-symbols-full-stacked-bar-chart" class="h-8 w-8" />
+              <div class="text-2xl">
+                Flash Firmware
               </div>
             </div>
-          </template>
+          </div>
+        </template>
 
-          <div v-if="true" class="flex flex-col gap-4">
-            <UCheckbox
-              v-model="ignoreMcuLayout"
-              :disabled="isFlashingActive"
-              :ui="{
-                label: 'text-sm font-medium text-red-700 dark:text-red-500',
+        <div v-if="true" class="flex flex-col gap-4">
+          <UCheckbox
+            v-model="ignoreMcuLayout"
+            :disabled="isFlashingActive"
+            :ui="{
+              label: 'text-sm font-medium text-red-700 dark:text-red-500',
+            }"
+            label="Ignore current mcu layout"
+            color="red"
+          />
+          <UAlert
+            v-if="ignoreMcuLayout"
+            icon="i-heroicons-exclamation-triangle"
+            title="Alert!"
+            variant="subtle"
+            color="red"
+            description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some efford!"
+          />
+          <UCheckbox
+            v-model="includePrerelease"
+            :disabled="isFlashingActive"
+            :ui="{
+              label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
+            }"
+            label="Include prerelease versions"
+            color="orange"
+          />
+          <UAlert
+            v-if="includePrerelease"
+            icon="i-heroicons-exclamation-triangle"
+            title="Be aware!"
+            variant="subtle"
+            color="orange"
+            description="Prerelease or release candidate versions might have bugs, if you encounter issues, please join our discord and report them!"
+          />
+          <UTabs
+            v-model="currentTab"
+            :items="flashTabs"
+          >
+            <template #release>
+              <div class="flex flex-col gap-4">
+                <USelectMenu
+                  v-model="selectedRelease"
+                  searchable
+                  searchable-placeholder="Search a release..."
+                  :disabled="isFlashingActive"
+                  :options="releasesOptions"
+                  :loading="status === 'pending'"
+                />
+                <USelectMenu
+                  v-model="selectedAsset"
+                  searchable
+                  searchable-placeholder="Search a hex file..."
+                  :options="assets"
+                  :disabled="assets?.length === 0 || !ignoreMcuLayout || isFlashingActive"
+                  :loading="status === 'pending'"
+                />
+              </div>
+            </template>
+            <template #local>
+              <div class="flex flex-col gap-4">
+                <UInput
+                  type="file"
+                  size="sm"
+                  icon="i-heroicons-folder"
+                  accept=".hex"
+                  :disabled="isFlashingActive"
+                  @change="selectFile($event)"
+                />
+                <div v-if="isFlashingActive" class="text-green-500 text-center">
+                  Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
+                </div>
+              </div>
+            </template>
+            <template #bootloader>
+              <div class="">
+                <UAlert
+                  color="red"
+                  variant="soft"
+                  icon=""
+                  title="Attention!"
+                  description="Flashing the bootloader will erase all settings and data on the mcu and if you flash the wrong bootloader, it will only be recoverable via SWD, are you sure you want to continue?"
+                  class="mb-2"
+                />
+                <UInput
+                  type="file"
+                  size="sm"
+                  icon="i-heroicons-folder"
+                  accept=".amj"
+                  :disabled="isFlashingActive"
+                  @change="selectFile($event)"
+                />
+                <div v-if="isFlashingActive" class="text-green-500 text-center">
+                  Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
+                </div>
+              </div>
+            </template>
+          </UTabs>
+        </div>
+        <div v-else class="text-green-500 text-center">
+          Flashing local '{{ fileInput ?? 'UNKNOWN' }}'
+        </div>
+        <div v-if="serialStore.isFourWay" class="pt-4">
+          <div class="text-center mb-2">
+            Select ESC(s) to flash:
+          </div>
+          <div class="w-full text-center flex justify-center gap-2">
+            <div
+              v-for="n of escStore.selectedEscInfo.length"
+              :key="n"
+              class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+              :class="{
+                'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
               }"
-              label="Ignore current mcu layout"
-              color="red"
-            />
-            <UAlert
-              v-if="ignoreMcuLayout"
-              icon="i-heroicons-exclamation-triangle"
-              title="Alert!"
-              variant="subtle"
-              color="red"
-              description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some efford!"
-            />
-            <UCheckbox
-              v-model="includePrerelease"
-              :disabled="isFlashingActive"
-              :ui="{
-                label: 'text-sm font-medium text-orange-700 dark:text-orange-500',
-              }"
-              label="Include prerelease versions"
-              color="orange"
-            />
-            <UAlert
-              v-if="includePrerelease"
-              icon="i-heroicons-exclamation-triangle"
-              title="Be aware!"
-              variant="subtle"
-              color="orange"
-              description="Prerelease or release candidate versions might have bugs, if you encounter issues, please join our discord and report them!"
-            />
-            <UTabs
-              v-model="currentTab"
-              :items="flashTabs"
+              @click="toggleSavingOrApplyingSelectedEsc(n);"
             >
-              <template #release>
-                <div class="flex flex-col gap-4">
-                  <USelectMenu
-                    v-model="selectedRelease"
-                    searchable
-                    searchable-placeholder="Search a release..."
-                    :disabled="isFlashingActive"
-                    :options="releasesOptions"
-                    :loading="status === 'pending'"
-                  />
-                  <USelectMenu
-                    v-model="selectedAsset"
-                    searchable
-                    searchable-placeholder="Search a hex file..."
-                    :options="assets"
-                    :disabled="assets?.length === 0 || !ignoreMcuLayout || isFlashingActive"
-                    :loading="status === 'pending'"
-                  />
-                </div>
-              </template>
-              <template #local>
-                <div class="flex flex-col gap-4">
-                  <UInput
-                    type="file"
-                    size="sm"
-                    icon="i-heroicons-folder"
-                    accept=".hex"
-                    :disabled="isFlashingActive"
-                    @change="selectFile($event)"
-                  />
-                  <div v-if="isFlashingActive" class="text-green-500 text-center">
-                    Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
-                  </div>
-                </div>
-              </template>
-              <template #bootloader>
-                <div class="">
-                  <UAlert
-                    color="red"
-                    variant="soft"
-                    icon=""
-                    title="Attention!"
-                    description="Flashing the bootloader will erase all settings and data on the mcu and if you flash the wrong bootloader, it will only be recoverable via SWD, are you sure you want to continue?"
-                    class="mb-2"
-                  />
-                  <UInput
-                    type="file"
-                    size="sm"
-                    icon="i-heroicons-folder"
-                    accept=".amj"
-                    :disabled="isFlashingActive"
-                    @change="selectFile($event)"
-                  />
-                  <div v-if="isFlashingActive" class="text-green-500 text-center">
-                    Flashing local '{{ fileInput?.name ?? 'UNKNOWN' }}'
-                  </div>
-                </div>
-              </template>
-            </UTabs>
+              {{ n }}
+            </div>
           </div>
-          <div v-else class="text-green-500 text-center">
-            Flashing local '{{ fileInput ?? 'UNKNOWN' }}'
+        </div>
+        <template #footer>
+          <div class="flex flex-col items-end gap-4">
+            <div v-if="escStore.activeTarget === -1" class="flex gap-4">
+              <UButton
+                label="Start flash"
+                :disabled="
+                  (savingOrApplyingSelectedEscs.length === 0) ||
+                    (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND')) ||
+                    (currentTab > 0 && !fileInput)
+                "
+                @click="startModalFlash"
+              />
+            </div>
+            <div v-if="escStore.activeTarget > -1" class="w-full">
+              Flashing ESC #{{ (escStore.activeTarget + 1) }}
+              <UProgress
+                :value="progressIsIntermediate ? undefined : (escStore.bytesWritten / escStore.totalBytes) * 100"
+                :indicator="!progressIsIntermediate"
+                animation="carousel"
+              />
+              <div class="flex justify-center pt-2 text-green-500">
+                <div>{{ escStore.step }}</div>
+              </div>
+            </div>
           </div>
-          <div v-if="serialStore.isFourWay" class="pt-4">
-            <div class="text-center mb-2">
-              Select ESC(s) to flash:
+        </template>
+      </UCard>
+    </UModal>
+    <UModal v-model="applyDefaultConfigModalOpen">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center justify-center gap-2 text-xl">
+              <UIcon name="i-material-symbols-sim-card-outline" class="h-8 w-8" />
+              <div class="text-2xl">
+                Apply default config
+              </div>
+            </div>
+          </div>
+        </template>
+        <div>
+          <div v-if="serialStore.isDirectConnect" class="text-center">
+            Do you want to overwrite the current config with default settings?
+          </div>
+          <div v-else class="flex flex-col gap-2">
+            <div class="text-center">
+              Select ESC(s) to apply:
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
@@ -237,156 +298,93 @@
               </div>
             </div>
           </div>
-          <template #footer>
-            <div class="flex flex-col items-end gap-4">
-              <div v-if="escStore.activeTarget === -1" class="flex gap-4">
-                <UButton
-                  label="Start flash"
-                  :disabled="
-                    (savingOrApplyingSelectedEscs.length === 0) ||
-                      (currentTab === 0 && (!selectedAsset || selectedAsset === 'NOT FOUND')) ||
-                      (currentTab > 0 && !fileInput)
-                  "
-                  @click="startModalFlash"
-                />
-              </div>
-              <div v-if="escStore.activeTarget > -1" class="w-full">
-                Flashing ESC #{{ (escStore.activeTarget + 1) }}
-                <UProgress
-                  :value="progressIsIntermediate ? undefined : (escStore.bytesWritten / escStore.totalBytes) * 100"
-                  :indicator="!progressIsIntermediate"
-                  animation="carousel"
-                />
-                <div class="flex justify-center pt-2 text-green-500">
-                  <div>{{ escStore.step }}</div>
-                </div>
-              </div>
-            </div>
-          </template>
-        </UCard>
-      </UModal>
-      <UModal v-model="applyDefaultConfigModalOpen">
-        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center justify-center gap-2 text-xl">
-                <UIcon name="i-material-symbols-sim-card-outline" class="h-8 w-8" />
-                <div class="text-2xl">
-                  Apply default config
-                </div>
-              </div>
-            </div>
-          </template>
-          <div>
-            <div v-if="serialStore.isDirectConnect" class="text-center">
-              Do you want to overwrite the current config with default settings?
-            </div>
-            <div v-else class="flex flex-col gap-2">
-              <div class="text-center">
-                Select ESC(s) to apply:
-              </div>
-              <div class="w-full text-center flex justify-center gap-2">
-                <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
-                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
-                  :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
-                  }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
-                >
-                  {{ n }}
-                </div>
+        </div>
+        <template #footer>
+          <div class="text-right">
+            <UButton color="green" :label="serialStore.isDirectConnect ? 'Yes' : 'Apply'" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="applyDefaultConfig" />
+          </div>
+        </template>
+      </UCard>
+    </UModal>
+    <UModal v-model="saveConfigModalOpen">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center justify-center gap-2 text-xl">
+              <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
+              <div class="text-2xl">
+                Save current ESC config
               </div>
             </div>
           </div>
-          <template #footer>
-            <div class="text-right">
-              <UButton color="green" :label="serialStore.isDirectConnect ? 'Yes' : 'Apply'" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="applyDefaultConfig" />
+        </template>
+        <div>
+          <div class="flex flex-col gap-2">
+            <div class="text-center">
+              Select ESC(s) to save:
             </div>
-          </template>
-        </UCard>
-      </UModal>
-      <UModal v-model="saveConfigModalOpen">
-        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center justify-center gap-2 text-xl">
-                <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
-                <div class="text-2xl">
-                  Save current ESC config
-                </div>
-              </div>
-            </div>
-          </template>
-          <div>
-            <div class="flex flex-col gap-2">
-              <div class="text-center">
-                Select ESC(s) to save:
-              </div>
-              <div class="w-full text-center flex justify-center gap-2">
-                <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
-                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
-                  :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
-                  }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
-                >
-                  {{ n }}
-                </div>
+            <div class="w-full text-center flex justify-center gap-2">
+              <div
+                v-for="n of escStore.selectedEscInfo.length"
+                :key="n"
+                class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                :class="{
+                  'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                }"
+                @click="toggleSavingOrApplyingSelectedEsc(n);"
+              >
+                {{ n }}
               </div>
             </div>
           </div>
-          <template #footer>
-            <div class="text-right">
-              <UButton label="Download" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="downloadEscConfig" />
-            </div>
-          </template>
-        </UCard>
-      </UModal>
-      <UModal v-model="applyConfigModalOpen">
-        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center justify-center gap-2 text-xl">
-                <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
-                <div class="text-2xl">
-                  Apply ESC config
-                </div>
-              </div>
-            </div>
-          </template>
-          <div>
-            <div class="flex flex-col gap-2">
-              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" />
-              <div class="text-center">
-                Select ESC(s) to apply:
-              </div>
-              <div class="w-full text-center flex justify-center gap-2">
-                <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
-                  class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
-                  :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
-                  }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
-                >
-                  {{ n }}
-                </div>
+        </div>
+        <template #footer>
+          <div class="text-right">
+            <UButton label="Download" :disabled="savingOrApplyingSelectedEscs.length === 0" @click="downloadEscConfig" />
+          </div>
+        </template>
+      </UCard>
+    </UModal>
+    <UModal v-model="applyConfigModalOpen">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center justify-center gap-2 text-xl">
+              <UIcon name="i-material-symbols-sim-card-download-outline" class="h-8 w-8" />
+              <div class="text-2xl">
+                Apply ESC config
               </div>
             </div>
           </div>
-          <template #footer>
-            <div class="text-right">
-              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0 || applyConfigFile?.input.files.length === 0" @click="applyConfig" />
+        </template>
+        <div>
+          <div class="flex flex-col gap-2">
+            <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" />
+            <div class="text-center">
+              Select ESC(s) to apply:
             </div>
-          </template>
-        </UCard>
-      </UModal>
-    </div>
+            <div class="w-full text-center flex justify-center gap-2">
+              <div
+                v-for="n of escStore.selectedEscInfo.length"
+                :key="n"
+                class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
+                :class="{
+                  'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                }"
+                @click="toggleSavingOrApplyingSelectedEsc(n);"
+              >
+                {{ n }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <template #footer>
+          <div class="text-right">
+            <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0 || applyConfigFile?.input.files.length === 0" @click="applyConfig" />
+          </div>
+        </template>
+      </UCard>
+    </UModal>
   </div>
 </template>
 
@@ -396,7 +394,7 @@ import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
-import serial from '~/src/communication/serial';
+
 import Serial from '~/src/communication/serial';
 import db from '~/src/db';
 import Flash from '~/src/flash';
