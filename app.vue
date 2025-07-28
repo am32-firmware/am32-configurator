@@ -47,14 +47,14 @@ onMounted(() => {
 const serialStore = useSerialStore();
 const { log, logWarning, logError } = useLogStore();
 
-if (navigator && 'serial' in navigator) {
+//if (navigator && 'serial' in navigator) {
     serialStore.hasSerial = true;
     Msp.init(log, logWarning, logError);
     FourWay.init(log, logWarning, logError);
     Direct.init(log, logWarning, logError);
 
     log('initializing...');
-} else {
+/*} else {
     logError('WebSerial not supported, use other browser!');
-}
+}*/
 </script>
