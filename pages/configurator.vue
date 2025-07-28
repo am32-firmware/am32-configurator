@@ -73,7 +73,16 @@
               </div>
               <div v-else-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
                 <div class="flex flex-col gap-4 justify-center">
-                  <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
+                  <SettingFieldGroup
+                    class="w-[500px]"
+                    title="Essentials"
+                    :cols="1"
+                    :switches="[{
+                      field: 'DISABLE_STICK_CALIBRATION',
+                      name: 'Disable stick calibration',
+                      minFirmwareVersion: 'v2.19'
+                    }]"
+                  >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
                       field="ESC_PROTOCOL"
@@ -451,6 +460,21 @@
                       show-value
                       @change="onSettingsChange"
                     />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ACTIVE_BRAKE_POWER"
+                      name="Active brake power"
+                      type="number"
+                      :min="0"
+                      :max="5"
+                      :step="1"
+                      unit="%"
+                      @change="onSettingsChange"
+                    >
+                      <template #unit="{ value }">
+                        {{ value === 0 ? 'Off' : `${value} % duty cycle` }}
+                      </template>
+                    </SettingField>
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Servo settings"
