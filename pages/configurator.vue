@@ -138,8 +138,8 @@
                       name="Timing advance"
                       type="number"
                       :min="0"
-                      :max="32"
-                      :step="1"
+                      :max="30"
+                      :step="0.9375"
                       :display-factor="1"
                       :offset="-10"
                       unit="°"
@@ -420,13 +420,41 @@
                     :cols="3"
                     :switches="[{
                       field: 'BRAKE_ON_STOP',
-                      name: 'Brake on stop'
+                      name: 'Brake on stop',
+                      maxFirmwareVersion: 'v2.18'
                     }, {
                       field: 'RC_CAR_REVERSING',
                       name: 'Car type reverse breaking'
                     }]"
+                    :radios="[{
+                      field: 'BRAKE_ON_STOP',
+                      name: 'Brake on stop',
+                      minFirmwareVersion: 'v2.19',
+                      values: [{
+                        name: 'Off',
+                        value: 0
+                      }, {
+                        name: 'Brake on stop',
+                        value: 1
+                      }, {
+                        name: 'Active brake',
+                        value: 2
+                      }]
+                    }]"
                     @change="onSettingsChange"
                   >
+                    <SettingField
+                      v-if="escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP === 2"
+                      :esc-info="escStore.selectedEscInfo"
+                      name="Active brake power"
+                      type="number"
+                      field="ACTIVE_BRAKE_POWER"
+                      :min="1"
+                      :max="5"
+                      :step="1"
+                      show-value
+                      @change="onSettingsChange"
+                    />
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
                       name="Brake strength"

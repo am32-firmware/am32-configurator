@@ -733,6 +733,27 @@ const connectToEsc = async () => {
 
         applyDefaultConfig();
     }
+
+    let needToSave = false;
+
+    for (const esc of escStore.escData) {
+        const firmwareVersion = `${esc.data.settings.MAIN_REVISION}.${esc.data.settings.SUB_REVISION}`;
+        if (firmwareVersion.endsWith('2.19')) {
+            if (esc.data.settings.TIMING_ADVANCE as number < 10) {
+                needToSave = true;
+                esc.data.settings.TIMING_ADVANCE = 16;
+            }
+        }
+    }
+
+    if (needToSave) {
+        await writeConfig();
+        toast.add({
+            title: 'Info',
+            color: 'blue',
+            description: 'Changed settings, saved and applied!'
+        });
+    }
 };
 
 const writeConfig = async () => {
