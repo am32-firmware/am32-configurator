@@ -56,7 +56,7 @@
           </template>
           <template #settings>
             <div class="h-full pt-4">
-              <div class="flex gap-4 w-full justify-center">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full justify-center">
                 <div v-for="(info, n) of escStore.escData" :key="n">
                   <EscView
                     :is-loading="info.isLoading"
@@ -73,7 +73,18 @@
               </div>
               <div v-else-if="escStore.selectedEscInfo.length > 0" class="p-4 max-w-[1400px] m-auto">
                 <div class="flex flex-col gap-4 justify-center">
-                  <SettingFieldGroup class="w-[500px]" title="Essentials" :cols="1">
+                  <SettingFieldGroup
+                    class="w-1/2"
+                    title="Essentials"
+                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
+                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :cols="1"
+                    :switches="[{
+                      field: 'DISABLE_STICK_CALIBRATION',
+                      name: 'Disable stick calibration',
+                      minFirmwareVersion: 'v2.19'
+                    }]"
+                  >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
                       field="ESC_PROTOCOL"
@@ -138,8 +149,8 @@
                       name="Timing advance"
                       type="number"
                       :min="0"
-                      :max="32"
-                      :step="1"
+                      :max="30"
+                      :step="0.9375"
                       :display-factor="1"
                       :offset="-10"
                       unit="°"
@@ -418,12 +429,30 @@
                   <SettingFieldGroup
                     title="Brake"
                     :cols="3"
+                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
+                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
                     :switches="[{
                       field: 'BRAKE_ON_STOP',
-                      name: 'Brake on stop'
+                      name: 'Brake on stop',
+                      maxFirmwareVersion: 'v2.18'
                     }, {
                       field: 'RC_CAR_REVERSING',
                       name: 'Car type reverse breaking'
+                    }]"
+                    :radios="[{
+                      field: 'BRAKE_ON_STOP',
+                      name: 'Brake on stop',
+                      minFirmwareVersion: 'v2.19',
+                      values: [{
+                        name: 'Off',
+                        value: 0
+                      }, {
+                        name: 'Brake on stop',
+                        value: 1
+                      }, {
+                        name: 'Active brake',
+                        value: 2
+                      }]
                     }]"
                     @change="onSettingsChange"
                   >
@@ -451,6 +480,22 @@
                       show-value
                       @change="onSettingsChange"
                     />
+                    <SettingField
+                      :esc-info="escStore.selectedEscInfo"
+                      field="ACTIVE_BRAKE_POWER"
+                      name="Active brake power"
+                      type="number"
+                      :min="0"
+                      :max="5"
+                      :step="1"
+                      unit="%"
+                      :disabled="(value: number) => escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP !== 2"
+                      @change="onSettingsChange"
+                    >
+                      <template #unit="{ value }">
+                        {{ value === 0 ? 'Off' : `${value} % duty cycle` }}
+                      </template>
+                    </SettingField>
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Servo settings"
