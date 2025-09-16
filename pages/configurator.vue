@@ -348,7 +348,8 @@
                       type="number"
                       :min="1"
                       :max="100"
-                      :step="0.5"
+                      :step="1"
+                      :display-factor="0.5"
                       unit="V"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF !== 2"
                       show-value
