@@ -20,6 +20,8 @@ services:
       - redis-net
     volumes:
       - cache:/data
+    ports:
+      - 6379:6379
 networks:
   conf:
   redis-net:

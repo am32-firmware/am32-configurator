@@ -39,7 +39,7 @@
             DISABLED
           </div>
           <div v-else>
-            {{ (min || 0).toString().includes('.') ? value.toFixed(1) : value }}
+            {{ (min || 0).toString().includes('.') ? (value * onlyDisplayFactor).toFixed(1) : value * onlyDisplayFactor }}
           </div>
           <div v-if="unit && (!disabledValue || value < disabledValue)">
             {{ unit }}
@@ -78,6 +78,7 @@ interface SettingFieldProps {
     max?: number;
     step?: number;
     displayFactor?: number;
+    onlyDisplayFactor?: number;
     offset?: number;
     unit?: string;
     showValue?: boolean;
@@ -89,6 +90,7 @@ interface SettingFieldProps {
 const props = withDefaults(defineProps<SettingFieldProps>(), {
     name: undefined,
     displayFactor: 1,
+    onlyDisplayFactor: 1,
     offset: 0,
     placeholder: undefined,
     description: undefined,
@@ -120,14 +122,14 @@ const value = computed({
     get: () => {
         let value = props.escInfo[props.individual ?? 0].settings[props.field] as number;
         if (value && props.type === 'number') {
-            value = value * props.displayFactor + props.offset;
+            value = (value * props.displayFactor) + props.offset;
         }
         return value;
     },
     set: (val) => {
         let value = val;
         if (props.type === 'number') {
-            value = Math.round((value - props.offset) / props.displayFactor);
+            value = (value - props.offset) / props.displayFactor;
         }
         emits('change', {
             field: props.field,

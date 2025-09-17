@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-[150px] min-w-[400px] p-4 border border-slate-900 rounded-xl cursor-pointer ring-4"
+    class="min-h-[150px] p-4 border border-slate-900 rounded-xl cursor-pointer ring-4"
     :class="{
       'ring-red-500': mcu?.isSelected && mcu.settingsDirty,
       'ring-green-500': mcu?.isSelected && !mcu.settingsDirty,

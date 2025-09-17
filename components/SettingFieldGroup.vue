@@ -74,8 +74,6 @@ const props = withDefaults(defineProps<SettingFieldGroupProps>(), {
 
 const semverFirmwareVersion = props.firmwareVersion?.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2') ?? '0.0';
 
-console.log(semverFirmwareVersion, props.switches);
-
 const filteredSwitches = computed(() => props.switches
     .filter(s => (!s.minEepromVersion || props.eepromVersion >= s.minEepromVersion) &&
                 (!s.maxEepromVersion || props.eepromVersion <= s.maxEepromVersion) &&

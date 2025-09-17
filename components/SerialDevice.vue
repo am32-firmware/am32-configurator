@@ -1,5 +1,5 @@
 <template>
-  <div class="min-w-[320px]">
+  <div class="min-w-[350px]">
     <div class="p-4 grid grid-cols-1 gap-2">
       <div class="flex flex-column gap-2">
         <USelectMenu v-model="serialStore.selectedDevice" class="flex-grow" :disabled="serialStore.hasConnection" :options="serialStore.pairedDevicesOptions" placeholder="Select device" />
