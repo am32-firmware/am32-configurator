@@ -241,10 +241,6 @@
                     v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
                     title="Extended settings"
                     :cols="3"
-                    :switches="[{
-                      field: 'DISABLE_STICK_CALIBRATION',
-                      name: 'Disable stick calibration'
-                    }]"
                   >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
@@ -407,7 +403,7 @@
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
                       field="SINE_MODE_RANGE"
-                      name="Sine Mode Power"
+                      name="Sine Mode Range"
                       type="number"
                       :min="5"
                       :max="25"
