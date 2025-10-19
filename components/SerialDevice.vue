@@ -936,7 +936,7 @@ const startFlash = async (hexString: string) => {
 
             let i = 0;
             if (parsed.bytes < 27 * 1024 - 1 + 32) {
-                const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
+                const filled = new Uint8Array(27 * 1024 - 1).fill(0xFF);
                 let bytes32Index = -1;
                 for (let i = 0; i < parsed.data.length; i++) {
                     if (parsed.data[i].bytes === 32) {
@@ -958,18 +958,16 @@ const startFlash = async (hexString: string) => {
                         lowIndex = i;
                     }
                 }
-                let totalBytes = parsed.data[lowIndex].bytes;
                 filled.set(parsed.data[lowIndex].data);
                 for (let i = 0; i < parsed.data.length; i++) {
                     if (i !== lowIndex && i !== bytes32Index) {
-                        totalBytes += parsed.data[i].bytes;
                         filled.set(parsed.data[i].data, parsed.data[i].address - parsed.data[lowIndex].address);
                         parsed.data[i].bytes = 0;
                     }
                 }
                 parsed.data[lowIndex].data = Array.from(filled);
-                parsed.data[lowIndex].bytes = totalBytes;
-                parsed.bytes = totalBytes + 32;
+                parsed.data[lowIndex].bytes = filled.length;
+                parsed.bytes = filled.length + 32;
             }
 
             debugger;
