@@ -937,17 +937,50 @@ const startFlash = async (hexString: string) => {
             let i = 0;
             if (parsed.bytes < 27 * 1024 - 1 + 32) {
                 const filled = new Uint8Array(27 * 1024 - 1).fill(0x00);
-                const highIndex = parsed.data.findIndex(d => d.bytes > 32);
-                filled.set(parsed.data[highIndex].data);
-                parsed.data[highIndex].data = Array.from(filled);
-                parsed.data[highIndex].bytes = filled.length;
-                parsed.bytes = filled.length + 32;
+                let bytes32Index = -1;
+                for (let i = 0; i < parsed.data.length; i++) {
+                    if (parsed.data[i].bytes === 32) {
+                        bytes32Index = i;
+                        break;
+                    }
+                }
+                if (bytes32Index === -1) {
+                    toast.add({
+                        title: 'Error',
+                        color: 'red',
+                        description: '32 bytes block not found in hex file!'
+                    });
+                    return;
+                }
+                let lowIndex = -1;
+                for (let i = 0; i < parsed.data.length; i++) {
+                    if (lowIndex === -1 || parsed.data[i].address < parsed.data[lowIndex].address) {
+                        lowIndex = i;
+                    }
+                }
+                let totalBytes = parsed.data[lowIndex].bytes;
+                filled.set(parsed.data[lowIndex].data);
+                for (let i = 0; i < parsed.data.length; i++) {
+                    if (i !== lowIndex && i !== bytes32Index) {
+                        totalBytes += parsed.data[i].bytes;
+                        filled.set(parsed.data[i].data, parsed.data[i].address - parsed.data[lowIndex].address);
+                        parsed.data[i].bytes = 0;
+                    }
+                }
+                parsed.data[lowIndex].data = Array.from(filled);
+                parsed.data[lowIndex].bytes = totalBytes;
+                parsed.bytes = totalBytes + 32;
             }
+
+            debugger;
 
             escStore.totalBytes = parsed.bytes;
             escStore.step = 'Writing';
 
             for (const start of parsed.data) {
+                if (start.bytes === 0) {
+                    continue;
+                }
                 i = 0;
                 logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
                 const CHUNK_SIZE = 64;
