@@ -147,6 +147,7 @@ import vimdronesImage from '~/assets/logos/vimdrones_logo_white.png';
 import gnbImage from '~/assets/logos/gnb.png';
 import flytexImage from '~/assets/logos/flytex_logo_full_white.svg';
 import radiomasterImage from '~/assets/logos/RadioMasterLogo.svg';
+import flycolorImage from '~/assets/logos/flycolor.svg';
 
 const images = [{
     path: radiomasterImage,
@@ -191,5 +192,9 @@ const images = [{
 }, {
     path: flytexImage,
     url: 'https://flytex.pro/'
+}, {
+    path: flycolorImage,
+    url: 'https://www.fly-color.net/',
+    class: 'invert'
 }];
 </script>
