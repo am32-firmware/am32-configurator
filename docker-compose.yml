@@ -5,9 +5,9 @@ services:
       dockerfile: docker/Dockerfile
     labels:
       - traefik.enable=true
-      - traefik.http.routers.configurator.rule=Host(`${DOMAIN:-am32.ca}`)
-      - traefik.http.routers.configurator.service=configurator
-      - traefik.http.services.configurator.loadbalancer.server.port=3000
+      - traefik.http.routers.${PREFIX:-}configurator.rule=Host(`${DOMAIN:-am32.ca}`)
+      - traefik.http.routers.${PREFIX:-}configurator.service=configurator
+      - traefik.http.services.${PREFIX:-}configurator.loadbalancer.server.port=3000
     pull_policy: build
     env_file: stack.env
     networks:

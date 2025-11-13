@@ -139,8 +139,6 @@ export default defineEventHandler(async (event) => {
 
         const bootloaders = await getBootloaders();
 
-        console.log(bootloaders);
-
         const bootloadersFolder = {
             name: 'bootloader',
             children: [] as BlobFolder[],
