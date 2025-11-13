@@ -13,7 +13,6 @@ services:
     networks:
       - proxy
       - redis-net
-      - traefik
   redisinsight:
     image: redis/redisinsight:latest
     volumes:
@@ -33,8 +32,6 @@ networks:
   redis-net:
     external: true
   proxy:
-    external: true
-  traefik:
     external: true
 volumes:
   cache:
