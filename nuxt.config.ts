@@ -63,14 +63,14 @@ export default defineNuxtConfig({
             description: 'Configurator for the ESC firmware AM32',
             icons: [
                 {
-                    src: 'assets/images/am32-logo.svg',
+                    src: 'assets/images/am32-logo.png',
                     sizes: '288x288',
-                    type: 'image/svg'
+                    type: 'image/png'
                 },
                 {
-                    src: 'assets/images/am32-logo.svg',
+                    src: 'assets/images/am32-logo.png',
                     sizes: '144x144',
-                    type: 'image/svg',
+                    type: 'image/png',
                     purpose: 'any'
                 }
             ],
