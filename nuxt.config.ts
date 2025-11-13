@@ -64,12 +64,23 @@ export default defineNuxtConfig({
             icons: [
                 {
                     src: 'assets/images/am32-logo.png',
-                    sizes: '288x288',
+                    sizes: '848x848',
                     type: 'image/png'
                 },
                 {
-                    src: 'assets/images/am32-logo.png',
+                    src: 'assets/images/192x192.png',
+                    sizes: '192x192',
+                    type: 'image/png'
+                },
+                {
+                    src: 'assets/images/144x144.png',
                     sizes: '144x144',
+                    type: 'image/png',
+                    purpose: 'any'
+                },
+                {
+                    src: 'assets/images/96x96.png',
+                    sizes: '96x96',
                     type: 'image/png',
                     purpose: 'any'
                 }
@@ -91,10 +102,10 @@ export default defineNuxtConfig({
                 }
             ]
         },
-        workbox: {
-            globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-            navigateFallback: '/'
-        },
+        // workbox: {
+        //    globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        //    navigateFallback: '/'
+        // },
         client: {
             installPrompt: true,
             // you don't need to include this: only for testing purposes

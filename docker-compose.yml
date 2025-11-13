@@ -7,12 +7,14 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.${PREFIX:-}configurator.rule=Host(`${DOMAIN:-am32.ca}`)
+      - traefik.http.routers.${PREFIX:-}configurator.service=${PREFIX:-}configurator
       - traefik.http.services.${PREFIX:-}configurator.loadbalancer.server.port=3000
     pull_policy: build
     env_file: stack.env
     networks:
       - proxy
       - redis-net
+      - traefik
   redisinsight:
     image: redis/redisinsight:latest
     volumes:
@@ -32,6 +34,8 @@ networks:
   redis-net:
     external: true
   proxy:
+    external: true
+  traefik:
     external: true
 volumes:
   cache:
