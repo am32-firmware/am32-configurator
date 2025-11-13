@@ -1,8 +1,8 @@
 import { finished } from 'node:stream/promises';
 import { Octokit } from 'octokit';
 import { coerce, compare } from 'semver';
-import * as Minio from 'minio';
 import 'dotenv';
+import { useMinio } from '~/composables/useMinio';
 
 export default async function (minTag?: string) {
     const octo = new Octokit();
@@ -17,13 +17,7 @@ export default async function (minTag?: string) {
 
     const semverMinTag = minTag?.replace(/(v[0-9]+)\.0?([0-9])/i, '$1.$2') ?? 'v0.0';
 
-    const minioClient = new Minio.Client({
-        endPoint: process.env.MINIO_URL ?? '',
-        port: 443,
-        useSSL: true,
-        accessKey: process.env.MINIO_ACCESS_KEY ?? '',
-        secretKey: process.env.MINIO_SECRET_KEY ?? ''
-    });
+    const minioClient = useMinio();
 
     const releasesStream = minioClient.listObjectsV2('releases', '', true, '');
 

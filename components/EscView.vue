@@ -69,8 +69,14 @@
               <div class="col-span-2">
                 Version
               </div>
-              <div class="col-span-3">
+              <div v-if="Number(getSettingValue('MAIN_REVISION')) > 1" class="col-span-3">
                 {{ getSettingValue('MAIN_REVISION') }}.{{ padVersion(getSettingValue<number>('SUB_REVISION') ?? 0) }}
+              </div>
+              <div v-else class="col-span-3 text-orange-300 font-bold flex items-center gap-2">
+                <UTooltip text="Default eeprom! Press disconnect and power cycle ESC!" :popper="{ placement: 'right' }">
+                  <UIcon name="i-heroicons-exclamation-triangle-16-solid" class="w-4 h-4" />
+                </UTooltip>
+                FRESH EEPROM
               </div>
             </div>
           </div>

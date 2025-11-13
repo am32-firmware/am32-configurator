@@ -1043,11 +1043,28 @@ const startFlash = async (hexString: string) => {
 };
 
 const applyDefaultConfig = async () => {
-    const file = await fetch('/assets/eeprom_default.bin');
+    let eepromVersion = escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number;
+    if (eepromVersion > 3) {
+        eepromVersion = 2;
+    }
+    const eepromUrl = await fetch(`/api/eeprom/${escStore.firstValidEscData?.data.meta.am32.fileName}?version=${eepromVersion}`)
+        .then((res) => {
+            if (res.status === 200) {
+                return res.text();
+            }
+            return fetch(`/api/eeprom/DEFAULT?version=${eepromVersion}`).then(res => res.text());
+        })
+        .catch(() => null);
+
+    if (!eepromUrl) {
+        throw new Error('Eeprom not found');
+    }
+
+    const file = await fetch(eepromUrl).then(res => res.arrayBuffer());
 
     if (file) {
-        const buffer = new Uint8Array(await file.arrayBuffer());
-        const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
+        const buffer = new Uint8Array(file);
+        const settings = bufferToSettings(buffer, eepromVersion);
 
         settings.STARTUP_MELODY = (new Array(128)).fill(0xFF);
 

@@ -1,6 +1,5 @@
-import * as Minio from 'minio';
-
 import { promiseTimeout } from '@vueuse/core';
+import { useMinio } from '~/composables/useMinio';
 
 function delay (ms: number) {
     return promiseTimeout(ms);
@@ -16,13 +15,7 @@ export default defineEventHandler(async (event) => {
     const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader', 'tools'];
     const includePrereleases = query.prereleases !== undefined;
 
-    const minioClient = new Minio.Client({
-        endPoint: process.env.MINIO_URL ?? '',
-        port: 443,
-        useSSL: true,
-        accessKey: process.env.MINIO_ACCESS_KEY ?? '',
-        secretKey: process.env.MINIO_SECRET_KEY ?? ''
-    });
+    const minioClient = useMinio();
 
     const folders: BlobFolder[] = [];
 
