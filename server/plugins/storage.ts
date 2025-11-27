@@ -31,8 +31,16 @@ export default defineNitroPlugin(() => {
         db: 3
     });
 
+    const schema = redisDriver({
+        base: 'redis',
+        host: useRuntimeConfig().redis.host,
+        port: useRuntimeConfig().redis.port,
+        db: 4
+    });
+
     storage.mount('tools', tools);
     storage.mount('releases', releases);
     storage.mount('bootloaders', bootloaders);
     storage.mount('binaries', binaries);
+    storage.mount('schema', schema);
 });
