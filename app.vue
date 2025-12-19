@@ -42,6 +42,8 @@ onMounted(() => {
             }
         });
     }
+
+    this.$matomo && this.$matomo.trackPageView();
 });
 
 const serialStore = useSerialStore();
