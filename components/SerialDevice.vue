@@ -409,6 +409,7 @@ const { escData } = storeToRefs(escStore);
 const { log, logWarning, logError } = useLogStore();
 const usbFCVendorIds = [0x0483, 0x2E3C, 0x2E8A, 0x1209, 0x26AC, 0x27AC, 0x2DAE, 0x3162, 0x35A7];
 const usbDirectVendorIds = [0x1A86, 0x0403, 0x4348, 0x26BA, 0x10C4];
+const usbDirectDeviceIdExceptions = [0xE204];
 const flashModalOpen = ref(false);
 const applyDefaultConfigModalOpen = ref(false);
 const saveConfigModalOpen = ref(false);
@@ -508,7 +509,10 @@ const requestSerialDevices = async () => {
     await fetchPairedDevices();
 };
 
-const isDirectConnectDevice = computed(() => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])));
+const isDirectConnectDevice = computed(
+    () => usbDirectVendorIds.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[0])) &&
+          !usbDirectDeviceIdExceptions.includes(Number.parseInt(serialStore.selectedDevice.id.split(':')[1]))
+);
 
 const fetchPairedDevices = async () => {
     const pairedDevices: SerialPort[] = await navigator.serial.getPorts();
@@ -1089,7 +1093,7 @@ const applyDefaultConfig = async () => {
 
 const downloadEscConfig = () => {
     for (const n of savingOrApplyingSelectedEscs.value) {
-        const blob = new Blob([escStore.escData[n - 1].data.settingsBuffer], {
+        const blob = new Blob([escStore.escData[n - 1].data.settingsBuffer.buffer as ArrayBuffer], {
             type: 'application/octet-stream'
         });
         const link = document.createElement('a');

@@ -1,4 +1,4 @@
-import Dexie, { type Table } from 'dexie';
+import Dexie from 'dexie';
 
 export class HexFile {
     id?: number;
@@ -7,7 +7,7 @@ export class HexFile {
 }
 
 export class Am32Dexie extends Dexie {
-    downloads!: Table<HexFile>;
+    downloads!: Dexie.Table<HexFile, any>;
 
     constructor () {
         super('Am32Dexie');

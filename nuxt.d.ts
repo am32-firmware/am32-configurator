@@ -75,3 +75,5 @@ declare module 'bluejay-rtttl-parse' {
         };
     }
 };
+
+declare module 'vue-matomo';

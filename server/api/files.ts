@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
                 for (const key of keys) {
                     result.push({
                         key,
-                        value: await releasesCache.getItem(key)
+                        value: (await releasesCache.getItem(key))?.toString() ?? ''
                     });
                 }
                 resolve(result);
@@ -130,7 +130,7 @@ export default defineEventHandler(async (event) => {
                 for (const key of keys) {
                     result.push({
                         key,
-                        value: await bootloadersCache.getItem(key)
+                        value: (await bootloadersCache.getItem(key))?.toString() ?? ''
                     });
                 }
                 resolve(result);
@@ -205,7 +205,7 @@ export default defineEventHandler(async (event) => {
                 for (const key of keys) {
                     result.push({
                         key,
-                        value: await toolsCache.getItem(key)
+                        value: (await toolsCache.getItem(key))?.toString() ?? ''
                     });
                 }
                 resolve(result);
