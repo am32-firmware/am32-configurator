@@ -225,15 +225,15 @@
             </div>
             <div class="w-full text-center flex justify-center gap-2">
               <div
-                v-for="n of escStore.selectedEscInfo.length"
-                :key="n"
+                v-for="item of selectedEscsWithIndex"
+                :key="item.index"
                 class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                 :class="{
-                  'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                  'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(item.index)
                 }"
-                @click="toggleSavingOrApplyingSelectedEsc(n);"
+                @click="toggleSavingOrApplyingSelectedEsc(item.index);"
               >
-                {{ n }}
+                {{ item.index }}
               </div>
             </div>
           </div>
@@ -287,15 +287,15 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
+                  v-for="item of selectedEscsWithIndex"
+                  :key="item.index"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(item.index)
                   }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                  @click="toggleSavingOrApplyingSelectedEsc(item.index);"
                 >
-                  {{ n }}
+                  {{ item.index }}
                 </div>
               </div>
             </div>
@@ -326,15 +326,15 @@
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
+                  v-for="item of selectedEscsWithIndex"
+                  :key="item.index"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(item.index)
                   }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                  @click="toggleSavingOrApplyingSelectedEsc(item.index);"
                 >
-                  {{ n }}
+                  {{ item.index }}
                 </div>
               </div>
             </div>
@@ -360,28 +360,28 @@
           </template>
           <div>
             <div class="flex flex-col gap-2">
-              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" />
+              <UInput ref="applyConfigFile" type="file" color="primary" variant="outline" placeholder=".bin" @change="applyConfigHasFile = !!applyConfigFile?.input?.files?.length" />
               <div class="text-center">
                 Select ESC(s) to apply:
               </div>
               <div class="w-full text-center flex justify-center gap-2">
                 <div
-                  v-for="n of escStore.selectedEscInfo.length"
-                  :key="n"
+                  v-for="item of selectedEscsWithIndex"
+                  :key="item.index"
                   class="transition-all w-8 h-8 rounded-full text-center border border-gray-500 bg-gray-800 p-1 cursor-pointer"
                   :class="{
-                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(n)
+                    'ring-2 ring-green-500 bg-green-300/30': savingOrApplyingSelectedEscs.includes(item.index)
                   }"
-                  @click="toggleSavingOrApplyingSelectedEsc(n);"
+                  @click="toggleSavingOrApplyingSelectedEsc(item.index);"
                 >
-                  {{ n }}
+                  {{ item.index }}
                 </div>
               </div>
             </div>
           </div>
           <template #footer>
             <div class="text-right">
-              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0 || applyConfigFile?.input.files.length === 0" @click="applyConfig" />
+              <UButton label="Apply" :disabled="savingOrApplyingSelectedEscs.length === 0 || !applyConfigHasFile" @click="applyConfig" />
             </div>
           </template>
         </UCard>
@@ -417,6 +417,7 @@ const applyConfigModalOpen = ref(false);
 const fileInput = ref<File | null>(null);
 const currentTab = ref(0);
 const applyConfigFile = ref();
+const applyConfigHasFile = ref(false);
 
 const selectedRelease = ref('');
 const selectedAsset = ref('');
@@ -426,6 +427,12 @@ const savingOrApplyingSelectedEscs = ref<number[]>([]);
 const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
 const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
+
+const selectedEscsWithIndex = computed(() => {
+    return escStore.escData
+        .map((esc, index) => ({ esc, index: index + 1 }))
+        .filter(item => item.esc.data?.isSelected);
+});
 
 const { data, status } = useAsyncData('get-releases', () => useFetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
     watch: [includePrerelease]
@@ -472,6 +479,12 @@ const toggleSavingOrApplyingSelectedEsc = (n: number) => {
         savingOrApplyingSelectedEscs.value.push(n);
     }
 };
+
+watch([flashModalOpen, applyDefaultConfigModalOpen, saveConfigModalOpen, applyConfigModalOpen], (values) => {
+    if (values.some(v => v)) {
+        savingOrApplyingSelectedEscs.value = selectedEscsWithIndex.value.map(e => e.index);
+    }
+});
 
 watchEffect(() => {
     if (assets.value && escStore.escData.length > 0) {
@@ -763,11 +776,16 @@ const connectToEsc = async () => {
     }
 };
 
-const writeConfig = async () => {
+const writeConfig = async (targets?: number[]) => {
     if (serialStore.isFourWay) {
         escStore.isSaving = true;
 
+        const targetList = Array.isArray(targets) ? targets : undefined;
+
         for (let i = 0; i < escStore.escData.length; ++i) {
+            if (targetList && !targetList.includes(i + 1)) {
+                continue;
+            }
             if (!escStore.escData[i].isError && escStore.escData[i].data.settingsDirty) {
                 const result = await FourWay.getInstance().writeSettings(i, escStore.escData[i].data).catch((err) => {
                     logError(`Error writing settings to ESC #${i + 1}: ${err.message}`);
@@ -1077,7 +1095,7 @@ const applyDefaultConfig = async () => {
             escStore.escData[n - 1].data.settingsDirty = true;
         }
 
-        await writeConfig().catch((err) => {
+        await writeConfig(savingOrApplyingSelectedEscs.value).catch((err) => {
             logError(err.message);
         });
 
@@ -1116,7 +1134,7 @@ const applyConfig = async () => {
                 escStore.escData[n - 1].data.settingsDirty = true;
             }
 
-            await writeConfig();
+            await writeConfig(savingOrApplyingSelectedEscs.value);
         }
 
         if (applyConfigFile.value) {
