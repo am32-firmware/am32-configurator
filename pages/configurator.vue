@@ -76,14 +76,15 @@
                   <SettingFieldGroup
                     class="w-1/2"
                     title="Essentials"
-                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
-                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :eeprom-version="layoutVersion"
+                    :firmware-version="firmwareVersion"
                     :cols="1"
                     :switches="[{
                       field: 'DISABLE_STICK_CALIBRATION',
                       name: 'Disable stick calibration',
                       minFirmwareVersion: 'v2.19'
                     }]"
+                    @change="onSettingsChange"
                   >
                     <SettingField
                       :esc-info="escStore.selectedEscInfo"
@@ -98,8 +99,8 @@
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     title="Motor"
-                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
-                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :eeprom-version="layoutVersion"
+                    :firmware-version="firmwareVersion"
                     :cols="3"
                     :switches="[{
                       field: 'STUCK_ROTOR_PROTECTION',
@@ -143,7 +144,7 @@
                     @change="onSettingsChange"
                   >
                     <SettingField
-                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                      v-if="isInEEpromVersion(layoutVersion, 3)"
                       :esc-info="escStore.selectedEscInfo"
                       field="TIMING_ADVANCE"
                       name="Timing advance"
@@ -222,7 +223,7 @@
                       name="PWM Frequency"
                       type="number"
                       :min="8"
-                      :max="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3) ? 144 : 48"
+                      :max="isInEEpromVersion(layoutVersion, 3) ? 144 : 48"
                       :step="1"
                       unit="kHz"
                       :disabled="(v: number) => (escStore.firstValidEscData?.data.settings.VARIABLE_PWM_FREQUENCY as number ?? 0) > 1"
@@ -239,7 +240,7 @@
                     </SettingField>
                   </SettingFieldGroup>
                   <SettingFieldGroup
-                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    v-if="isInEEpromVersion(layoutVersion, 3)"
                     title="Extended settings"
                     :cols="3"
                   >
@@ -273,7 +274,7 @@
                   <SettingFieldGroup
                     title="Limits"
                     :cols="3"
-                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :firmware-version="firmwareVersion"
                     :switches="[{
                       field: 'LOW_VOLTAGE_CUTOFF',
                       name: 'Low voltage cut off',
@@ -337,7 +338,7 @@
                       @change="onSettingsChange"
                     />
                     <SettingField
-                      v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)
+                      v-if="isInEEpromVersion(layoutVersion, 3)
                         && (escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) === 2"
                       :esc-info="escStore.selectedEscInfo"
                       field="ABSOLUTE_VOLTAGE_CUTOFF"
@@ -354,7 +355,7 @@
                     />
                   </SettingFieldGroup>
                   <SettingFieldGroup
-                    v-if="isInEEpromVersion(escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number, 3)"
+                    v-if="isInEEpromVersion(layoutVersion, 3)"
                     title="Current control"
                     :cols="3"
                     :class="{
@@ -427,8 +428,8 @@
                   <SettingFieldGroup
                     title="Brake"
                     :cols="3"
-                    :eeprom-version="escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number"
-                    :firmware-version="`${escStore.firstValidEscData?.data.settings.MAIN_REVISION}.${escStore.firstValidEscData?.data.settings.SUB_REVISION}`"
+                    :eeprom-version="layoutVersion"
+                    :firmware-version="firmwareVersion"
                     :switches="[{
                       field: 'BRAKE_ON_STOP',
                       name: 'Brake on stop',
@@ -565,6 +566,9 @@ const serialStore = useSerialStore();
 const escStore = useEscStore();
 
 const syncAllEscTunes = ref(false);
+
+const firmwareVersion = computed(() => `${escStore.firstValidEscData?.data.settings.MAIN_REVISION ?? '0'}.${escStore.firstValidEscData?.data.settings.SUB_REVISION ?? '0'}`);
+const layoutVersion = computed(() => escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number ?? 0);
 
 const onChange = (payload: { index: number, field: EepromLayoutKeys, value: boolean }) => {
     escStore.escData[payload.index].data.settingsDirty = escStore.escData[payload.index].data.settings[payload.field] !== (payload.value ? 1 : 0);
