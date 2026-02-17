@@ -52,7 +52,7 @@ am32-configurator/
 
 - **Indent**: 4 spaces (ESLint enforced)
 - **Semicolons**: always required
-- **Package manager**: Yarn 4.12 — do NOT use npm
+- **Package manager**: No strict convention. `yarn.lock` is committed and `package.json` declares `yarn@4.12.0`, but Netlify deploys with `bun run build`, Docker uses `yarn run build`. npm/pnpm/yarn/bun all work per Nuxt defaults.
 - **SSR disabled**: pure SPA (`ssr: false`), no server-side rendering for pages
 - **Auto-imports**: Nuxt auto-imports Vue APIs, composables, utils, stores
 - **Singletons**: `Serial`, `Msp`, `FourWay`, `Direct` — `export default new X()`
@@ -73,12 +73,16 @@ am32-configurator/
 ## COMMANDS
 
 ```bash
+# Any package manager works (npm/pnpm/yarn/bun)
+# Examples below use yarn (yarn.lock is committed), substitute as needed
 yarn dev          # Start dev server
 yarn build        # Production build
 yarn generate     # Static site generation
 yarn preview      # Preview production build
 yarn lint         # ESLint check
 yarn upload:files # Upload firmware files to MinIO
+# Netlify deploys with: bun run build
+# Docker builds with:  yarn run build
 ```
 
 ## NOTES
@@ -89,5 +93,5 @@ yarn upload:files # Upload firmware files to MinIO
 - MCU variants identified by 2-byte signature (e.g. `1F06` = STM32F051)
 - `Mcu.LAYOUT_SIZE = 0xB8` (184 bytes) — total EEPROM read size
 - `Mcu.RESET_DELAY_MS = 5000` — wait 5s for MCU reset after flash
-- Production: Netlify + Netlify Blobs. Alt: Docker + Redis + Traefik
+- Production: Netlify (builds with Bun) + Netlify Blobs. Alt: Docker + Redis + Traefik
 - PWA auto-update with 1h periodic sync
