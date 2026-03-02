@@ -587,11 +587,9 @@ const isInEEpromVersion = (escEeepromVersion: number, minVersion?: number, maxVe
 
 const tabs = computed(() => {
     const ret = [
-        { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' }
+        { label: 'Base', slot: 'settings', icon: 'i-material-symbols-settings' },
+        { label: 'Tune', slot: 'tune', icon: 'i-material-symbols-music-note' }
     ];
-    if (escStore.firstValidEscData?.data.settings && escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number < 3) {
-        ret.push({ label: 'Tune', slot: 'tune', icon: 'i-material-symbols-music-note' });
-    }
     return ret;
 });
 
