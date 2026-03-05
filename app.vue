@@ -35,7 +35,7 @@ onMounted(() => {
             icon: 'i-material-symbols-cloud-sync',
             color: 'green',
             title: 'Update',
-            description: 'Update avaiable, please reload.',
+            description: 'Update available, please reload.',
             timeout: 3,
             callback: () => {
                 window.location.reload();

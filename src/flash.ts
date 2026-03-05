@@ -75,7 +75,7 @@ class Flash {
         let nextAddress = 0;
 
         for (let i = 0; i < string.length; i += 1) {
-            // each byte is represnted by two chars
+            // each byte is represented by two chars
             const byteCount = parseInt(string[i].substr(1, 2), 16);
             const address = parseInt(string[i].substr(3, 4), 16);
             const recordType = parseInt(string[i].substr(7, 2), 16);

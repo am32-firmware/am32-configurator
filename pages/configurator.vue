@@ -436,7 +436,7 @@
                       maxFirmwareVersion: 'v2.18'
                     }, {
                       field: 'RC_CAR_REVERSING',
-                      name: 'Car type reverse breaking'
+                      name: 'Car type reverse braking'
                     }]"
                     :radios="[{
                       field: 'BRAKE_ON_STOP',

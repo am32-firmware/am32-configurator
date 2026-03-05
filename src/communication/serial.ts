@@ -95,20 +95,20 @@ class Serial {
                         console.log('Parsing MSP response of size ' + ret.length);
                         if (ret.length < 4) {
                             console.log('Too short');
-                            t = setTimeout(endStream, timeout); // to short to be reply
+                            t = setTimeout(endStream, timeout); // too short to be a reply
                         } else if ((ret.length === (ret[3] + 6)) && (ret[0] === 36) && (ret[1] === 77) && (ret[2] === 62)) {
                             console.log('Ending stream! All good.');
                             endStream();
                         } else {
                             console.log('Not yet complete');
-                            t = setTimeout(endStream, timeout); // to short to be reply
+                            t = setTimeout(endStream, timeout); // too short to be a reply
                         }
                     } else {
                         console.log('Parsing 4way response of size ' + ret.length);
 
                         if (ret.length < 7) {
                             console.log('Not enough data');
-                            t = setTimeout(endStream, timeout); // to short to be reply
+                            t = setTimeout(endStream, timeout); // too short to be a reply
                         } else {
                             let tmpLen = ret[4];
                             if (tmpLen === 0) { tmpLen = 256; }
@@ -116,7 +116,7 @@ class Serial {
                                 console.log('Ending stream, all All good!');
                                 endStream();
                             } else {
-                                t = setTimeout(endStream, timeout); // to short to be reply
+                                t = setTimeout(endStream, timeout); // too short to be a reply
                             }
                         }
                     }

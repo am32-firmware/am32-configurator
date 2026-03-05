@@ -133,7 +133,7 @@
               title="Alert!"
               variant="subtle"
               color="red"
-              description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some efford!"
+              description="If you flash a wrong mcu type, you will brick the mcu, recovering from this will take some effort!"
             />
             <UCheckbox
               v-model="includePrerelease"
@@ -425,7 +425,7 @@ const includePrerelease = ref(false);
 const savingOrApplyingSelectedEscs = ref<number[]>([]);
 const isFlashingActive = computed(() => escStore.activeTarget > -1);
 
-const progressIsIntermediate = computed(() => !['Writing', 'Verifing'].includes(escStore.step));
+const progressIsIntermediate = computed(() => !['Writing', 'Verifying'].includes(escStore.step));
 
 const { data, status } = useAsyncData('get-releases', () => useFetch(`/api/files?filter=releases${includePrerelease.value ? '&prereleases' : ''}`), {
     watch: [includePrerelease]

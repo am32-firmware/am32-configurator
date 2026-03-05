@@ -97,7 +97,7 @@
         <div v-if="mcu?.settingsBuffer[0] === 0x00" class="flex items-center justify-center gap-4">
           <UIcon name="i-heroicons-exclamation-triangle-16-solid" class="w-10 h-10 text-red-700" /> 
           <div class="text-red-700 font-bold">
-            <p>Flash was unsuccessfull.</p>
+            <p>Flash was unsuccessful.</p>
             <p>Reflash firmware to fix</p>
           </div>
         </div>

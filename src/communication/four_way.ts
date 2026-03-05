@@ -397,7 +397,7 @@ export class FourWay {
                     }
                     */
 
-                    this.log('Successful wrote settings to ESC #' + (target + 1));
+                    this.log('Successfully wrote settings to ESC #' + (target + 1));
                 }
             }
 
@@ -440,12 +440,12 @@ export class FourWay {
 
                     await this.writePages(0x04, 0x40, pageSize, flash, timeout);
                     /* try {
-                        escStore.step = 'Verifing';
+                        escStore.step = 'Verifying';
                         await delay(200);
                         // await this.verifyPages(0x04, 0x40, pageSize, flash);
                     } catch (error) {
                         try {
-                            escStore.step = 'Verifing';
+                            escStore.step = 'Verifying';
                             await delay(200);
                             await this.verifyPages(0x04, 0x40, pageSize, flash);
                         } catch (error) {

@@ -50,7 +50,7 @@ export const useSerialStore = defineStore('serial', () => {
         if (deviceHandles.value.port?.readable) {
             deviceHandles.value.reader = deviceHandles.value.port.readable.getReader();
         } else {
-            throw new Error('port or read stream not avaiable');
+            throw new Error('port or read stream not available');
         }
         return deviceHandles.value.reader;
     };
