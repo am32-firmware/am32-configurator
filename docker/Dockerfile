@@ -1,17 +1,20 @@
-FROM node:22-alpine AS base
+FROM node:22-bookworm AS base
 WORKDIR /usr/src/app
 
 FROM base AS prerelease
 WORKDIR /usr/src/app
 COPY . .
 
+ARG DATABASE_URL
+ENV CI='true'
+ENV YARN_ENABLE_INLINE_BUILDS='true'
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
-ENV DATABASE_URL="mysql://am32:am32password@mariadb:3306/am32"
+ENV DATABASE_URL="${DATABASE_URL:-mysql://am32:am32password@mariadb:3306/am32}"
 RUN corepack enable && yarn set version berry
 RUN npm -g i tsx
 RUN yarn --immutable
-RUN yarn run build
+RUN yarn run build 
 RUN yarn prisma:generate
 
 USER node
