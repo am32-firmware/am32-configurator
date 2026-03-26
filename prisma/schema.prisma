@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+  compilerBuild = "fast"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Sponsor {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  name      String    @db.VarChar(255)
+  image     String    @db.Text
+  url       String    @db.Text
+  class     String    @default("") @db.VarChar(255)
+  hideAfter DateTime? @map("hide_after")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([hideAfter])
+  @@map("sponsors")
+}
+
+model Session {
+  token     String   @id @db.VarChar(36)
+  username  String   @db.VarChar(255)
+  expiresAt BigInt   @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  username  String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  email     String?  @unique @db.VarChar(255)
+  role      String   @default("user") @db.VarChar(50)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([username])
+  @@index([role])
+  @@map("users")
+}

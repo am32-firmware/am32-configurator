@@ -13,6 +13,15 @@ export default defineNuxtConfig({
         typeCheck: true
     },
 
+    nitro: {
+        storage: {
+            uploads: {
+                driver: 'fs',
+                base: './public/uploads'
+            }
+        }
+    },
+
     ssr: false,
 
     runtimeConfig: {
@@ -20,6 +29,13 @@ export default defineNuxtConfig({
             host: process.env.REDIS_HOST,
             port: 6379
             /* other redis connector options */
+        },
+        mariadb: {
+            host: process.env.MYSQL_HOST || 'mariadb',
+            port: parseInt(process.env.MYSQL_PORT || '3306'),
+            user: process.env.MYSQL_USER || 'am32',
+            password: process.env.MYSQL_PASSWORD || 'am32password',
+            database: process.env.MYSQL_DATABASE || 'am32'
         }
     },
 

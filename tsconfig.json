@@ -5,6 +5,8 @@
     "module": "ES2022",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
     "types": [
       "@types/w3c-web-serial"
     ]

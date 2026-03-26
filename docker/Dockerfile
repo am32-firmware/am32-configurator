@@ -1,4 +1,4 @@
-FROM node:lts AS base
+FROM node:22-alpine AS base
 WORKDIR /usr/src/app
 
 FROM base AS prerelease
@@ -7,16 +7,16 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
+ENV DATABASE_URL="mysql://am32:am32password@mariadb:3306/am32"
 RUN corepack enable && yarn set version berry
-RUN yarn install
+RUN npm -g i tsx
+RUN yarn --immutable
 RUN yarn run build
-
-FROM base AS release
-COPY --chown=node:node --from=prerelease /usr/src/app/node_modules node_modules
-COPY --chown=node:node --from=prerelease /usr/src/app/.output .
+RUN yarn prisma:generate
 
 USER node
 ENV HOST=0.0.0.0
 ENV REDIS_HOST=cache
 EXPOSE 3000
-ENTRYPOINT [ "node", "server/index.mjs" ]
+
+ENTRYPOINT [ "node", ".output/server/index.mjs" ]

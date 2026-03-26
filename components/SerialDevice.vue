@@ -974,8 +974,6 @@ const startFlash = async (hexString: string) => {
                 parsed.bytes = filled.length + 32;
             }
 
-            debugger;
-
             escStore.totalBytes = parsed.bytes;
             escStore.step = 'Writing';
 
@@ -1001,6 +999,7 @@ const startFlash = async (hexString: string) => {
             await writeConfig();
             escStore.step = 'Resetting';
             await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_Reset, 0);
+            await delay(3000);
             escStore.step = 'Read config';
             await Direct.getInstance().init();
 

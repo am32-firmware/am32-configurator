@@ -37,7 +37,7 @@
           </div>
         </div>
         <div class="text-center min-w-[200px]">
-          v0.1.2
+          v0.1.3
         </div>
       </div>
     </div>

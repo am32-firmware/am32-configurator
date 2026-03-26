@@ -11,9 +11,14 @@ services:
       - traefik.http.services.${PREFIX:-}configurator.loadbalancer.server.port=3000
     pull_policy: build
     env_file: stack.env
+    volumes:
+      - uploads:/usr/src/app/public/uploads
     networks:
       - proxy
       - redis-net
+      - mariadb-net
+    depends_on:
+      - mariadb
   redisinsight:
     image: redis/redisinsight:latest
     volumes:
@@ -28,12 +33,37 @@ services:
       - cache:/data
     ports:
       - 6379:6379
+  mariadb:
+    image: mariadb:11
+    container_name: ${PREFIX:-}mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-am32}
+      MYSQL_USER: ${MYSQL_USER:-am32}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-am32password}
+    volumes:
+      - mariadb:/var/lib/mysql
+    networks:
+      - mariadb-net
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 networks:
   conf:
   redis-net:
     external: true
   proxy:
     external: true
+  mariadb-net:
+    driver: bridge
 volumes:
   cache:
   redisinsight:
+  mariadb:
+  uploads:
