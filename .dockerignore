@@ -15,3 +15,4 @@ helm-charts
 coverage*
 .output
 public/uploads
+.nuxt
