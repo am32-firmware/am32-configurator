@@ -96,6 +96,30 @@
               </UAccordion>
             </div>
           </template>
+          <template #unlocker_data>
+            <div v-if="getFolder('unlocker').value" class="p-4">
+              <UAccordion color="teal" :items="getChildrenFolder(getFolder('unlocker').value)" variant="outline" size="sm">
+                <template #files="{ item }">
+                  <div class="grid grid-cols-4">
+                    <div v-for="file of item.files" :key="file" class="py-1">
+                      <ULink
+                        :to="file.url"
+                        external
+                        :download="file.name"
+                        class="transition-all hover:text-red-500"
+                        :class="{
+                          'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
+                          'text-red-500': filter && file.name.toLowerCase().includes(filter.toLowerCase())
+                        }"
+                      >
+                        {{ file.name }}
+                      </ULink>
+                    </div>
+                  </div>
+                </template>
+              </UAccordion>
+            </div>
+          </template>
         </UAccordion>
       </div>
     </div>
@@ -133,7 +157,7 @@ const getChildrenFolder = (folder?: BlobFolder | null) => {
         .map(f => ({
             label: f.name,
             slot: 'files',
-            files: f.files.filter(f => f.name.toLowerCase().endsWith('.hex'))
+            files: f.files.filter(f => f.name.toLowerCase())
         }))
         .sort((a, b) => b.label.localeCompare(a.label)) ?? [];
 };

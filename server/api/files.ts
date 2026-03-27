@@ -11,8 +11,9 @@ export default defineEventHandler(async (event) => {
     const toolsCache = useStorage('tools');
     const releasesCache = useStorage('releases');
     const bootloadersCache = useStorage('bootloaders');
+    const unlockerCache = useStorage('unlocker');
 
-    const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader', 'tools'];
+    const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader', 'tools', 'unlocker'];
     const includePrereleases = query.prereleases !== undefined;
 
     const minioClient = useMinio();
@@ -173,7 +174,83 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    if (filter.includes('bootloader')) {
+    if (filter.includes('unlocker')) {
+        const unlockerStream = minioClient.listObjectsV2('unlocker', '', true, '');
+
+        const getUnlocker = (): Promise<{
+            key: string,
+            value: string | null
+        }[]> => new Promise((resolve) => {
+            unlockerStream.on('data', async (obj) => {
+                console.log(obj);
+                if (obj.name) {
+                    if (!(await unlockerCache.hasItem(`unlocker:${obj.name}`))) {
+                        const url = await minioClient.presignedUrl('get', 'unlocker', obj.name, 24 * 60 * 60);
+                        await unlockerCache.setItem(
+                            `unlocker:${obj.name}`,
+                            `${url}`,
+                            {
+                                ttl: (24 * 60 * 60) - 1
+                            }
+                        );
+                    }
+                }
+            });
+
+            unlockerStream.on('end', async () => {
+                await delay(200);
+                const keys = await unlockerCache.getKeys('unlocker');
+                const result: {
+                    key: string,
+                    value: string | null
+                }[] = [];
+                for (const key of keys) {
+                    result.push({
+                        key,
+                        value: (await unlockerCache.getItem(key))?.toString() ?? ''
+                    });
+                }
+                resolve(result);
+            });
+        });
+
+        const unlocker = await getUnlocker();
+        console.log(unlocker);
+        const unlockerFolder = {
+            name: 'unlocker',
+            children: [] as BlobFolder[],
+            files: [] as BlobFolderFile[]
+        };
+
+        folders.push(unlockerFolder);
+
+        for (const u of unlocker) {
+            const [, fileOrVersion, ...subParts] = u.key.split(':').filter(Boolean);
+
+            if (subParts.length > 0) {
+                let subfolder = unlockerFolder.children.find(sf => sf.name === fileOrVersion);
+                if (!subfolder) {
+                    subfolder = {
+                        name: fileOrVersion,
+                        files: [],
+                        children: []
+                    };
+                    unlockerFolder.children.push(subfolder);
+                }
+                subfolder.files.push({
+                    name: subParts[0],
+                    url: u.value ?? ''
+                });
+            } else {
+                unlockerFolder.files.push({
+                    name: fileOrVersion,
+                    url: u.value ?? ''
+                });
+            }
+        }
+    }
+
+    if (filter.includes('tools')) {
         const toolsStream = minioClient.listObjectsV2('am32-tools', '', true, '');
 
         const getTools = (): Promise<{
