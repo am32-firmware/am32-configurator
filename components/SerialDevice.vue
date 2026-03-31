@@ -396,7 +396,6 @@ import commandsQueue from '~/src/communication/commands.queue';
 import { DIRECT_COMMANDS, Direct } from '~/src/communication/direct';
 import { FOUR_WAY_COMMANDS, FourWay } from '~/src/communication/four_way';
 import Msp, { MSP_COMMANDS } from '~/src/communication/msp';
-import serial from '~/src/communication/serial';
 import Serial from '~/src/communication/serial';
 import db from '~/src/db';
 import Flash from '~/src/flash';

@@ -1,303 +1,191 @@
 import { promiseTimeout } from '@vueuse/core';
 import { useMinio } from '~/composables/useMinio';
 
+type CachedObject = {
+    key: string,
+    value: string | null
+};
+
+type SectionConfig = {
+    filterName: string,
+    folderName: string,
+    bucketName: string,
+    cacheNamespace: string,
+    storageName: string,
+    nested: boolean,
+    includePrereleaseFilter?: boolean
+};
+
 function delay (ms: number) {
     return promiseTimeout(ms);
 }
 
+async function getCachedObjects (
+    minioClient: ReturnType<typeof useMinio>,
+    cache: ReturnType<typeof useStorage>,
+    bucketName: string,
+    cacheNamespace: string
+): Promise<CachedObject[]> {
+    const stream = minioClient.listObjectsV2(bucketName, '', true, '');
+
+    return await new Promise((resolve) => {
+        stream.on('data', async (obj) => {
+            if (obj.name && !(await cache.hasItem(`${cacheNamespace}:${obj.name}`))) {
+                const url = await minioClient.presignedUrl('get', bucketName, obj.name, 24 * 60 * 60);
+                await cache.setItem(
+                    `${cacheNamespace}:${obj.name}`,
+                    `${url}`,
+                    {
+                        ttl: (24 * 60 * 60) - 1
+                    }
+                );
+            }
+        });
+
+        stream.on('end', async () => {
+            await delay(200);
+            const keys = await cache.getKeys(cacheNamespace);
+            const result: CachedObject[] = [];
+
+            for (const key of keys) {
+                result.push({
+                    key,
+                    value: (await cache.getItem(key))?.toString() ?? ''
+                });
+            }
+
+            resolve(result);
+        });
+    });
+}
+
+function buildNestedFolder (
+    folderName: string,
+    entries: CachedObject[],
+    includePrereleases = true
+) {
+    const folder = {
+        name: folderName,
+        children: [] as BlobFolder[],
+        files: [] as BlobFolderFile[]
+    };
+
+    for (const entry of entries) {
+        const [, fileOrVersion, ...subParts] = entry.key.split(':').filter(Boolean);
+
+        if (!fileOrVersion) {
+            continue;
+        }
+
+        if (!includePrereleases && fileOrVersion.endsWith('-rc')) {
+            continue;
+        }
+
+        if (subParts.length > 0) {
+            let subfolder = folder.children.find(sf => sf.name === fileOrVersion);
+
+            if (!subfolder) {
+                subfolder = {
+                    name: fileOrVersion,
+                    files: [],
+                    children: []
+                };
+                folder.children.push(subfolder);
+            }
+
+            subfolder.files.push({
+                name: subParts.join('/'),
+                url: entry.value ?? ''
+            });
+        } else {
+            folder.files.push({
+                name: fileOrVersion,
+                url: entry.value ?? ''
+            });
+        }
+    }
+
+    return folder;
+}
+
+function buildFlatFolder (folderName: string, entries: CachedObject[]) {
+    return {
+        name: folderName,
+        children: [] as BlobFolder[],
+        files: entries.filter(entry => entry.value).map(entry => ({
+            name: entry.key.split(':').pop() ?? entry.key,
+            url: entry.value ?? ''
+        }))
+    };
+}
+
 export default defineEventHandler(async (event) => {
     const query = getQuery(event);
-
-    const toolsCache = useStorage('tools');
-    const releasesCache = useStorage('releases');
-    const bootloadersCache = useStorage('bootloaders');
-    const unlockerCache = useStorage('unlocker');
-
-    const filter = query.filter?.toString().split(',') ?? ['releases', 'bootloader', 'tools', 'unlocker'];
     const includePrereleases = query.prereleases !== undefined;
+    const filter = query.filter?.toString().split(',') ?? ['releases', 'kiss-ultra-releases', 'bootloader', 'tools', 'unlocker'];
+
+    const sectionConfigs: SectionConfig[] = [
+        {
+            filterName: 'releases',
+            folderName: 'releases',
+            bucketName: 'releases',
+            cacheNamespace: 'releases',
+            storageName: 'releases',
+            nested: true,
+            includePrereleaseFilter: true
+        },
+        {
+            filterName: 'kiss-ultra-releases',
+            folderName: 'kiss-ultra-releases',
+            bucketName: 'kiss-ultra-releases',
+            cacheNamespace: 'kiss-ultra-releases',
+            storageName: 'kiss-ultra-releases',
+            nested: true
+        },
+        {
+            filterName: 'bootloader',
+            folderName: 'bootloader',
+            bucketName: 'bootloaders',
+            cacheNamespace: 'bootloaders',
+            storageName: 'bootloaders',
+            nested: true
+        },
+        {
+            filterName: 'tools',
+            folderName: 'tools',
+            bucketName: 'am32-tools',
+            cacheNamespace: 'tools',
+            storageName: 'tools',
+            nested: false
+        },
+        {
+            filterName: 'unlocker',
+            folderName: 'unlocker',
+            bucketName: 'unlocker',
+            cacheNamespace: 'unlocker',
+            storageName: 'unlocker',
+            nested: true
+        }
+    ];
 
     const minioClient = useMinio();
-
     const folders: BlobFolder[] = [];
 
-    if (filter.includes('releases')) {
-        const releasesStream = minioClient.listObjectsV2('releases', '', true, '');
-
-        const getReleases = (): Promise<{
-            key: string,
-            value: string | null
-        }[]> => new Promise((resolve) => {
-            releasesStream.on('data', async (obj) => {
-                if (obj.name) {
-                    if (!(await releasesCache.hasItem(`releases:${obj.name}`))) {
-                        const url = await minioClient.presignedUrl('get', 'releases', obj.name, 24 * 60 * 60);
-                        await releasesCache.setItem(
-                            `releases:${obj.name}`,
-                            `${url}`,
-                            {
-                                ttl: (24 * 60 * 60) - 1
-                            }
-                        );
-                    }
-                }
-            });
-
-            releasesStream.on('end', async () => {
-                await delay(200);
-                const keys = await releasesCache.getKeys('releases');
-                const result: {
-                    key: string,
-                    value: string | null
-                }[] = [];
-                for (const key of keys) {
-                    result.push({
-                        key,
-                        value: (await releasesCache.getItem(key))?.toString() ?? ''
-                    });
-                }
-                resolve(result);
-            });
-        });
-
-        const releases = await getReleases();
-
-        const releasesFolder = {
-            name: 'releases',
-            children: [] as BlobFolder[],
-            files: [] as BlobFolderFile[]
-        };
-
-        folders.push(releasesFolder);
-
-        for (const release of releases) {
-            const [, fileOrVersion, ...subParts] = release.key.split(':').filter(Boolean);
-            if (
-                includePrereleases ||
-                !fileOrVersion.endsWith('-rc')
-            ) {
-                if (subParts.length > 0) {
-                    let subfolder = releasesFolder.children.find(sf => sf.name === fileOrVersion);
-                    if (!subfolder) {
-                        subfolder = {
-                            name: fileOrVersion,
-                            files: [],
-                            children: []
-                        };
-                        releasesFolder.children.push(subfolder);
-                    }
-                    subfolder.files.push({
-                        name: subParts[0],
-                        url: release.value ?? ''
-                    });
-                } else {
-                    releasesFolder.files.push({
-                        name: fileOrVersion,
-                        url: release.value ?? ''
-                    });
-                }
-            }
+    for (const section of sectionConfigs) {
+        if (!filter.includes(section.filterName)) {
+            continue;
         }
-    }
 
-    if (filter.includes('bootloader')) {
-        const bootloadersStream = minioClient.listObjectsV2('bootloaders', '', true, '');
+        const cache = useStorage(section.storageName);
+        const entries = await getCachedObjects(minioClient, cache, section.bucketName, section.cacheNamespace);
 
-        const getBootloaders = (): Promise<{
-            key: string,
-            value: string | null
-        }[]> => new Promise((resolve) => {
-            bootloadersStream.on('data', async (obj) => {
-                if (obj.name) {
-                    if (!(await bootloadersCache.hasItem(`bootloaders:${obj.name}`))) {
-                        const url = await minioClient.presignedUrl('get', 'bootloaders', obj.name, 24 * 60 * 60);
-                        await bootloadersCache.setItem(
-                            `bootloaders:${obj.name}`,
-                            `${url}`,
-                            {
-                                ttl: (24 * 60 * 60) - 1
-                            }
-                        );
-                    }
-                }
-            });
-
-            bootloadersStream.on('end', async () => {
-                await delay(200);
-                const keys = await bootloadersCache.getKeys('bootloaders');
-                const result: {
-                    key: string,
-                    value: string | null
-                }[] = [];
-                for (const key of keys) {
-                    result.push({
-                        key,
-                        value: (await bootloadersCache.getItem(key))?.toString() ?? ''
-                    });
-                }
-                resolve(result);
-            });
-        });
-
-        const bootloaders = await getBootloaders();
-
-        const bootloadersFolder = {
-            name: 'bootloader',
-            children: [] as BlobFolder[],
-            files: [] as BlobFolderFile[]
-        };
-
-        folders.push(bootloadersFolder);
-
-        for (const bootloader of bootloaders) {
-            const [, fileOrVersion, ...subParts] = bootloader.key.split(':').filter(Boolean);
-
-            if (subParts.length > 0) {
-                let subfolder = bootloadersFolder.children.find(sf => sf.name === fileOrVersion);
-                if (!subfolder) {
-                    subfolder = {
-                        name: fileOrVersion,
-                        files: [],
-                        children: []
-                    };
-                    bootloadersFolder.children.push(subfolder);
-                }
-                subfolder.files.push({
-                    name: subParts[0],
-                    url: bootloader.value ?? ''
-                });
-            } else {
-                bootloadersFolder.files.push({
-                    name: fileOrVersion,
-                    url: bootloader.value ?? ''
-                });
-            }
-        }
-    }
-
-    if (filter.includes('unlocker')) {
-        const unlockerStream = minioClient.listObjectsV2('unlocker', '', true, '');
-
-        const getUnlocker = (): Promise<{
-            key: string,
-            value: string | null
-        }[]> => new Promise((resolve) => {
-            unlockerStream.on('data', async (obj) => {
-                console.log(obj);
-                if (obj.name) {
-                    if (!(await unlockerCache.hasItem(`unlocker:${obj.name}`))) {
-                        const url = await minioClient.presignedUrl('get', 'unlocker', obj.name, 24 * 60 * 60);
-                        await unlockerCache.setItem(
-                            `unlocker:${obj.name}`,
-                            `${url}`,
-                            {
-                                ttl: (24 * 60 * 60) - 1
-                            }
-                        );
-                    }
-                }
-            });
-
-            unlockerStream.on('end', async () => {
-                await delay(200);
-                const keys = await unlockerCache.getKeys('unlocker');
-                const result: {
-                    key: string,
-                    value: string | null
-                }[] = [];
-                for (const key of keys) {
-                    result.push({
-                        key,
-                        value: (await unlockerCache.getItem(key))?.toString() ?? ''
-                    });
-                }
-                resolve(result);
-            });
-        });
-
-        const unlocker = await getUnlocker();
-        console.log(unlocker);
-        const unlockerFolder = {
-            name: 'unlocker',
-            children: [] as BlobFolder[],
-            files: [] as BlobFolderFile[]
-        };
-
-        folders.push(unlockerFolder);
-
-        for (const u of unlocker) {
-            const [, fileOrVersion, ...subParts] = u.key.split(':').filter(Boolean);
-
-            if (subParts.length > 0) {
-                let subfolder = unlockerFolder.children.find(sf => sf.name === fileOrVersion);
-                if (!subfolder) {
-                    subfolder = {
-                        name: fileOrVersion,
-                        files: [],
-                        children: []
-                    };
-                    unlockerFolder.children.push(subfolder);
-                }
-                subfolder.files.push({
-                    name: subParts[0],
-                    url: u.value ?? ''
-                });
-            } else {
-                unlockerFolder.files.push({
-                    name: fileOrVersion,
-                    url: u.value ?? ''
-                });
-            }
-        }
-    }
-
-    if (filter.includes('tools')) {
-        const toolsStream = minioClient.listObjectsV2('am32-tools', '', true, '');
-
-        const getTools = (): Promise<{
-            key: string,
-            value: string | null
-        }[]> => new Promise((resolve) => {
-            toolsStream.on('data', async (obj) => {
-                if (obj.name) {
-                    if (!(await toolsCache.hasItem(`tools:${obj.name}`))) {
-                        const url = await minioClient.presignedUrl('get', 'am32-tools', obj.name, 24 * 60 * 60);
-                        await toolsCache.setItem(
-                            `tools:${obj.name}`,
-                            `${url}`,
-                            {
-                                ttl: (24 * 60 * 60) - 1
-                            }
-                        );
-                    }
-                }
-            });
-
-            toolsStream.on('end', async () => {
-                await delay(200);
-                const keys = await toolsCache.getKeys('tools');
-                const result: {
-                    key: string,
-                    value: string | null
-                }[] = [];
-                for (const key of keys) {
-                    result.push({
-                        key,
-                        value: (await toolsCache.getItem(key))?.toString() ?? ''
-                    });
-                }
-                resolve(result);
-            });
-        });
-
-        const tools = await getTools();
-        folders.push({
-            name: 'tools',
-            children: [],
-            files: tools.filter(t => t.value).map(t => ({
-                name: t.key.split(':').pop() ?? t.key,
-                url: t.value ?? ''
-            }))
-        });
+        folders.push(section.nested
+            ? buildNestedFolder(
+                section.folderName,
+                entries,
+                section.includePrereleaseFilter ? includePrereleases : true
+            )
+            : buildFlatFolder(section.folderName, entries));
     }
 
     return {

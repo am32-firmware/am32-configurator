@@ -179,7 +179,7 @@ export type SponsorGroupByOutputType = {
   _max: SponsorMaxAggregateOutputType | null
 }
 
-type GetSponsorGroupByPayload<T extends SponsorGroupByArgs> = Prisma.PrismaPromise<
+export type GetSponsorGroupByPayload<T extends SponsorGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SponsorGroupByOutputType, T['by']> &
       {

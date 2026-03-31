@@ -17,8 +17,8 @@ import type * as Prisma from "./prismaNamespace"
 
 const config: runtime.GetPrismaClientConfig = {
   "previewFeatures": [],
-  "clientVersion": "7.5.0",
-  "engineVersion": "280c870be64f457428992c43c1f6d557fab6e29e",
+  "clientVersion": "7.6.0",
+  "engineVersion": "75cbdc1eb7150937890ad5465d861175c6624711",
   "activeProvider": "mysql",
   "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\ngenerator client {\n  provider      = \"prisma-client\"\n  output        = \"./generated\"\n  compilerBuild = \"fast\"\n}\n\ndatasource db {\n  provider = \"mysql\"\n}\n\nmodel Sponsor {\n  id        String    @id @default(uuid()) @db.VarChar(36)\n  name      String    @db.VarChar(255)\n  image     String    @db.Text\n  url       String    @db.Text\n  class     String    @default(\"\") @db.VarChar(255)\n  hideAfter DateTime? @map(\"hide_after\")\n  createdAt DateTime  @default(now()) @map(\"created_at\")\n  updatedAt DateTime  @updatedAt @map(\"updated_at\")\n\n  @@index([hideAfter])\n  @@map(\"sponsors\")\n}\n\nmodel Session {\n  token     String   @id @db.VarChar(36)\n  username  String   @db.VarChar(255)\n  expiresAt BigInt   @map(\"expires_at\")\n  createdAt DateTime @default(now()) @map(\"created_at\")\n\n  @@index([expiresAt])\n  @@map(\"sessions\")\n}\n\nmodel User {\n  id        String   @id @default(uuid()) @db.VarChar(36)\n  username  String   @unique @db.VarChar(255)\n  password  String   @db.VarChar(255)\n  email     String?  @unique @db.VarChar(255)\n  role      String   @default(\"user\") @db.VarChar(50)\n  active    Boolean  @default(true)\n  createdAt DateTime @default(now()) @map(\"created_at\")\n  updatedAt DateTime @updatedAt @map(\"updated_at\")\n\n  @@index([username])\n  @@index([role])\n  @@map(\"users\")\n}\n",
   "runtimeDataModel": {
