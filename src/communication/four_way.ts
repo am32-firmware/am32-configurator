@@ -146,7 +146,7 @@ export class FourWay {
         const eepromOffset = mcu.getEepromOffset();
 
         try {
-            const fileNameRead = await this.readAddress(eepromOffset - 32, 32);
+            const fileNameRead = await this.readAddress(mcu.toWireAddress(eepromOffset - 32), 32);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -161,7 +161,7 @@ export class FourWay {
 
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
-            const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
+            const settingsArray = (await this.readAddress(mcu.toWireAddress(eepromOffset), mcu.getInfo().layoutSize))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
@@ -352,8 +352,10 @@ export class FourWay {
    * @param {number} end
    * @param {number} pageSize
    * @param {Uint8Array} data
+   * @param {number} timeout
+   * @param {number} addressShift - right-shift for wire addresses (2 for 128K flash)
    */
-    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array, timeout: number) {
+    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array, timeout: number, addressShift = 0) {
         const beginAddress = begin * pageSize;
         const endAddress = end * pageSize;
         const step = 0x100;
@@ -361,7 +363,7 @@ export class FourWay {
 
         for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
             await this.write(
-                address,
+                address >> addressShift,
                 data.subarray(address, Math.min(address + step, data.length)),
                 timeout
             );
@@ -384,11 +386,12 @@ export class FourWay {
             } else {
                 const info = Flash.getInfo(flash!);
                 const mcu = new Mcu(info.meta.signature);
+                const wireEepromOffset = mcu.toWireAddress(mcu.getEepromOffset());
 
                 let readbackSettings = null;
 
-                await this.write(mcu.getEepromOffset(), newSettingsArray);
-                readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
+                await this.write(wireEepromOffset, newSettingsArray);
+                readbackSettings = (await this.readAddress(wireEepromOffset, Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
                     /*
@@ -414,18 +417,32 @@ export class FourWay {
             const initFlash = await this.initFlash(target, 3);
             const info = Flash.getInfo(initFlash!);
             const mcu = new Mcu(info.meta.signature);
+
+            // Populate MCU info from ESC store so CAN firmware can be detected
+            const escInfo = escStore.escData[target]?.data;
+            if (escInfo) {
+                mcu.setInfo(escInfo);
+            }
+
             const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
             const flash = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
             if (flash) {
                 const eepromOffset = mcu.getEepromOffset();
+                const wireEepromOffset = mcu.toWireAddress(eepromOffset);
                 const pageSize = mcu.getPageSize();
-                const firmwareStart = mcu.getFirmwareStart();
+                const addressShift = mcu.getAddressShift();
+
+                // Detect firmware start from the hex file's first data address
+                const hexFirmwareStart = parsed.data[0].address - mcu.getFlashOffset();
+                const firmwareStart = hexFirmwareStart > 0 ? hexFirmwareStart : mcu.getFirmwareStart();
+                const beginPage = firmwareStart / pageSize;
+                const endPage = mcu.getFlashSize() / pageSize;
 
                 escStore.totalBytes = flash.byteLength - firmwareStart;
                 escStore.bytesWritten = 0;
                 escStore.step = 'Writing';
 
-                const message = await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
+                const message = await this.readAddress(wireEepromOffset, Mcu.LAYOUT_SIZE);
                 if (message) {
                     const originalSettings = message.params;
 
@@ -436,9 +453,9 @@ export class FourWay {
                     originalSettings.fill(0x00, 3, 5);
                     originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
                     */
-                    await this.write(eepromOffset, originalSettings, timeout);
+                    await this.write(wireEepromOffset, originalSettings, timeout);
 
-                    await this.writePages(0x04, 0x40, pageSize, flash, timeout);
+                    await this.writePages(beginPage, endPage, pageSize, flash, timeout, addressShift);
                     /* try {
                         escStore.step = 'Verifying';
                         await delay(200);
@@ -459,7 +476,7 @@ export class FourWay {
 
                     // boot bit
                     originalSettings[0] = 0x01;
-                    await this.write(eepromOffset, originalSettings);
+                    await this.write(wireEepromOffset, originalSettings);
                 }
             }
         }
@@ -472,8 +489,9 @@ export class FourWay {
    * @param {number} end
    * @param {number} pageSize
    * @param {Uint8Array} data
+   * @param {number} addressShift - right-shift for wire addresses (2 for 128K flash)
    */
-    async verifyPages (begin: number, end: number, pageSize: number, data: Uint8Array) {
+    async verifyPages (begin: number, end: number, pageSize: number, data: Uint8Array, addressShift = 0) {
         const beginAddress = begin * pageSize;
         const endAddress = end * pageSize;
         const step = 0x80;
@@ -481,7 +499,7 @@ export class FourWay {
         const escStore = useEscStore();
 
         for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
-            const message = await this.readAddress(address, Math.min(step, data.length - address), 10, 100);
+            const message = await this.readAddress(address >> addressShift, Math.min(step, data.length - address), 10, 100);
             if (message) {
                 const reference = data.subarray(message.address, message.address + message.params.byteLength);
 

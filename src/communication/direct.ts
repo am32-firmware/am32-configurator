@@ -112,9 +112,10 @@ export class Direct {
             mcu.setInfo(info);
 
             const eepromOffset = mcu.getEepromOffset();
+            const addressShift = mcu.getAddressShift();
 
             try {
-                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset - 32);
+                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.toWireAddress(eepromOffset - 32));
                 if (fileNameAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                     await delay(200);
 
@@ -134,7 +135,7 @@ export class Direct {
 
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
-                    const settingsArray = await this.readChunked(eepromOffset, info.layoutSize);
+                    const settingsArray = await this.readChunked(eepromOffset, info.layoutSize, addressShift);
                     info.settings = bufferToSettings(settingsArray!, info.settings.LAYOUT_REVISION as number);
                     info.settingsBuffer = settingsArray!;
 
@@ -195,9 +196,9 @@ export class Direct {
         return serial.write(new Uint8Array(buffer).buffer).then(result => result?.subarray(buffer.length));
     }
 
-    async readChunked (address: number, expected: number, chunkSize = 64) {
+    async readChunked (address: number, expected: number, addressShift = 0, chunkSize = 64) {
         let response: Uint8Array = new Uint8Array();
-        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address >> addressShift);
         if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             if (expected > chunkSize) {
                 let currentLayoutSize = 0;
@@ -213,7 +214,7 @@ export class Direct {
 
                     currentLayoutSize += chunkSize;
 
-                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address + currentLayoutSize);
+                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, (address + currentLayoutSize) >> addressShift);
                     if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                         this.logError('Failed to set address');
                         throw new Error('Failed to set address');
@@ -228,8 +229,8 @@ export class Direct {
         return response;
     }
 
-    async writeChunked (address: number, payload: Uint8Array, chunkSize = 64) {
-        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+    async writeChunked (address: number, payload: Uint8Array, addressShift = 0, chunkSize = 64) {
+        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address >> addressShift);
         await delay(200);
         if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             if (payload.length > chunkSize) {
@@ -256,10 +257,10 @@ export class Direct {
         }
     }
 
-    async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {
+    async writeBufferToAddress (address: number, payload: Uint8Array, addressShift = 0, retries = 10) {
         let currentTry = 0;
         while (true) {
-            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address >> addressShift);
             if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                 if (currentTry++ === retries) {
                     throw new Error('setAddress failed');

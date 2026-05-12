@@ -8,6 +8,7 @@ export interface McuVariant {
     flash_offset: string;
     firmware_start: string;
     eeprom_offset: string;
+    address_shift?: number;
 }
 
 export interface McuInfo {
@@ -64,8 +65,20 @@ class Mcu {
                 flash_offset: '0x08000000',
                 firmware_start: '0x1000',
                 eeprom_offset: '0xF800'
+            },
+            '2B06': {
+                name: 'STM32G431',
+                signature: '0x2b06',
+                page_size: 2048,
+                flash_size: 131072,
+                flash_offset: '0x08000000',
+                firmware_start: '0x1000',
+                eeprom_offset: '0x1f800',
+                address_shift: 2
             }
         };
+
+    static CAN_FIRMWARE_START = '0x4000';
 
     static RESET_DELAY_MS = 5000;
     static LAYOUT_SIZE = 0xB8;
@@ -154,12 +167,43 @@ class Mcu {
     }
 
     /**
+     * Get address shift for 128K+ flash boards.
+     * The bootloader left-shifts wire addresses by this amount.
+     *
+     * @returns {number}
+     */
+    getAddressShift () {
+        return this.mcu.address_shift ?? 0;
+    }
+
+    /**
+     * Convert a physical flash offset to a wire address for the 4-way protocol.
+     * 128K flash boards use ADDRESS_SHIFT=2 in the bootloader.
+     *
+     * @param {number} physicalOffset
+     * @returns {number}
+     */
+    toWireAddress (physicalOffset: number) {
+        return physicalOffset >> this.getAddressShift();
+    }
+
+    /**
+     * Check if firmware is a DroneCAN build based on file name
+     */
+    isDroneCAN (): boolean {
+        return this.info?.meta.am32.fileName?.includes('CAN') ?? false;
+    }
+
+    /**
      * Get firmware start address
      *
      * @returns {number}
      */
     getFirmwareStart () {
         if (this.mcu.firmware_start) {
+            if (this.isDroneCAN()) {
+                return parseInt(Mcu.CAN_FIRMWARE_START, 16);
+            }
             return parseInt(this.mcu.firmware_start, 16);
         }
 
