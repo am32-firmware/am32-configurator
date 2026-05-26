@@ -444,13 +444,21 @@ export class FourWay {
         const escStore = useEscStore();
 
         for (let off = beginByte; off < endByte && off < data.length; off += step) {
-            await this.write(
-                mcu.toWireAddress(off),
-                data.subarray(off, Math.min(off + step, data.length)),
-                timeout
-            );
+            const chunkEnd = Math.min(off + step, data.length);
+            let chunk: Uint8Array = data.subarray(off, chunkEnd);
+            // STM32 G4 (and similar) flash programs in 8-byte doublewords, so
+            // the bootloader rejects a last chunk whose size isn't a multiple
+            // of 8 (ACK_D_GENERAL_ERROR). Pad with 0xFF up to the next 8-byte
+            // boundary — matches what the desktop client does.
+            if (chunk.byteLength % 8 !== 0) {
+                const padded = new Uint8Array((chunk.byteLength + 7) & ~7);
+                padded.fill(0xFF);
+                padded.set(chunk);
+                chunk = padded;
+            }
+            await this.write(mcu.toWireAddress(off), chunk, timeout);
 
-            escStore.bytesWritten += step;
+            escStore.bytesWritten += chunkEnd - off;
         }
     }
 
