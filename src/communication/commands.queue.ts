@@ -50,6 +50,18 @@ class CommandQueue {
         const logStore = useLogStore();
         const escStore = useEscStore();
 
+        const minBytes: Partial<Record<MSP_COMMANDS, number>> = {
+            [MSP_COMMANDS.MSP_API_VERSION]: 3,
+            [MSP_COMMANDS.MSP_BATTERY_STATE]: 8,
+            [MSP_COMMANDS.MSP_SET_PASSTHROUGH]: 1,
+            [MSP_COMMANDS.MSP_MOTOR_CONFIG]: 7
+        };
+        const required = minBytes[command];
+        if (required !== undefined && data.byteLength < required) {
+            logStore.logError(`${enumToString(command, MSP_COMMANDS)} response too short (${data.byteLength}/${required} bytes) - update FC firmware if outdated.`);
+            return;
+        }
+
         let offset = 0;
         const fcType = new TextDecoder().decode(data.buffer);
 
@@ -104,7 +116,7 @@ class CommandQueue {
             break;
         case MSP_COMMANDS.MSP_MOTOR:
             serialStore.mspData.motorCount = 0;
-            for (let i = 0; i < data.buffer.byteLength; i += 2) {
+            for (let i = 0; i + 1 < data.buffer.byteLength; i += 2) {
                 if (data.getUint16(i) > 0) {
                     serialStore.mspData.motorCount++;
                 }

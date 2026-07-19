@@ -97,6 +97,7 @@ export class Msp {
     getTypeMotorCommand (type: MspData['type']) {
         switch (type) {
         case 'inav':
+        case 'emuf':
             return MSP_COMMANDS.MSP_MOTOR;
         default:
             return MSP_COMMANDS.MSP_MOTOR_CONFIG;
