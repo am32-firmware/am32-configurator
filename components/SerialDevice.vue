@@ -950,7 +950,6 @@ const startFlash = async (hexString: string) => {
             escStore.activeTarget = 0;
             escStore.bytesWritten = 0;
 
-            let i = 0;
             if (parsed.bytes < 27 * 1024 - 1 + 32) {
                 const filled = new Uint8Array(27 * 1024 - 1).fill(0xFF);
                 let bytes32Index = -1;
@@ -993,18 +992,23 @@ const startFlash = async (hexString: string) => {
                 if (start.bytes === 0) {
                     continue;
                 }
-                i = 0;
                 logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
                 const CHUNK_SIZE = 64;
-                while (true) {
-                    logStore.log(`... 0x${((start.address - mcu.getFlashOffset()) + (i * CHUNK_SIZE)).toString(16)} - 0x${((start.address - mcu.getFlashOffset()) + ((i + 1) * CHUNK_SIZE) - 1).toString(16)}`);
-                    const chunk = new Uint8Array(start.data.slice(i * CHUNK_SIZE, ((i + 1) * CHUNK_SIZE > start.data.length ? start.data.length - 1 : (i + 1) * CHUNK_SIZE)));
-                    await Direct.getInstance().writeBufferToAddress((start.address - mcu.getFlashOffset()) + (i * CHUNK_SIZE), chunk);
-                    escStore.bytesWritten += CHUNK_SIZE;
-                    i += 1;
-                    if ((i + 1) * CHUNK_SIZE > start.data.length) {
-                        break;
+                for (let offset = 0; offset < start.data.length; offset += CHUNK_SIZE) {
+                    const wireAddress = (start.address - mcu.getFlashOffset()) + offset;
+                    const end = Math.min(offset + CHUNK_SIZE, start.data.length);
+                    logStore.log(`... 0x${wireAddress.toString(16)} - 0x${(wireAddress + (end - offset) - 1).toString(16)}`);
+                    let chunk = new Uint8Array(start.data.slice(offset, end));
+                    if (chunk.length % 8 !== 0) {
+                        // the bootloader's flash write requires an 8-byte
+                        // aligned length; pad the image tail with erased
+                        // flash
+                        const padded = new Uint8Array(chunk.length + 8 - (chunk.length % 8)).fill(0xFF);
+                        padded.set(chunk);
+                        chunk = padded;
                     }
+                    await Direct.getInstance().writeBufferToAddress(wireAddress, chunk);
+                    escStore.bytesWritten += end - offset;
                 }
             }
             escStore.step = 'Rewriting config';

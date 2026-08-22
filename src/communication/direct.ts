@@ -94,7 +94,8 @@ export class Direct {
         const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
         ]);
-        const result = await serial.write(init.buffer, 2000);
+        const result = await serial.write(init.buffer, 2000,
+            (response: Uint8Array) => response.length >= init.length + 9);
         if (result) {
             const infoBuffer = result.subarray(init.length);
             const message: FourWayResponse = {
@@ -206,7 +207,24 @@ export class Direct {
         const crc = this.makeCRC(buffer);
         buffer.push(crc & 0xFF);
         buffer.push(crc >> 8 & 0xFF);
-        return serial.write(new Uint8Array(buffer).buffer).then(result => result?.subarray(buffer.length));
+        // How many reply bytes follow the adapter's echo of the command:
+        // one ACK for the write-side commands, data + CRC16 + ACK for a
+        // read, nothing at all for SetBufferSize. With the length known
+        // the exchange can complete on the last expected byte instead of
+        // waiting out an inactivity timeout - which at 19200 baud fires
+        // mid-command and truncates the response.
+        let replyLength = 1;
+        if (command === DIRECT_COMMANDS.cmd_SetBufferSize) {
+            replyLength = 0;
+        } else if (command === DIRECT_COMMANDS.cmd_ReadFlash) {
+            replyLength = payload![0] + 3;
+        }
+        const expected = buffer.length + replyLength;
+        return serial.write(
+            new Uint8Array(buffer).buffer,
+            2000,
+            (response: Uint8Array) => response.length >= expected
+        ).then(result => result?.subarray(buffer.length));
     }
 
     async readChunked (address: number, expected: number, chunkSize = 64) {
