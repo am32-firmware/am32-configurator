@@ -6,6 +6,9 @@ WORKDIR /usr/src/app
 COPY . .
 
 ARG DATABASE_URL
+# .git is excluded from the build context, so the caller passes the hash in
+ARG GIT_SHA=
+ENV NUXT_PUBLIC_GIT_HASH=${GIT_SHA}
 ENV CI='true'
 ENV YARN_ENABLE_INLINE_BUILDS='true'
 ENV NODE_ENV=production

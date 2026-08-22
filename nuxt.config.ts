@@ -1,3 +1,15 @@
+import { execSync } from 'node:child_process';
+
+// short git hash for display; docker builds have no .git in the context,
+// so they pass it in via NUXT_PUBLIC_GIT_HASH (from the GIT_SHA build arg)
+const gitShortHash = () => {
+    try {
+        return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+        return '';
+    }
+};
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     devtools: {
@@ -25,6 +37,9 @@ export default defineNuxtConfig({
     ssr: false,
 
     runtimeConfig: {
+        public: {
+            gitHash: process.env.NUXT_PUBLIC_GIT_HASH || gitShortHash()
+        },
         redis: { // Default values
             host: process.env.REDIS_HOST,
             port: 6379

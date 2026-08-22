@@ -4,6 +4,9 @@ services:
     build:
       context: ./
       dockerfile: docker/Dockerfile
+      args:
+        # e.g. GIT_SHA=$(git rev-parse --short HEAD) docker compose build
+        GIT_SHA: ${GIT_SHA:-}
     labels:
       - traefik.enable=true
       - traefik.http.routers.${PREFIX:-}configurator.rule=Host(`${DOMAIN:-am32.ca}`)
