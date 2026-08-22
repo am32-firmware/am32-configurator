@@ -111,6 +111,15 @@ export class Direct {
             const mcu = new Mcu(info.meta.signature);
             mcu.setInfo(info);
 
+            // the direct protocol has no v3 devinfo / address_shift support,
+            // so parts whose flash exceeds the 16-bit wire-address space
+            // (e.g. 128k STM32G431) cannot be addressed; fail before any
+            // write instead of truncating offsets into firmware flash
+            if (mcu.getFlashSize() > 0x10000) {
+                this.logError(`${mcu.getName()} (${mcu.getFlashSize() / 1024}k flash) is not supported in direct-connect mode`);
+                throw new Error(`${mcu.getName()} is not supported in direct-connect mode`);
+            }
+
             const eepromOffset = mcu.getEepromOffset();
 
             try {
@@ -162,6 +171,11 @@ export class Direct {
 
         switch (command) {
         case DIRECT_COMMANDS.cmd_SetAddress:
+            // the wire address is 16-bit; truncating a larger offset would
+            // silently address the wrong flash location
+            if (address > 0xFFFF) {
+                throw new Error(`cmd_SetAddress 0x${address.toString(16)} exceeds 16-bit wire range`);
+            }
             buffer.push(0x00);
             buffer.push((address >> 8) & 0xFF);
             buffer.push(address & 0xFF);
