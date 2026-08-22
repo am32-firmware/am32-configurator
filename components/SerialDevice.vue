@@ -1008,7 +1008,7 @@ const startFlash = async (hexString: string) => {
         for (const n of savingOrApplyingSelectedEscs.value) {
             const i = n - 1;
             escStore.activeTarget = i;
-            await FourWay.getInstance().writeHex(i, hexString, 200);
+            await FourWay.getInstance().writeHex(i, escStore.escData[i].data, hexString, 200);
             await delay(200);
             if (currentTab.value === 2) {
                 escStore.step = 'Sending default config';

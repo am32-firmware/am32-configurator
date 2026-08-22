@@ -1,7 +1,64 @@
 import Flash from '../flash';
-import Mcu, { type McuInfo } from '../mcu';
+import Mcu, { type DevinfoV3, type McuInfo } from '../mcu';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
+
+/*
+  Bootloader magic CMD_SET_ADDRESS values.
+
+  v2 added EEPROM and FILE_NAME magics so the configurator can address the
+  EEPROM region without per-MCU offsets. v3 adds DEVINFO: a read at 0x23
+  returns the bootloader's packed devinfo struct (magic1, magic2, 9-byte
+  deviceInfo, length, address_shift, and four CMD_SET_ADDRESS values for
+  firmware / filename / eeprom / tune).
+
+  See AM32-bootloader bootloader/main.c (ADDRESS_MAGIC_* + decodeInput) and
+  the desktop client am32-firmware/Offline-Configurator fourwayif.cpp
+  parseDevinfoBlock for the canonical reference.
+ */
+export enum ADDRESS_MAGIC {
+    EEPROM = 0x20,
+    FILE_NAME = 0x21,
+    CONTINUE = 0x22,
+    DEVINFO = 0x23,
+}
+
+const DEVINFO_MAGIC1 = 0x5925E3DA;
+const DEVINFO_MAGIC2 = 0x4EB863D9;
+/**
+ * Parse a response payload read from ADDRESS_MAGIC_DEVINFO. Returns the v3
+ * fields when the magic words match and the bootloader-reported length is
+ * sane; otherwise null (pre-v3 bootloader, truncated response, or junk).
+ */
+const DEVINFO_V3_MIN = 27; // smallest struct that contains every field we read
+const DEVINFO_V3_MAX = 64; // sanity cap so a garbage byte can't be trusted as a length
+function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
+    if (block.byteLength < 8 + 9 + 1) { // need at least magic + deviceInfo + length
+        return null;
+    }
+    const dv = new DataView(block.buffer, block.byteOffset, block.byteLength);
+    const m1 = dv.getUint32(0, true);
+    const m2 = dv.getUint32(4, true);
+    if (m1 !== DEVINFO_MAGIC1 || m2 !== DEVINFO_MAGIC2) {
+        return null;
+    }
+    // packed layout: magic1[0..3] magic2[4..7] deviceInfo[8..16]
+    // length[17] address_shift[18] firmware_start[19..20]
+    // filename_start[21..22] eeprom_start[23..24] tune_start[25..26]
+    const length = dv.getUint8(17);
+    if (length < DEVINFO_V3_MIN || length > DEVINFO_V3_MAX || block.byteLength < length) {
+        return null;
+    }
+    const v3: DevinfoV3 = {
+        length,
+        address_shift: dv.getUint8(18),
+        firmware_start: dv.getUint16(19, true),
+        filename_start: dv.getUint16(21, true),
+        eeprom_start: dv.getUint16(23, true),
+        tune_start: dv.getUint16(25, true)
+    };
+    return v3;
+}
 
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
@@ -143,10 +200,38 @@ export class FourWay {
         const mcu = new Mcu(info.meta.signature);
         mcu.setInfo(info);
 
-        const eepromOffset = mcu.getEepromOffset();
+        // v3 detection: try the magic-devinfo read. v3+ bootloaders return a
+        // packed struct beginning with two magic words; pre-v3 bootloaders
+        // either reject the read (address < 1024 is reserved) or return junk
+        // that fails the magic check. Fail fast so pre-v3 boards aren't slowed.
+        try {
+            // read the max so a forward-compatible block with length>27 still
+            // satisfies the length check in parseDevinfoBlock; we only decode
+            // the first 27 bytes regardless.
+            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 2, 50, 50);
+            const v3 = magicRead?.params ? parseDevinfoBlock(magicRead.params) : null;
+            if (v3) {
+                info.v3 = v3;
+                this.log(`v3 devinfo: address_shift=${v3.address_shift} firmware_start=0x${v3.firmware_start.toString(16)} eeprom_start=0x${v3.eeprom_start.toString(16)}`);
+            }
+        } catch (e) {
+            // pre-v3 bootloader; the magic read can fail, that's fine
+        }
+
+        // Parts whose flash exceeds the 16-bit wire-address space (e.g. 128k
+        // STM32G431/G491, signature 2B06) MUST report a non-zero address_shift
+        // via v3 devinfo. Without it, getFileNameWireAddress() would mask the
+        // EEPROM offset to 16 bits and silently miscompute the address. The
+        // configurator never supported such parts pre-v3 anyway, so a missing
+        // v3 here is an unsupported/transient-failure condition; fail clearly
+        // rather than corrupting flash.
+        if (mcu.getFlashSize() > 0x10000 && !info.v3) {
+            const sig = info.meta.signature.toString(16).toUpperCase();
+            throw new Error(`MCU 0x${sig} requires v3 bootloader devinfo (address_shift) but the magic-devinfo read failed. Try reconnecting; if this persists the ESC is running a pre-v3 bootloader that this configurator can't drive correctly.`);
+        }
 
         try {
-            const fileNameRead = await this.readAddress(eepromOffset - 32, 32);
+            const fileNameRead = await this.readAddress(mcu.getFileNameWireAddress(), 32);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -161,7 +246,7 @@ export class FourWay {
 
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
-            const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
+            const settingsArray = (await this.readAddress(mcu.getEepromWireAddress(), mcu.getInfo().layoutSize))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
@@ -188,13 +273,14 @@ export class FourWay {
         return info;
     }
 
-    readAddress (address: number, bytes: number, retries = 10, timeout = 200) {
+    readAddress (address: number, bytes: number, retries = 10, timeout = 200, retryDelay = 250) {
         return this.sendWithPromise(
             FOUR_WAY_COMMANDS.cmd_DeviceRead,
             [bytes === 256 ? 0 : bytes],
             address,
             retries,
-            timeout
+            timeout,
+            retryDelay
         );
     }
 
@@ -232,7 +318,7 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200): Promise<FourWayResponse | null> {
+    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200, retryDelay = 250): Promise<FourWayResponse | null> {
         let currentTry = 0;
 
         const callback: (resolve: PromiseFn<any>, reject: PromiseFn<any>) => void = async (resolve, reject) => {
@@ -259,7 +345,9 @@ export class FourWay {
                         console.error(e);
                     }
                 }
-                await delay(250);
+                if (currentTry < retries) {
+                    await delay(retryDelay);
+                }
             }
 
             if (currentTry > retries) {
@@ -346,23 +434,19 @@ export class FourWay {
     }
 
     /**
-   * Write data to multiple pages up to (but not including) end page
-   *
-   * @param {number} begin
-   * @param {number} end
-   * @param {number} pageSize
-   * @param {Uint8Array} data
-   */
-    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array, timeout: number) {
-        const beginAddress = begin * pageSize;
-        const endAddress = end * pageSize;
+     * Write firmware to flash, in 256-byte chunks, between two physical byte
+     * offsets (from flash_offset). The wire CMD_SET_ADDRESS for each chunk is
+     * computed via mcu.toWireAddress(), so 128k parts that report an
+     * address_shift in the v3 devinfo get the right addresses.
+     */
+    async writePages (beginByte: number, endByte: number, data: Uint8Array, timeout: number, mcu: Mcu) {
         const step = 0x100;
         const escStore = useEscStore();
 
-        for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
+        for (let off = beginByte; off < endByte && off < data.length; off += step) {
             await this.write(
-                address,
-                data.subarray(address, Math.min(address + step, data.length)),
+                mcu.toWireAddress(off),
+                data.subarray(off, Math.min(off + step, data.length)),
                 timeout
             );
 
@@ -384,11 +468,15 @@ export class FourWay {
             } else {
                 const info = Flash.getInfo(flash!);
                 const mcu = new Mcu(info.meta.signature);
+                // attach the McuInfo from the previous getInfo() so v3 devinfo
+                // (address_shift / eeprom_start) drives the wire address
+                mcu.setInfo(esc);
 
                 let readbackSettings = null;
+                const eepromWireAddr = mcu.getEepromWireAddress();
 
-                await this.write(mcu.getEepromOffset(), newSettingsArray);
-                readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
+                await this.write(eepromWireAddr, newSettingsArray);
+                readbackSettings = (await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE));
 
                 if (readbackSettings) {
                     /*
@@ -407,90 +495,40 @@ export class FourWay {
         throw new Error('EscInitError');
     }
 
-    async writeHex (target: number, hex: string, timeout: number) { // }, force: boolean, migrate: boolean) {
+    async writeHex (target: number, esc: McuInfo, hex: string, timeout: number) {
         const escStore = useEscStore();
         const parsed = Flash.parseHex(hex);
         if (parsed) {
             const initFlash = await this.initFlash(target, 3);
             const info = Flash.getInfo(initFlash!);
             const mcu = new Mcu(info.meta.signature);
+            // re-use the McuInfo from the previous getInfo() so v3 devinfo
+            // (address_shift, firmware_start, eeprom_start, ...) is honoured
+            // by the wire-address helpers below.
+            mcu.setInfo(esc);
             const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
             const flash = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
             if (flash) {
-                const eepromOffset = mcu.getEepromOffset();
-                const pageSize = mcu.getPageSize();
-                const firmwareStart = mcu.getFirmwareStart();
+                const eepromWireAddr = mcu.getEepromWireAddress();
+                const firmwareStartByte = mcu.getFirmwareStartByte();
+                const endByte = flash.byteLength;
 
-                escStore.totalBytes = flash.byteLength - firmwareStart;
+                escStore.totalBytes = endByte - firmwareStartByte;
                 escStore.bytesWritten = 0;
                 escStore.step = 'Writing';
 
-                const message = await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
+                const message = await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE);
                 if (message) {
                     const originalSettings = message.params;
 
-                    // boot bit
+                    // boot bit: clear before flashing, set after success
                     originalSettings[0] = 0x00;
-                    /*
-                    originalSettings[0] = 0x00;
-                    originalSettings.fill(0x00, 3, 5);
-                    originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
-                    */
-                    await this.write(eepromOffset, originalSettings, timeout);
+                    await this.write(eepromWireAddr, originalSettings, timeout);
 
-                    await this.writePages(0x04, 0x40, pageSize, flash, timeout);
-                    /* try {
-                        escStore.step = 'Verifying';
-                        await delay(200);
-                        // await this.verifyPages(0x04, 0x40, pageSize, flash);
-                    } catch (error) {
-                        try {
-                            escStore.step = 'Verifying';
-                            await delay(200);
-                            await this.verifyPages(0x04, 0x40, pageSize, flash);
-                        } catch (error) {
-                            this.logError('flashingVerificationFailed');
-                        }
-                    }
+                    await this.writePages(firmwareStartByte, endByte, flash, timeout, mcu);
+
                     originalSettings[0] = 0x01;
-                    originalSettings.fill(0x00, 3, 5);
-                    originalSettings.set(asciiToBuffer('NOT READY   '), 5);
-                    */
-
-                    // boot bit
-                    originalSettings[0] = 0x01;
-                    await this.write(eepromOffset, originalSettings);
-                }
-            }
-        }
-    }
-
-    /**
-   * Verify multiple pages up to (but not including) end page
-   *
-   * @param {number} begin
-   * @param {number} end
-   * @param {number} pageSize
-   * @param {Uint8Array} data
-   */
-    async verifyPages (begin: number, end: number, pageSize: number, data: Uint8Array) {
-        const beginAddress = begin * pageSize;
-        const endAddress = end * pageSize;
-        const step = 0x80;
-
-        const escStore = useEscStore();
-
-        for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
-            const message = await this.readAddress(address, Math.min(step, data.length - address), 10, 100);
-            if (message) {
-                const reference = data.subarray(message.address, message.address + message.params.byteLength);
-
-                if (!compare(message.params, reference)) {
-                    console.debug('Verification failed - retry');
-                    this.logError(`failed to verify write at address 0x${message.address.toString(0x10)}`);
-                    throw new Error(`failed to verify write at address 0x${message.address.toString(0x10)}`);
-                } else {
-                    escStore.bytesWritten += step;
+                    await this.write(eepromWireAddr, originalSettings);
                 }
             }
         }

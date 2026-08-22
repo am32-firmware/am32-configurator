@@ -22,6 +22,7 @@ class Flash {
                 pin: '',
                 version: 0
             },
+            v3: null,
             layoutSize: 0,
             settingsDirty: false,
             settings: {},
