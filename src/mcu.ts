@@ -258,6 +258,18 @@ class Mcu {
     }
 
     /**
+     * Byte offset (from flash_offset) of the EEPROM region. With v3 this comes
+     * from the bootloader; otherwise from the per-MCU variant default.
+     */
+    getEepromStartByte (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.eeprom_start << v3.address_shift;
+        }
+        return this.getEepromOffset();
+    }
+
+    /**
      * CMD_SET_ADDRESS value at which the EEPROM region starts.
      */
     getEepromWireAddress (): number {
@@ -266,6 +278,19 @@ class Mcu {
             return v3.eeprom_start;
         }
         return this.toWireAddress(this.getEepromOffset());
+    }
+
+    /**
+     * Byte offset (from flash_offset) of the 32-byte file-name block. With v3
+     * this comes from the bootloader (DroneCAN builds place it away from the
+     * EEPROM); otherwise it sits 32 bytes below the EEPROM region.
+     */
+    getFileNameStartByte (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.filename_start << v3.address_shift;
+        }
+        return this.getEepromOffset() - 32;
     }
 
     /**

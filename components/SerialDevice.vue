@@ -867,15 +867,19 @@ const startModalFlash = async () => {
         if (fileInput.value) {
             if (!ignoreMcuLayout.value && escStore.firstValidEscData) {
                 const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-                const eepromOffset = mcu.getEepromOffset();
+                // honour v3 devinfo so the filename block is located at the
+                // bootloader-reported filename address (DroneCAN builds link
+                // it away from the EEPROM), not the static-table default.
+                mcu.setInfo(escStore.firstValidEscData.data);
                 const offset = 0x8000000;
-                const fileNamePlaceOffset = 30;
+                // a point 2 bytes inside the 32-byte file-name block
+                const fileNameProbe = mcu.getFileNameStartByte() + 2;
 
                 const fileFlash = Flash.parseHex(await fileInput.value.text());
                 const tmp = escStore.firstValidEscData.data.meta.am32;
                 if (fileFlash && tmp.mcuType && tmp.fileName) {
                     const findFileNameBlock = fileFlash.data.find(d =>
-                        (eepromOffset - fileNamePlaceOffset) > (d.address - offset) && (eepromOffset - fileNamePlaceOffset) < (d.address - offset + d.bytes)
+                        fileNameProbe > (d.address - offset) && fileNameProbe < (d.address - offset + d.bytes)
                     );
                     if (!findFileNameBlock) {
                         logStore.logError('File name not found in hex, probably too old!');
