@@ -301,8 +301,11 @@ export class Direct {
             }
         }
         currentTry = 0;
-        await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
         while (true) {
+            // SetBufferSize is part of the retry unit: a failed payload
+            // leaves the ESC back in command mode, where a bare
+            // re-sent payload is just a long garbage command
+            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
             const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload);
             if (sendBuffer?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                 if (currentTry++ === retries) {
