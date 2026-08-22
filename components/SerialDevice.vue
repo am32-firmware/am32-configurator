@@ -1048,44 +1048,96 @@ const startFlash = async (hexString: string) => {
     }
 };
 
+// newest eeprom layout we know defaults for
+const HIGHEST_LAYOUT_REVISION = 4;
+
 const applyDefaultConfig = async () => {
-    let eepromVersion = escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number;
-    if (eepromVersion > 3) {
-        eepromVersion = 2;
-    }
-    const eepromUrl = await fetch(`/api/eeprom/${escStore.firstValidEscData?.data.meta.am32.fileName}?version=${eepromVersion}`)
-        .then((res) => {
-            if (res.status === 200) {
-                return res.text();
+    const rawEscVersion = escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number;
+    const escName = escStore.firstValidEscData?.data.meta.am32.fileName;
+    // an erased eeprom reads 0xFF (or 0x00 when zeroed) - not a real layout.
+    // Start the descent from the newest known layout instead of walking
+    // hundreds of bogus versions (or, for 0, never running at all).
+    const layoutIsValid = rawEscVersion >= 1 && rawEscVersion <= HIGHEST_LAYOUT_REVISION;
+    const escVersion = layoutIsValid ? rawEscVersion : HIGHEST_LAYOUT_REVISION;
+
+    // Find a default image the ESC can actually take: its own layout
+    // first, then older layouts (whose fields are a subset), the named
+    // target before the generic default at each step. Every response is
+    // validated before use - an API error page written to the eeprom
+    // bricks the settings, which is exactly what used to happen here.
+    const fetchDefault = async (): Promise<{ buffer: Uint8Array, version: number } | null> => {
+        for (let version = escVersion; version >= 1; version--) {
+            for (const name of [escName, 'DEFAULT']) {
+                if (!name) {
+                    continue;
+                }
+                const url = await fetch(`/api/eeprom/${name}?version=${version}`)
+                    .then(res => (res.status === 200 ? res.text() : null))
+                    .catch(() => null);
+                if (!url) {
+                    continue;
+                }
+                const blob = await fetch(url)
+                    .then(res => (res.status === 200 ? res.arrayBuffer() : null))
+                    .catch(() => null);
+                if (!blob) {
+                    continue;
+                }
+                const buffer = new Uint8Array(blob);
+                // a settings image, not an error page: the layout byte
+                // must be the one we asked for and the boot byte sane
+                if (buffer.length >= 48 && buffer[1] === version && buffer[0] <= 1) {
+                    return { buffer, version };
+                }
             }
-            return fetch(`/api/eeprom/DEFAULT?version=${eepromVersion}`).then(res => res.text());
-        })
-        .catch(() => null);
-
-    if (!eepromUrl) {
-        throw new Error('Eeprom not found');
-    }
-
-    const file = await fetch(eepromUrl).then(res => res.arrayBuffer());
-
-    if (file) {
-        const buffer = new Uint8Array(file);
-        const settings = bufferToSettings(buffer, eepromVersion);
-
-        settings.STARTUP_MELODY = (new Array(128)).fill(0xFF);
-
-        for (const n of savingOrApplyingSelectedEscs.value) {
-            escStore.escData[n - 1].data.settings = settings;
-            escStore.escData[n - 1].data.settingsDirty = true;
         }
+        return null;
+    };
 
-        await writeConfig().catch((err) => {
-            logError(err.message);
-        });
-
+    const found = await fetchDefault();
+    if (!found) {
+        logError(`No valid default config available for ${escName} (eeprom v${escVersion})`);
         if (applyDefaultConfigModalOpen.value) {
             applyDefaultConfigModalOpen.value = false;
         }
+        return;
+    }
+
+    const defaults = bufferToSettings(found.buffer, found.version);
+    defaults.STARTUP_MELODY = (new Array(128)).fill(0xFF);
+    // a default config must not change what the ESC is, only how it is
+    // tuned: identity fields always come from the ESC itself. An erased
+    // eeprom has no identity to keep, though - preserving its 0xFF boot
+    // byte would leave the ESC unbootable - so remember the default's
+    // boot/layout bytes for that case.
+    const defaultBootByte = defaults.BOOT_BYTE;
+    const defaultLayout = defaults.LAYOUT_REVISION;
+    delete defaults.BOOT_BYTE;
+    delete defaults.LAYOUT_REVISION;
+    delete defaults.BOOT_LOADER_REVISION;
+    delete defaults.MAIN_REVISION;
+    delete defaults.SUB_REVISION;
+
+    for (const n of savingOrApplyingSelectedEscs.value) {
+        const current = escStore.escData[n - 1].data.settings;
+        // fields the (possibly older-layout) default lacks keep their
+        // current values rather than becoming undefined
+        const merged = { ...current, ...defaults };
+        const currentLayout = current.LAYOUT_REVISION as number;
+        if (!(currentLayout >= 1 && currentLayout <= HIGHEST_LAYOUT_REVISION)) {
+            merged.BOOT_BYTE = defaultBootByte;
+            merged.LAYOUT_REVISION = defaultLayout;
+        }
+        escStore.escData[n - 1].data.settings = merged;
+        escStore.escData[n - 1].data.settingsDirty = true;
+    }
+
+    await writeConfig().catch((err) => {
+        logError(err.message);
+    });
+
+    if (applyDefaultConfigModalOpen.value) {
+        applyDefaultConfigModalOpen.value = false;
     }
 
     if (applyConfigFile.value) {
