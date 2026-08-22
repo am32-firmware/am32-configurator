@@ -166,7 +166,13 @@ export class FourWay {
     }
 
     initFlash (target: number, retries = 10) {
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
+        // put the target in the address field: InitFlash replies carry no
+        // target of their own, so without this a late reply for one ESC is
+        // accepted as the reply for the next. The 4way interface (betaflight
+        // serial_4way.c, ArduPilot AP_BLHeli) ignores the address here but
+        // echoes it, which lets the stale-reply check in sendWithPromise
+        // tell replies for different targets apart.
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], target, retries);
     }
 
     reset (target: number) {
@@ -346,11 +352,21 @@ export class FourWay {
                 if (result) {
                     try {
                         const response = this.parseMessage(result.buffer);
-                        if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
+                        // A reply echoes the command and address it answers.
+                        // A late reply to a timed-out request can land here
+                        // instead - without this check it gets accepted as
+                        // the answer to the current request and every later
+                        // exchange pairs with the wrong reply (a devinfo
+                        // block read as the firmware name, for example).
+                        if (response.data.command !== command ||
+                            response.data.address !== address) {
+                            this.logError(`  stale reply for ${enumToString(response.data.command, FOUR_WAY_COMMANDS)} @0x${response.data.address.toString(16)}, discarded`);
+                        } else if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;
+                        } else {
+                            this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                         }
-                        this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                     } catch (e) {
                         console.error(e);
                     }
@@ -478,7 +494,7 @@ export class FourWay {
     }
 
     async writeSettings (target: number, esc: McuInfo) {
-        const flash = await this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target]);
+        const flash = await this.initFlash(target);
 
         if (flash) {
             const newSettingsArray = objectToSettingsArray(esc.settings, esc.settings.LAYOUT_REVISION as number);
