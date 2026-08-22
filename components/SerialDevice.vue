@@ -722,8 +722,11 @@ const connectToEsc = async () => {
 
     if (
         escStore.escData.filter(
-            e => e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
-                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0
+            // errored slots never get data assigned - skip them, they must
+            // not crash the empty-settings scan for the healthy ESCs
+            e => !e.isError && e.data?.settingsBuffer.length &&
+                (e.data.settingsBuffer.filter(s => s === 0xFF).length === e.data.settingsBuffer.length ||
+                  e.data.settingsBuffer.reduce((acc, cur) => acc + cur, 0) === 0)
         ).length > 0
     ) {
         toast.add({
@@ -732,7 +735,7 @@ const connectToEsc = async () => {
             description: 'Found empty settings, flashing default settings now!'
         });
 
-        savingOrApplyingSelectedEscs.value = escStore.escData.map((_, i) => i + 1);
+        savingOrApplyingSelectedEscs.value = escStore.selectedEscInfo.map((_, i) => i + 1);
 
         applyDefaultConfig();
     }
@@ -740,11 +743,17 @@ const connectToEsc = async () => {
     let needToSave = false;
 
     for (const esc of escStore.escData) {
+        if (esc.isError || !esc.data) {
+            continue;
+        }
         const firmwareVersion = `${esc.data.settings.MAIN_REVISION}.${esc.data.settings.SUB_REVISION}`;
         if (firmwareVersion.endsWith('2.19')) {
             if (esc.data.settings.TIMING_ADVANCE as number < 10) {
                 needToSave = true;
                 for (let i = 0; i < escStore.escData.length; ++i) {
+                    if (escStore.escData[i].isError || !escStore.escData[i].data) {
+                        continue;
+                    }
                     escStore.escData[i].data.settingsDirty = true;
                     escStore.escData[i].data.settings.TIMING_ADVANCE = 16;
                 }
@@ -1010,7 +1019,12 @@ const startFlash = async (hexString: string) => {
         }
     } else {
         for (const n of savingOrApplyingSelectedEscs.value) {
-            const i = n - 1;
+            // n is a position in the filtered selectedEscInfo list the modal
+            // shows; map it to the escData slot / four-way target behind it
+            const i = escStore.selectedEscIndices[n - 1];
+            if (i === undefined) {
+                continue;
+            }
             escStore.activeTarget = i;
             await FourWay.getInstance().writeHex(i, escStore.escData[i].data, hexString, 200);
             await delay(200);
@@ -1119,7 +1133,11 @@ const applyDefaultConfig = async () => {
     delete defaults.SUB_REVISION;
 
     for (const n of savingOrApplyingSelectedEscs.value) {
-        const current = escStore.escData[n - 1].data.settings;
+        const i = escStore.selectedEscIndices[n - 1];
+        if (i === undefined) {
+            continue;
+        }
+        const current = escStore.escData[i].data.settings;
         // fields the (possibly older-layout) default lacks keep their
         // current values rather than becoming undefined
         const merged = { ...current, ...defaults };
@@ -1128,8 +1146,8 @@ const applyDefaultConfig = async () => {
             merged.BOOT_BYTE = defaultBootByte;
             merged.LAYOUT_REVISION = defaultLayout;
         }
-        escStore.escData[n - 1].data.settings = merged;
-        escStore.escData[n - 1].data.settingsDirty = true;
+        escStore.escData[i].data.settings = merged;
+        escStore.escData[i].data.settingsDirty = true;
     }
 
     await writeConfig().catch((err) => {
@@ -1147,12 +1165,16 @@ const applyDefaultConfig = async () => {
 
 const downloadEscConfig = () => {
     for (const n of savingOrApplyingSelectedEscs.value) {
-        const blob = new Blob([escStore.escData[n - 1].data.settingsBuffer.buffer as ArrayBuffer], {
+        const i = escStore.selectedEscIndices[n - 1];
+        if (i === undefined) {
+            continue;
+        }
+        const blob = new Blob([escStore.escData[i].data.settingsBuffer.buffer as ArrayBuffer], {
             type: 'application/octet-stream'
         });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `esc${n}_config.bin`;
+        link.download = `esc${i + 1}_config.bin`;
         link.click();
         URL.revokeObjectURL(link.href);
     }
@@ -1166,8 +1188,12 @@ const applyConfig = async () => {
             const settings = bufferToSettings(buffer, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
 
             for (const n of savingOrApplyingSelectedEscs.value) {
-                escStore.escData[n - 1].data.settings = settings;
-                escStore.escData[n - 1].data.settingsDirty = true;
+                const i = escStore.selectedEscIndices[n - 1];
+                if (i === undefined) {
+                    continue;
+                }
+                escStore.escData[i].data.settings = settings;
+                escStore.escData[i].data.settingsDirty = true;
             }
 
             await writeConfig();
