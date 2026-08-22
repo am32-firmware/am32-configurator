@@ -1011,8 +1011,20 @@ const startFlash = async (hexString: string) => {
                     escStore.bytesWritten += end - offset;
                 }
             }
-            escStore.step = 'Rewriting config';
-            await writeConfig();
+            // A factory-fresh ESC has an erased settings area: there is
+            // no valid layout to serialise (LAYOUT_REVISION reads 0xFF,
+            // and the version-gated fields are absent from the parsed
+            // settings) and nothing worth preserving, so leave it erased
+            // and let 'Send default config' seed it. Rewriting is for
+            // keeping a real pre-flash configuration across the update.
+            const preFlash = escStore.firstValidEscData.data.settings;
+            if ((preFlash.BOOT_BYTE as number) <= 1 &&
+                (preFlash.LAYOUT_REVISION as number) <= 64) {
+                escStore.step = 'Rewriting config';
+                await writeConfig();
+            } else {
+                logStore.log('eeprom is erased; use "Send default config" to initialise it');
+            }
             escStore.step = 'Resetting';
             await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_Reset, 0);
             await delay(3000);
