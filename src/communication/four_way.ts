@@ -208,7 +208,13 @@ export class FourWay {
             // read the max so a forward-compatible block with length>27 still
             // satisfies the length check in parseDevinfoBlock; we only decode
             // the first 27 bytes regardless.
-            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 2, 50, 50);
+            // These timeouts are failure bounds, not latencies: they only
+            // cost time when something is actually wrong. The 64-byte reply
+            // is ~35ms of 19200-baud wire time and a passthrough FC only
+            // forwards it once complete; a heavily loaded emulator host can
+            // stretch that a lot, and 128k parts have no fallback if v3
+            // detection fails, so be generous
+            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 3, 500, 50);
             const v3 = magicRead?.params ? parseDevinfoBlock(magicRead.params) : null;
             if (v3) {
                 info.v3 = v3;
@@ -231,7 +237,7 @@ export class FourWay {
         }
 
         try {
-            const fileNameRead = await this.readAddress(mcu.getFileNameWireAddress(), 32);
+            const fileNameRead = await this.readAddress(mcu.getFileNameWireAddress(), 32, 10, 1000);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -246,7 +252,11 @@ export class FourWay {
 
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
-            const settingsArray = (await this.readAddress(mcu.getEepromWireAddress(), mcu.getInfo().layoutSize))!.params;
+            // the settings block is ~184 bytes = ~100ms of 19200-baud wire
+            // time, and a passthrough FC forwards the reply only once it is
+            // complete, so the default 200ms timeout barely fits; give the
+            // transfer real headroom (emulated ESCs can be slower still)
+            const settingsArray = (await this.readAddress(mcu.getEepromWireAddress(), mcu.getInfo().layoutSize, 10, 1500))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
@@ -456,7 +466,12 @@ export class FourWay {
                 padded.set(chunk);
                 chunk = padded;
             }
-            await this.write(mcu.toWireAddress(off), chunk, timeout);
+            // a 256-byte chunk is ~140ms of 19200-baud wire time and the
+            // FC forwards the ack only after the whole set-address /
+            // set-buffer / program sequence, so the caller's timeout (the
+            // UI passes 200ms) cannot cover it; retrying early just queues
+            // duplicate transfers behind the one still running
+            await this.write(mcu.toWireAddress(off), chunk, Math.max(timeout, 3000));
 
             escStore.bytesWritten += chunkEnd - off;
         }
@@ -483,8 +498,8 @@ export class FourWay {
                 let readbackSettings = null;
                 const eepromWireAddr = mcu.getEepromWireAddress();
 
-                await this.write(eepromWireAddr, newSettingsArray);
-                readbackSettings = (await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE));
+                await this.write(eepromWireAddr, newSettingsArray, 1500);
+                readbackSettings = (await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE, 10, 1500));
 
                 if (readbackSettings) {
                     /*
@@ -525,18 +540,18 @@ export class FourWay {
                 escStore.bytesWritten = 0;
                 escStore.step = 'Writing';
 
-                const message = await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE);
+                const message = await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE, 10, 1500);
                 if (message) {
                     const originalSettings = message.params;
 
                     // boot bit: clear before flashing, set after success
                     originalSettings[0] = 0x00;
-                    await this.write(eepromWireAddr, originalSettings, timeout);
+                    await this.write(eepromWireAddr, originalSettings, Math.max(timeout, 1500));
 
                     await this.writePages(firmwareStartByte, endByte, flash, timeout, mcu);
 
                     originalSettings[0] = 0x01;
-                    await this.write(eepromWireAddr, originalSettings);
+                    await this.write(eepromWireAddr, originalSettings, Math.max(timeout, 1500));
                 }
             }
         }
