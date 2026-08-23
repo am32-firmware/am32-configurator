@@ -792,7 +792,7 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number));
+        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number), mcu.getDirectWriteChunk());
         escStore.firstValidEscData.data.settingsDirty = false;
         escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
     }
@@ -993,7 +993,26 @@ const startFlash = async (hexString: string) => {
                     continue;
                 }
                 logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
-                const CHUNK_SIZE = 64;
+                const CHUNK_SIZE = mcu.getDirectWriteChunk();
+                if (CHUNK_SIZE > 8) {
+                    // this part refuses writes at unaligned addresses, and
+                    // hex blocks start wherever the linker put them: walk an
+                    // aligned grid over the block, padding the uncovered
+                    // edges with erased flash
+                    const blockEnd = start.address + start.data.length;
+                    for (let win = start.address - (start.address % CHUNK_SIZE);
+                        win < blockEnd; win += CHUNK_SIZE) {
+                        const chunk = new Uint8Array(CHUNK_SIZE).fill(0xFF);
+                        const from = Math.max(win, start.address);
+                        const to = Math.min(win + CHUNK_SIZE, blockEnd);
+                        chunk.set(start.data.slice(from - start.address, to - start.address), from - win);
+                        const wireAddress = win - mcu.getFlashOffset();
+                        logStore.log(`... 0x${wireAddress.toString(16)} - 0x${(wireAddress + CHUNK_SIZE - 1).toString(16)}`);
+                        await Direct.getInstance().writeBufferToAddress(wireAddress, chunk);
+                        escStore.bytesWritten += to - from;
+                    }
+                    continue;
+                }
                 for (let offset = 0; offset < start.data.length; offset += CHUNK_SIZE) {
                     const wireAddress = (start.address - mcu.getFlashOffset()) + offset;
                     const end = Math.min(offset + CHUNK_SIZE, start.data.length);

@@ -8,6 +8,9 @@ export interface McuVariant {
     flash_offset: string;
     firmware_start: string;
     eeprom_offset: string;
+    // direct-mode write chunk (and alignment) the part requires; most
+    // accept any 8-byte-aligned length, so the default is 64
+    direct_write_size?: number;
 }
 
 /*
@@ -92,9 +95,13 @@ class Mcu {
                 signature: '0x1506',
                 page_size: 1024,
                 flash_size: 65536,
-                flash_offset: '0x08000000',
+                // the MCXA153 flash really is at address 0
+                flash_offset: '0x0',
                 firmware_start: '0x4000',
-                eeprom_offset: '0xE000'
+                eeprom_offset: '0xE000',
+                // its flash driver refuses writes whose address is not
+                // 128-byte aligned, so direct-mode chunks must be 128
+                direct_write_size: 128
             },
             '2B06': {
                 // STM32G431/G491 (128k AM32 CAN ESCs). The firmware_start /
@@ -192,6 +199,10 @@ class Mcu {
      *
      * @returns {number}
      */
+    getDirectWriteChunk () {
+        return this.mcu.direct_write_size ?? 64;
+    }
+
     getPageSize () {
         return this.mcu.page_size;
     }
