@@ -5,12 +5,12 @@ bootloader emulator (ci/bootloader_sim.py) over every combination of
 transport (direct / 4way), bootloader generation (old = V17-era
 protocol v2, new = V19-era protocol v3) and flash size (32/64/128k).
 
-Not every cell is expected to pass - the app refuses some combinations
+Not every cell is expected to pass - the app refuses 128k parts on
+pre-v3 bootloaders (no address_shift on the wire)
 by design, and those refusals are part of what is being tested:
 
-  direct + 128k (both generations)  the app refuses direct-connect on
-                                    parts whose flash exceeds the 16-bit
-                                    wire-address space
+  direct + 128k + old               the app refuses without the v3
+                                    address_shift ("needs a v3 bootloader")
   4way + 128k + old                 128k parts need v3 devinfo; the app
                                     must fail with its "requires v3" error
 
@@ -111,9 +111,11 @@ def main():
     results = []
     failed = False
     for mode, generation, flash_kb in cells:
-        # expected outcome per cell (see module docstring)
-        if mode == 'direct' and flash_kb == 128:
-            expect = ('refused', 'not supported in direct-connect mode')
+        # expected outcome per cell (see module docstring): 128k parts
+        # need the v3 devinfo address_shift on either transport, which
+        # only the new bootloader provides
+        if mode == 'direct' and flash_kb == 128 and generation == 'old':
+            expect = ('refused', 'needs a v3 bootloader')
         elif mode == '4way' and flash_kb == 128 and generation == 'old':
             expect = ('refused', 'requires v3')
         else:
