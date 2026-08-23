@@ -1,0 +1,31 @@
+name: protocol matrix
+
+# Run the app's serial protocol stack (via cli/am32cli.mjs) against the
+# pure-python bootloader emulator over the full transport / bootloader
+# generation / flash size matrix. See ci/run_matrix.py for the cells and
+# which of them are expected to be refused by design.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  protocol-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: install dependencies
+        run: |
+          corepack enable
+          yarn --immutable
+        env:
+          YARN_ENABLE_INLINE_BUILDS: 'true'
+
+      - name: run protocol matrix
+        run: python3 ci/run_matrix.py
