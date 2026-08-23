@@ -792,7 +792,8 @@ const writeConfig = async () => {
         escStore.settingsDirty = false;
     } else if (serialStore.isDirectConnect && escStore.firstValidEscData) {
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
-        await Direct.getInstance().writeChunked(mcu.getEepromOffset(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number), mcu.getDirectWriteChunk());
+        mcu.setInfo(escStore.firstValidEscData.data);
+        await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number), mcu.getDirectWriteChunk());
         escStore.firstValidEscData.data.settingsDirty = false;
         escStore.firstValidEscData.data.settingsBuffer = objectToSettingsArray(escStore.firstValidEscData.data.settings, escStore.firstValidEscData?.data.settings.LAYOUT_REVISION as number);
     }
@@ -880,7 +881,7 @@ const startModalFlash = async () => {
                 // bootloader-reported filename address (DroneCAN builds link
                 // it away from the EEPROM), not the static-table default.
                 mcu.setInfo(escStore.firstValidEscData.data);
-                const offset = 0x8000000;
+                const offset = mcu.getFlashOffset();
                 // a point 2 bytes inside the 32-byte file-name block
                 const fileNameProbe = mcu.getFileNameStartByte() + 2;
 
@@ -946,89 +947,59 @@ const startFlash = async (hexString: string) => {
         const logStore = useLogStore();
         const parsed = Flash.parseHex(hexString);
         const mcu = new Mcu(escStore.firstValidEscData.data.meta.signature);
+        // v3 devinfo (address_shift, firmware/eeprom starts) from the
+        // connect-time read, so 128k parts address correctly
+        mcu.setInfo(escStore.firstValidEscData.data);
         if (parsed) {
             escStore.activeTarget = 0;
             escStore.bytesWritten = 0;
 
-            if (parsed.bytes < 27 * 1024 - 1 + 32) {
-                const filled = new Uint8Array(27 * 1024 - 1).fill(0xFF);
-                let bytes32Index = -1;
-                for (let i = 0; i < parsed.data.length; i++) {
-                    if (parsed.data[i].bytes === 32) {
-                        bytes32Index = i;
-                        break;
-                    }
-                }
-                if (bytes32Index === -1) {
-                    toast.add({
-                        title: 'Error',
-                        color: 'red',
-                        description: '32 bytes block not found in hex file!'
-                    });
-                    return;
-                }
-                let lowIndex = -1;
-                for (let i = 0; i < parsed.data.length; i++) {
-                    if (lowIndex === -1 || parsed.data[i].address < parsed.data[lowIndex].address) {
-                        lowIndex = i;
-                    }
-                }
-                filled.set(parsed.data[lowIndex].data);
-                for (let i = 0; i < parsed.data.length; i++) {
-                    if (i !== lowIndex && i !== bytes32Index) {
-                        filled.set(parsed.data[i].data, parsed.data[i].address - parsed.data[lowIndex].address);
-                        parsed.data[i].bytes = 0;
-                    }
-                }
-                parsed.data[lowIndex].data = Array.from(filled);
-                parsed.data[lowIndex].bytes = filled.length;
-                parsed.bytes = filled.length + 32;
+            // One merged 0xFF-filled image, written in aligned chunks from
+            // the firmware start - the same shape the four-way writeHex
+            // path uses. Writing per hex block double-programmed any
+            // aligned window shared by two blocks (losing the first
+            // block's bytes to the second write's padding) and could not
+            // address blocks whose start the v3 address_shift cannot
+            // express.
+            const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
+            const image = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
+            if (!image) {
+                toast.add({
+                    title: 'Error',
+                    color: 'red',
+                    description: 'hex file addresses fall outside the flash!'
+                });
+                return;
             }
-
-            escStore.totalBytes = parsed.bytes;
+            const begin = mcu.getFirmwareStartByte();
+            escStore.totalBytes = image.byteLength - begin;
             escStore.step = 'Writing';
 
-            for (const start of parsed.data) {
-                if (start.bytes === 0) {
-                    continue;
+            // boot bit: clear before flashing, set again via the config
+            // rewrite (or reset seeding) after success, as writeHex does -
+            // a power loss mid-flash must not leave a half image bootable
+            const preFlashSettings = escStore.firstValidEscData.data.settings;
+            const havePreConfig = (preFlashSettings.BOOT_BYTE as number) <= 1 &&
+                (preFlashSettings.LAYOUT_REVISION as number) <= 64;
+            if (havePreConfig) {
+                const guard = Uint8Array.from(escStore.firstValidEscData.data.settingsBuffer.subarray(0, 48));
+                guard[0] = 0x00;
+                await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), guard, mcu.getDirectWriteChunk());
+            }
+
+            const CHUNK_SIZE = mcu.getDirectWriteChunk();
+            for (let off = begin; off < image.byteLength; off += CHUNK_SIZE) {
+                const end = Math.min(off + CHUNK_SIZE, image.byteLength);
+                let chunk: Uint8Array = image.subarray(off, end);
+                if (chunk.length % 8 !== 0) {
+                    // the bootloader's flash write requires an 8-byte
+                    // aligned length; pad the image tail with erased flash
+                    const padded = new Uint8Array((chunk.length + 7) & ~7).fill(0xFF);
+                    padded.set(chunk);
+                    chunk = padded;
                 }
-                logStore.log(`Flashing: 0x${start.address.toString(16)}, ${start.bytes} bytes`);
-                const CHUNK_SIZE = mcu.getDirectWriteChunk();
-                if (CHUNK_SIZE > 8) {
-                    // this part refuses writes at unaligned addresses, and
-                    // hex blocks start wherever the linker put them: walk an
-                    // aligned grid over the block, padding the uncovered
-                    // edges with erased flash
-                    const blockEnd = start.address + start.data.length;
-                    for (let win = start.address - (start.address % CHUNK_SIZE);
-                        win < blockEnd; win += CHUNK_SIZE) {
-                        const chunk = new Uint8Array(CHUNK_SIZE).fill(0xFF);
-                        const from = Math.max(win, start.address);
-                        const to = Math.min(win + CHUNK_SIZE, blockEnd);
-                        chunk.set(start.data.slice(from - start.address, to - start.address), from - win);
-                        const wireAddress = win - mcu.getFlashOffset();
-                        logStore.log(`... 0x${wireAddress.toString(16)} - 0x${(wireAddress + CHUNK_SIZE - 1).toString(16)}`);
-                        await Direct.getInstance().writeBufferToAddress(wireAddress, chunk);
-                        escStore.bytesWritten += to - from;
-                    }
-                    continue;
-                }
-                for (let offset = 0; offset < start.data.length; offset += CHUNK_SIZE) {
-                    const wireAddress = (start.address - mcu.getFlashOffset()) + offset;
-                    const end = Math.min(offset + CHUNK_SIZE, start.data.length);
-                    logStore.log(`... 0x${wireAddress.toString(16)} - 0x${(wireAddress + (end - offset) - 1).toString(16)}`);
-                    let chunk = new Uint8Array(start.data.slice(offset, end));
-                    if (chunk.length % 8 !== 0) {
-                        // the bootloader's flash write requires an 8-byte
-                        // aligned length; pad the image tail with erased
-                        // flash
-                        const padded = new Uint8Array(chunk.length + 8 - (chunk.length % 8)).fill(0xFF);
-                        padded.set(chunk);
-                        chunk = padded;
-                    }
-                    await Direct.getInstance().writeBufferToAddress(wireAddress, chunk);
-                    escStore.bytesWritten += end - offset;
-                }
+                await Direct.getInstance().writeBufferToAddress(off, chunk);
+                escStore.bytesWritten += end - off;
             }
             // A factory-fresh ESC has an erased settings area: there is
             // no valid layout to serialise (LAYOUT_REVISION reads 0xFF,
