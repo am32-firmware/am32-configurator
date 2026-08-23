@@ -21,6 +21,12 @@ export default defineNuxtConfig({
     },
 
     typescript: {
+        // the cli harness is plain Node JS gluing the app modules
+        // together; letting the typecheck ingest its globalThis
+        // assignments turns the auto-imported store types into any
+        tsConfig: {
+            exclude: ['../cli']
+        },
         shim: false,
         typeCheck: true
     },
