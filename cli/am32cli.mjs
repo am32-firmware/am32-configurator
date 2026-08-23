@@ -116,76 +116,43 @@ function settingsEqualButVersionByte (a, b) {
 async function directFlash (info, hexString) {
     const parsed = Flash.parseHex(hexString);
     const mcu = new Mcu(info.meta.signature);
+    mcu.setInfo(info);
     if (!parsed) {
         throw new Error('hex parse failed');
     }
     escStore.bytesWritten = 0;
 
-    if (parsed.bytes < 27 * 1024 - 1 + 32) {
-        const filled = new Uint8Array(27 * 1024 - 1).fill(0xFF);
-        let bytes32Index = -1;
-        for (let i = 0; i < parsed.data.length; i++) {
-            if (parsed.data[i].bytes === 32) {
-                bytes32Index = i;
-                break;
-            }
-        }
-        if (bytes32Index === -1) {
-            throw new Error('32 bytes block not found in hex file!');
-        }
-        let lowIndex = -1;
-        for (let i = 0; i < parsed.data.length; i++) {
-            if (lowIndex === -1 || parsed.data[i].address < parsed.data[lowIndex].address) {
-                lowIndex = i;
-            }
-        }
-        filled.set(parsed.data[lowIndex].data);
-        for (let i = 0; i < parsed.data.length; i++) {
-            if (i !== lowIndex && i !== bytes32Index) {
-                filled.set(parsed.data[i].data, parsed.data[i].address - parsed.data[lowIndex].address);
-                parsed.data[i].bytes = 0;
-            }
-        }
-        parsed.data[lowIndex].data = Array.from(filled);
-        parsed.data[lowIndex].bytes = filled.length;
-        parsed.bytes = filled.length + 32;
+    // one merged 0xFF-filled image written in aligned chunks from the
+    // firmware start, mirroring the component (and writeHex)
+    const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
+    const image = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
+    if (!image) {
+        throw new Error('hex file addresses fall outside the flash');
+    }
+    const begin = mcu.getFirmwareStartByte();
+    escStore.totalBytes = image.byteLength - begin;
+
+    const havePreConfig = info.settings.BOOT_BYTE <= 1 && info.settings.LAYOUT_REVISION <= 64;
+    if (havePreConfig) {
+        const guard = Uint8Array.from(info.settingsBuffer.subarray(0, 48));
+        guard[0] = 0x00;
+        await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), guard, mcu.getDirectWriteChunk());
     }
 
-    escStore.totalBytes = parsed.bytes;
+    const CHUNK_SIZE = mcu.getDirectWriteChunk();
+    console.log('  flashing: 0x%s..0x%s (%d bytes)', begin.toString(16),
+        image.byteLength.toString(16), image.byteLength - begin);
     const t0 = Date.now();
-    for (const start of parsed.data) {
-        if (start.bytes === 0) {
-            continue;
+    for (let off = begin; off < image.byteLength; off += CHUNK_SIZE) {
+        const end = Math.min(off + CHUNK_SIZE, image.byteLength);
+        let chunk = image.subarray(off, end);
+        if (chunk.length % 8 !== 0) {
+            const padded = new Uint8Array((chunk.length + 7) & ~7).fill(0xFF);
+            padded.set(chunk);
+            chunk = padded;
         }
-        console.log('  flashing: 0x%s, %d bytes', start.address.toString(16), start.bytes);
-        const CHUNK_SIZE = mcu.getDirectWriteChunk();
-        if (CHUNK_SIZE > 8) {
-            // aligned-grid write for parts that refuse unaligned
-            // addresses, mirroring the component
-            const blockEnd = start.address + start.data.length;
-            for (let win = start.address - (start.address % CHUNK_SIZE);
-                win < blockEnd; win += CHUNK_SIZE) {
-                const chunk = new Uint8Array(CHUNK_SIZE).fill(0xFF);
-                const from = Math.max(win, start.address);
-                const to = Math.min(win + CHUNK_SIZE, blockEnd);
-                chunk.set(start.data.slice(from - start.address, to - start.address), from - win);
-                await Direct.getInstance().writeBufferToAddress(win - mcu.getFlashOffset(), chunk);
-                escStore.bytesWritten += to - from;
-            }
-            continue;
-        }
-        for (let offset = 0; offset < start.data.length; offset += CHUNK_SIZE) {
-            const wireAddress = (start.address - mcu.getFlashOffset()) + offset;
-            const end = Math.min(offset + CHUNK_SIZE, start.data.length);
-            let chunk = new Uint8Array(start.data.slice(offset, end));
-            if (chunk.length % 8 !== 0) {
-                const padded = new Uint8Array(chunk.length + 8 - (chunk.length % 8)).fill(0xFF);
-                padded.set(chunk);
-                chunk = padded;
-            }
-            await Direct.getInstance().writeBufferToAddress(wireAddress, chunk);
-            escStore.bytesWritten += end - offset;
-        }
+        await Direct.getInstance().writeBufferToAddress(off, chunk);
+        escStore.bytesWritten += end - off;
     }
     console.log('  flash writes done in %ds', ((Date.now() - t0) / 1000).toFixed(1));
 
@@ -193,7 +160,8 @@ async function directFlash (info, hexString) {
     if (preFlash.BOOT_BYTE <= 1 && preFlash.LAYOUT_REVISION <= 64) {
         console.log('  rewriting config');
         const mcu2 = new Mcu(info.meta.signature);
-        await Direct.getInstance().writeChunked(mcu2.getEepromOffset(),
+        mcu2.setInfo(info);
+        await Direct.getInstance().writeChunked(mcu2.getEepromStartByte(),
             objectToSettingsArray(info.settings, info.settings.LAYOUT_REVISION),
             mcu2.getDirectWriteChunk());
     } else {
@@ -218,9 +186,10 @@ async function directSuite (tty, hexPath) {
 
     // save settings, as writeConfig() does in direct mode, then re-read
     const mcu = new Mcu(info.meta.signature);
+    mcu.setInfo(info);
     const written = objectToSettingsArray(info.settings, info.settings.LAYOUT_REVISION);
-    await Direct.getInstance().writeChunked(mcu.getEepromOffset(), written, mcu.getDirectWriteChunk());
-    const back = await Direct.getInstance().readChunked(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
+    await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), written, mcu.getDirectWriteChunk());
+    const back = await Direct.getInstance().readChunked(mcu.getEepromStartByte(), Mcu.LAYOUT_SIZE);
     if (!settingsEqualButVersionByte(written.subarray(0, back.length), back)) {
         throw new Error('settings write/readback mismatch');
     }
