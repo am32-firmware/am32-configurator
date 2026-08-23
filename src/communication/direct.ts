@@ -1,6 +1,7 @@
 import Flash from '../flash';
 import Mcu from '../mcu';
 import serial from './serial';
+import { ADDRESS_MAGIC, DEVINFO_V3_MAX, parseDevinfoBlock } from './four_way';
 
 export enum DIRECT_COMMANDS {
     cmd_SetAddress = 0xFF,
@@ -41,6 +42,15 @@ export class Direct {
         private readonly logError: ((s: string) => void),
         private readonly logWarning: ((s: string) => void)
     ) {
+    }
+
+    // the connected ESC's Mcu, kept so the read/write helpers can apply
+    // its v3 address_shift; byte offsets are the public currency and the
+    // wire conversion happens in one place
+    private mcu: Mcu | null = null;
+
+    private toWire (byteOffset: number) {
+        return this.mcu ? this.mcu.toWireAddress(byteOffset) : byteOffset;
     }
 
     makeCRC (pBuff: number[]) {
@@ -111,20 +121,37 @@ export class Direct {
 
             const mcu = new Mcu(info.meta.signature);
             mcu.setInfo(info);
+            this.mcu = mcu;
 
-            // the direct protocol has no v3 devinfo / address_shift support,
-            // so parts whose flash exceeds the 16-bit wire-address space
-            // (e.g. 128k STM32G431) cannot be addressed; fail before any
-            // write instead of truncating offsets into firmware flash
-            if (mcu.getFlashSize() > 0x10000) {
-                this.logError(`${mcu.getName()} (${mcu.getFlashSize() / 1024}k flash) is not supported in direct-connect mode`);
-                throw new Error(`${mcu.getName()} is not supported in direct-connect mode`);
+            // v3 detection, as getInfo() does over 4-way: the same magic
+            // works on the raw wire (decodeInput() serves both
+            // transports). A pre-v3 bootloader either rejects the magic
+            // (addresses below 1024 are reserved) or returns flash bytes
+            // that fail the magic-word check.
+            try {
+                const magicAck = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, ADDRESS_MAGIC.DEVINFO);
+                if (magicAck?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                    const block = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([DEVINFO_V3_MAX]));
+                    const v3 = block ? parseDevinfoBlock(block) : null;
+                    if (v3) {
+                        info.v3 = v3;
+                        this.log(`v3 devinfo: address_shift=${v3.address_shift} firmware_start=0x${v3.firmware_start.toString(16)} eeprom_start=0x${v3.eeprom_start.toString(16)}`);
+                    }
+                }
+            } catch (e) {
+                // pre-v3 bootloader; the magic read can fail, that's fine
             }
 
-            const eepromOffset = mcu.getEepromOffset();
+            // parts whose flash exceeds the 16-bit wire-address space need
+            // the v3 address_shift; without it, fail before any write
+            // instead of truncating offsets into firmware flash
+            if (mcu.getFlashSize() > 0x10000 && !info.v3) {
+                this.logError(`${mcu.getName()} (${mcu.getFlashSize() / 1024}k flash) needs a v3 bootloader for direct-connect mode`);
+                throw new Error(`${mcu.getName()} needs a v3 bootloader for direct-connect mode`);
+            }
 
             try {
-                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset - 32);
+                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getFileNameWireAddress());
                 if (fileNameAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                     await delay(200);
 
@@ -144,7 +171,7 @@ export class Direct {
 
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
-                    const settingsArray = await this.readChunked(eepromOffset, info.layoutSize);
+                    const settingsArray = await this.readChunked(mcu.getEepromStartByte(), info.layoutSize);
                     info.settings = bufferToSettings(settingsArray!, info.settings.LAYOUT_REVISION as number);
                     info.settingsBuffer = settingsArray!;
 
@@ -229,7 +256,7 @@ export class Direct {
 
     async readChunked (address: number, expected: number, chunkSize = 64) {
         let response: Uint8Array = new Uint8Array();
-        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address));
         if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             if (expected > chunkSize) {
                 let currentLayoutSize = 0;
@@ -250,7 +277,7 @@ export class Direct {
                         break;
                     }
 
-                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address + currentLayoutSize);
+                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address + currentLayoutSize));
                     if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                         this.logError('Failed to set address');
                         throw new Error('Failed to set address');
@@ -277,7 +304,7 @@ export class Direct {
     async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {
         let currentTry = 0;
         while (true) {
-            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address));
             if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                 if (currentTry++ === retries) {
                     throw new Error('setAddress failed');

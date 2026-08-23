@@ -31,8 +31,8 @@ const DEVINFO_MAGIC2 = 0x4EB863D9;
  * sane; otherwise null (pre-v3 bootloader, truncated response, or junk).
  */
 const DEVINFO_V3_MIN = 27; // smallest struct that contains every field we read
-const DEVINFO_V3_MAX = 64; // sanity cap so a garbage byte can't be trusted as a length
-function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
+export const DEVINFO_V3_MAX = 64; // sanity cap so a garbage byte can't be trusted as a length
+export function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
     if (block.byteLength < 8 + 9 + 1) { // need at least magic + deviceInfo + length
         return null;
     }
