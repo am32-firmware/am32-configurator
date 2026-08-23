@@ -131,11 +131,9 @@ class Flash {
                 }
                 break;
 
-                // start segment address record
+                // start segment address record: the program entry point,
+                // irrelevant to what gets flashed
             case 0x03:
-                if (parseInt(content, 16) !== 0) { // ignore if segment is 0
-                    throw new Error('start segment address record found - NOT IMPLEMENTED!');
-                }
                 break;
 
                 // extended linear address record
