@@ -57,6 +57,11 @@ export function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
         eeprom_start: dv.getUint16(23, true),
         tune_start: dv.getUint16(25, true)
     };
+    if (v3.address_shift > 8) {
+        // every field below redirects flash writes; a shift no real part
+        // needs (8 covers 16MB) marks the block as junk, not v3
+        return null;
+    }
     return v3;
 }
 

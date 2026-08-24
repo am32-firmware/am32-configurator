@@ -131,8 +131,17 @@ export class Direct {
             try {
                 const magicAck = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, ADDRESS_MAGIC.DEVINFO);
                 if (magicAck?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                    const block = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([DEVINFO_V3_MAX]));
-                    const v3 = block ? parseDevinfoBlock(block) : null;
+                    const reply = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([DEVINFO_V3_MAX]));
+                    // the reply is data + crc16 (lo, hi) + ack. The block
+                    // redirects every later eeprom and firmware write, so a
+                    // bit error that leaves the magic words intact must not
+                    // be trusted: require the ack and the wire CRC too.
+                    const n = DEVINFO_V3_MAX;
+                    const v3 = (reply && reply.length === n + 3 &&
+                        reply[n + 2] === DIRECT_RESPONSES.GOOD_ACK &&
+                        this.makeCRC(Array.from(reply.subarray(0, n))) === ((reply[n + 1] << 8) | reply[n]))
+                        ? parseDevinfoBlock(reply.subarray(0, n))
+                        : null;
                     if (v3) {
                         info.v3 = v3;
                         this.log(`v3 devinfo: address_shift=${v3.address_shift} firmware_start=0x${v3.firmware_start.toString(16)} eeprom_start=0x${v3.eeprom_start.toString(16)}`);
@@ -143,9 +152,11 @@ export class Direct {
             }
 
             // parts whose flash exceeds the 16-bit wire-address space need
-            // the v3 address_shift; without it, fail before any write
-            // instead of truncating offsets into firmware flash
-            if (mcu.getFlashSize() > 0x10000 && !info.v3) {
+            // a v3 address_shift that actually spans them; without that,
+            // fail before any write instead of truncating offsets into
+            // firmware flash
+            if (mcu.getFlashSize() > 0x10000 &&
+                !(info.v3 && (0x10000 << info.v3.address_shift) >= mcu.getFlashSize())) {
                 this.logError(`${mcu.getName()} (${mcu.getFlashSize() / 1024}k flash) needs a v3 bootloader for direct-connect mode`);
                 throw new Error(`${mcu.getName()} needs a v3 bootloader for direct-connect mode`);
             }
