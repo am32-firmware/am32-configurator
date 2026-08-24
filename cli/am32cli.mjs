@@ -132,9 +132,12 @@ async function directFlash (info, hexString) {
     const begin = mcu.getFirmwareStartByte();
     escStore.totalBytes = image.byteLength - begin;
 
-    const havePreConfig = info.settings.BOOT_BYTE <= 1 && info.settings.LAYOUT_REVISION <= 64;
+    // LAYOUT_REVISION 0 is a zeroed eeprom, not a configuration; the guard
+    // writes the whole buffer since the eeprom write erases its page
+    const havePreConfig = info.settings.BOOT_BYTE <= 1 &&
+        info.settings.LAYOUT_REVISION >= 1 && info.settings.LAYOUT_REVISION <= 64;
     if (havePreConfig) {
-        const guard = Uint8Array.from(info.settingsBuffer.subarray(0, 48));
+        const guard = Uint8Array.from(info.settingsBuffer);
         guard[0] = 0x00;
         await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), guard, mcu.getDirectWriteChunk());
     }
@@ -156,9 +159,11 @@ async function directFlash (info, hexString) {
     }
     console.log('  flash writes done in %ds', ((Date.now() - t0) / 1000).toFixed(1));
 
-    const preFlash = info.settings;
-    if (preFlash.BOOT_BYTE <= 1 && preFlash.LAYOUT_REVISION <= 64) {
+    if (havePreConfig) {
         console.log('  rewriting config');
+        // the flash completed, so the ESC must boot it: a reconnect after
+        // an interrupted flash reads back the 0 the guard wrote
+        info.settings.BOOT_BYTE = 1;
         const mcu2 = new Mcu(info.meta.signature);
         mcu2.setInfo(info);
         await Direct.getInstance().writeChunked(mcu2.getEepromStartByte(),
