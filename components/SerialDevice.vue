@@ -977,12 +977,17 @@ const startFlash = async (hexString: string) => {
 
             // boot bit: clear before flashing, set again via the config
             // rewrite (or reset seeding) after success, as writeHex does -
-            // a power loss mid-flash must not leave a half image bootable
+            // a power loss mid-flash must not leave a half image bootable.
+            // LAYOUT_REVISION 0 is a zeroed eeprom, not a configuration.
             const preFlashSettings = escStore.firstValidEscData.data.settings;
             const havePreConfig = (preFlashSettings.BOOT_BYTE as number) <= 1 &&
+                (preFlashSettings.LAYOUT_REVISION as number) >= 1 &&
                 (preFlashSettings.LAYOUT_REVISION as number) <= 64;
             if (havePreConfig) {
-                const guard = Uint8Array.from(escStore.firstValidEscData.data.settingsBuffer.subarray(0, 48));
+                // the whole buffer, not just the leading bytes: the eeprom
+                // write erases its page, so a short guard would trade the
+                // rest of the stored settings for the boot byte
+                const guard = Uint8Array.from(escStore.firstValidEscData.data.settingsBuffer);
                 guard[0] = 0x00;
                 await Direct.getInstance().writeChunked(mcu.getEepromStartByte(), guard, mcu.getDirectWriteChunk());
             }
@@ -1007,10 +1012,12 @@ const startFlash = async (hexString: string) => {
             // settings) and nothing worth preserving, so leave it erased
             // and let 'Send default config' seed it. Rewriting is for
             // keeping a real pre-flash configuration across the update.
-            const preFlash = escStore.firstValidEscData.data.settings;
-            if ((preFlash.BOOT_BYTE as number) <= 1 &&
-                (preFlash.LAYOUT_REVISION as number) <= 64) {
+            if (havePreConfig) {
                 escStore.step = 'Rewriting config';
+                // the flash completed: the ESC must boot it, whatever the
+                // boot byte said before - a reconnect after an interrupted
+                // flash reads back the 0 the guard wrote
+                escStore.firstValidEscData.data.settings.BOOT_BYTE = 1;
                 await writeConfig();
             } else {
                 logStore.log('eeprom is erased; use "Send default config" to initialise it');
