@@ -6,12 +6,15 @@ WORKDIR /usr/src/app
 COPY . .
 
 ARG DATABASE_URL
+# .git is excluded from the build context, so the caller passes the hash in
+ARG GIT_SHA=
+ENV NUXT_PUBLIC_GIT_HASH=${GIT_SHA}
 ENV CI='true'
 ENV YARN_ENABLE_INLINE_BUILDS='true'
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
 ENV DATABASE_URL="${DATABASE_URL:-mysql://am32:am32password@mariadb:3306/am32}"
-RUN corepack enable && yarn set version berry
+RUN corepack enable
 RUN npm -g i tsx
 RUN yarn --immutable
 RUN yarn run prepare

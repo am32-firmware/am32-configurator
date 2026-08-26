@@ -7,6 +7,12 @@ export const useEscStore = defineStore('esc', () => {
     const escData = ref<EscData[]>([]);
 
     const selectedEscInfo = computed(() => escData.value.filter(e => !e.isError && e.data?.isSelected).map(e => e.data) ?? []);
+    // escData indices (== four-way targets) behind each selectedEscInfo
+    // position, so UI selections over the filtered list can be mapped back
+    // to the right physical ESC
+    const selectedEscIndices = computed(() => escData.value
+        .map((e, i) => (!e.isError && e.data?.isSelected) ? i : -1)
+        .filter(i => i >= 0));
     const firstValidEscData = computed(() => escData.value?.find(d => !d.isError && d.data));
 
     const settingsDirty = ref(false);
@@ -29,7 +35,7 @@ export const useEscStore = defineStore('esc', () => {
         step.value = 'Writing';
     };
 
-    return { settingsDirty, isSaving, isLoading, count, expectedCount, escData, selectedEscInfo, firstValidEscData, activeTarget, totalBytes, bytesWritten, step, $reset };
+    return { settingsDirty, isSaving, isLoading, count, expectedCount, escData, selectedEscInfo, selectedEscIndices, firstValidEscData, activeTarget, totalBytes, bytesWritten, step, $reset };
 });
 
 if (import.meta.hot) {
