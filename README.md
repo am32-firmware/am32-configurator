@@ -109,3 +109,14 @@ on the host that owns the mount:
 ```bash
 FILES_ROOT=/srv/am32/files tsx run.ts
 ```
+
+### Where the folder comes from
+
+The files were previously served through an S3 API in front of the same data:
+a Versity Gateway (`versitygw`) running with a POSIX backend, so each "bucket"
+was already a directory on the server. Migrating was a folder-to-folder copy,
+not an object-store export — bucket names and directory names match one for
+one, which is why the layout above needs no translation.
+
+If a deployment still has an S3-compatible endpoint holding these files, any
+mirroring tool will do; nothing in the app talks to S3 any more.
