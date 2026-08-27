@@ -16,3 +16,4 @@ coverage*
 .output
 public/uploads
 .nuxt
+storage

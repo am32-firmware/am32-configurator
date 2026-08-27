@@ -13,6 +13,7 @@ ENV CI='true'
 ENV YARN_ENABLE_INLINE_BUILDS='true'
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
+ENV FILES_ROOT=/data/files
 ENV DATABASE_URL="${DATABASE_URL:-mysql://am32:am32password@mariadb:3306/am32}"
 RUN corepack enable
 RUN npm -g i tsx
@@ -24,6 +25,7 @@ RUN yarn run build
 USER node
 ENV HOST=0.0.0.0
 ENV REDIS_HOST=cache
+ENV FILES_ROOT=/data/files
 EXPOSE 3000
 
 ENTRYPOINT [ "node", ".output/server/index.mjs" ]

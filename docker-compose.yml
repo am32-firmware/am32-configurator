@@ -16,6 +16,9 @@ services:
     env_file: stack.env
     volumes:
       - uploads:/usr/src/app/public/uploads
+      # firmware / tools / eeprom binaries are distributed from this folder;
+      # point FILES_HOST_PATH at the directory that holds them on the host
+      - ${FILES_HOST_PATH:-./storage/files}:/data/files:ro
     networks:
       - proxy
       - redis-net
