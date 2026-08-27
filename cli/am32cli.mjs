@@ -19,9 +19,14 @@ import { openNodeSerialPort } from './node-serial-port.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// webserial-wrapper's timer shim references the Worker identifier at
-// module scope; make it resolve (to undefined) so the wrapper falls
-// back to native timers under Node
+// webserial-wrapper's timer shim references browser globals at module
+// scope. Node 20 does not provide navigator, and the wrapper only needs
+// its userAgent while deciding whether to install the worker timer shim.
+// Supply the minimum browser stand-ins before jiti imports the store that
+// imports webserial-wrapper.
+if (!('navigator' in globalThis)) {
+    globalThis.navigator = { userAgent: 'Node.js' };
+}
 if (!('Worker' in globalThis)) {
     globalThis.Worker = undefined;
 }
