@@ -11,7 +11,7 @@ Two transports:
                   reply, since the app's direct mode paces itself on the
                   adapter's self-echo of the shared wire
   --mode 4way     a Betaflight-style FC: minimal MSP plus BLHeli 4-way
-                  passthrough to the emulated bootloader
+                  passthrough to four independent emulated bootloaders
 
 Two bootloader generations, modelled on the AM32-bootloader sources:
 
@@ -39,6 +39,7 @@ REQ_MARK = 0x2F
 RESP_MARK = 0x2E
 ACK_OK = 0x00
 ACK_I_INVALID_CMD = 0x02
+ACK_I_INVALID_CHANNEL = 0x08
 ACK_D_GENERAL_ERROR = 0x0F
 
 # bootloader serial acks
@@ -435,11 +436,12 @@ class DirectServer(object):
 class FourWayFC(object):
     '''a Betaflight-style FC: minimal MSP, then BLHeli 4-way passthrough
     after MSP_SET_PASSTHROUGH. Each 4-way command becomes bootloader
-    transactions against the EscModel, mirroring what a real FC does on
-    the one-wire side.'''
+    transactions against the selected EscModel, mirroring what a real FC
+    does on each motor's one-wire side.'''
 
-    def __init__(self, esc, log):
-        self.esc = esc
+    def __init__(self, escs, log):
+        self.escs = list(escs)
+        self.selected_esc = 0
         self.log = log
         self.ep = PtyEndpoint()
         self.in_fourway = False
@@ -503,7 +505,7 @@ class FourWayFC(object):
         elif cmd == 104:    # MSP_MOTOR
             self._msp_reply(cmd, struct.pack('<8H', *([1000] * 8)))
         elif cmd == 245:    # MSP_SET_PASSTHROUGH
-            self._msp_reply(cmd, bytes([1]))
+            self._msp_reply(cmd, bytes([len(self.escs)]))
             self.in_fourway = True
             self.log('4-way passthrough started')
         else:
@@ -537,16 +539,16 @@ class FourWayFC(object):
                        len(params) & 0xFF]) + bytes(params) + bytes([ack]))
         return body + struct.pack('>H', crc16_xmodem(body))
 
-    def _connect(self):
+    def _connect(self, esc):
         '''probe until the ESC is back in its bootloader, as an FC's
         passthrough retries do; bounded so a dead ESC still errors'''
         deadline = time.time() + 3.0
-        while self.esc.running and time.time() < deadline:
+        while esc.running and time.time() < deadline:
             time.sleep(0.05)
-        return not self.esc.running
+        return not esc.running
 
     def _handle(self, frame):
-        esc = self.esc
+        esc = self.escs[self.selected_esc]
         cmd = frame[1]
         address = (frame[2] << 8) | frame[3]
         size = frame[4] or 256
@@ -568,14 +570,21 @@ class FourWayFC(object):
             ack = ACK_OK if not esc.running else ACK_D_GENERAL_ERROR
             return self._reply(cmd, address, [0], ack)
         if cmd == 0x37:              # cmd_DeviceInitFlash
-            if params and params[0] != 0:
-                return self._reply(cmd, address, [0], ACK_I_INVALID_CMD)
-            if not self._connect():
-                return self._reply(cmd, address, [0], ACK_D_GENERAL_ERROR)
+            target = params[0] if params else 0
+            # Betaflight uses the parameter as the motor/ESC channel. Its
+            # init reply has address 0 rather than echoing that channel, as
+            # seen on the wire; the channel remains selected for following
+            # read/write/reset commands.
+            if target >= len(self.escs):
+                return self._reply(cmd, 0, [0], ACK_I_INVALID_CHANNEL)
+            self.selected_esc = target
+            esc = self.escs[target]
+            if not self._connect(esc):
+                return self._reply(cmd, 0, [0], ACK_D_GENERAL_ERROR)
             info = esc.device_info()
             # escDeviceInfo_t: signature LE from bytes 4/5, then the pin
             # code and boot-pages slots
-            return self._reply(cmd, address,
+            return self._reply(cmd, 0,
                                [info[5], info[4], info[3], info[6]], ACK_OK)
         if cmd == 0x35:              # cmd_DeviceReset
             esc.run()
@@ -621,6 +630,9 @@ def main():
     parser.add_argument('--run-seconds', type=float, default=2.0,
                         help='how long the "app" runs after CMD_RUN '
                              'before quiet-timing-out into the bootloader')
+    parser.add_argument('--esc-count', type=int, choices=range(1, 9),
+                        default=4,
+                        help='number of ESCs behind the 4-way interface')
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
 
@@ -628,12 +640,15 @@ def main():
         if args.verbose:
             print('sim: %s' % msg, file=sys.stderr, flush=True)
 
-    esc = EscModel(args.generation, args.flash_size,
-                   run_seconds=args.run_seconds, log=log)
     if args.mode == 'direct':
+        esc = EscModel(args.generation, args.flash_size,
+                       run_seconds=args.run_seconds, log=log)
         server = DirectServer(esc, log)
     else:
-        server = FourWayFC(esc, log)
+        escs = [EscModel(args.generation, args.flash_size,
+                         run_seconds=args.run_seconds, log=log)
+                for _ in range(args.esc_count)]
+        server = FourWayFC(escs, log)
     print(server.ep.path, flush=True)
     try:
         server.serve_forever()

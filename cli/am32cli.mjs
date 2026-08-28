@@ -270,9 +270,17 @@ async function fourwaySuite (tty, hexPath) {
     escStore.expectedCount = passthrough?.data.getUint8(0) ?? 0;
     console.log('  4-way passthrough, %d ESC(s)', escStore.expectedCount);
 
-    const info = await FourWay.getInstance().getInfo(0, 20);
-    escStore.escData = [{ isError: false, data: info }];
-    summarize(info);
+    if (escStore.expectedCount < 1) {
+        throw new Error('4-way interface reported no ESCs');
+    }
+    escStore.escData = [];
+    for (let target = 0; target < escStore.expectedCount; target++) {
+        const targetInfo = await FourWay.getInstance().getInfo(target, 20);
+        escStore.escData.push({ isError: false, data: targetInfo });
+        console.log('  ESC %d discovered', target + 1);
+        summarize(targetInfo);
+    }
+    const info = escStore.escData[0].data;
 
     // settings write via writeSettings(), with a real change, then verify
     // through a fresh read and restore

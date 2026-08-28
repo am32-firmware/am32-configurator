@@ -129,8 +129,14 @@ def main():
         took = time.time() - t0
 
         if expect[0] == 'pass':
-            ok = rc == 0
-            detail = 'suite passed' if ok else 'exit %u' % rc
+            found_four = mode != '4way' or 'ESC 4 discovered' in out
+            ok = rc == 0 and found_four
+            if ok:
+                detail = 'suite passed'
+            elif rc == 0:
+                detail = 'suite did not discover all four ESCs'
+            else:
+                detail = 'exit %u' % rc
         else:
             ok = rc not in (0, 2, 3) and expect[1] in out
             if rc == 0:
