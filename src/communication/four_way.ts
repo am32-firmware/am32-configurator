@@ -171,13 +171,10 @@ export class FourWay {
     }
 
     initFlash (target: number, retries = 10) {
-        // put the target in the address field: InitFlash replies carry no
-        // target of their own, so without this a late reply for one ESC is
-        // accepted as the reply for the next. The 4way interface (betaflight
-        // serial_4way.c, ArduPilot AP_BLHeli) ignores the address here but
-        // echoes it, which lets the stale-reply check in sendWithPromise
-        // tell replies for different targets apart.
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], target, retries);
+        // The target is carried only in the parameter. Betaflight replies to
+        // InitFlash with address 0, so putting the target in the otherwise
+        // unused address field makes every target after ESC 1 look stale.
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
     }
 
     reset (target: number) {
