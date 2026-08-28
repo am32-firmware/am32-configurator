@@ -439,9 +439,15 @@ class FourWayFC(object):
     transactions against the selected EscModel, mirroring what a real FC
     does on each motor's one-wire side.'''
 
-    def __init__(self, escs, log):
+    def __init__(self, escs, log, init_delay=1.0):
         self.escs = list(escs)
         self.selected_esc = 0
+        # how long the interface takes to answer cmd_DeviceInitFlash. It is
+        # not a wire round-trip: the FC first connects to the ESC on its
+        # one-wire side and only acks once that succeeded. Measured against
+        # a Betaflight passthrough: ~1.0s. Replying instantly would let the
+        # app's timeouts pass here and still fail on real hardware.
+        self.init_delay = init_delay
         self.log = log
         self.ep = PtyEndpoint()
         self.in_fourway = False
@@ -542,6 +548,7 @@ class FourWayFC(object):
     def _connect(self, esc):
         '''probe until the ESC is back in its bootloader, as an FC's
         passthrough retries do; bounded so a dead ESC still errors'''
+        time.sleep(self.init_delay)
         deadline = time.time() + 3.0
         while esc.running and time.time() < deadline:
             time.sleep(0.05)
@@ -633,6 +640,10 @@ def main():
     parser.add_argument('--esc-count', type=int, choices=range(1, 9),
                         default=4,
                         help='number of ESCs behind the 4-way interface')
+    parser.add_argument('--init-delay', type=float, default=1.0,
+                        help='seconds the 4-way interface takes to answer '
+                             'cmd_DeviceInitFlash, as a real FC does while '
+                             'it connects to the ESC (0 disables)')
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
 
@@ -648,7 +659,7 @@ def main():
         escs = [EscModel(args.generation, args.flash_size,
                          run_seconds=args.run_seconds, log=log)
                 for _ in range(args.esc_count)]
-        server = FourWayFC(escs, log)
+        server = FourWayFC(escs, log, init_delay=args.init_delay)
     print(server.ep.path, flush=True)
     try:
         server.serve_forever()

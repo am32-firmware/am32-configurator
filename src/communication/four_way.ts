@@ -65,6 +65,18 @@ export function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
     return v3;
 }
 
+/**
+ * Extra behaviour for one sendWithPromise exchange.
+ *
+ * `probe` marks a feature-detection read: a command the ESC is allowed to
+ * refuse. A refusal then resolves to null instead of being retried and
+ * logged as a fault - a pre-v3 bootloader nacking the devinfo magic is the
+ * protocol working, not an error the user should see in red.
+ */
+export interface FourWaySendOptions {
+    probe?: boolean;
+}
+
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
     cmd_ProtocolGetVersion = 0x31,
@@ -170,11 +182,25 @@ export class FourWay {
         return crc & 0xFFFF;
     }
 
-    initFlash (target: number, retries = 10) {
+    /**
+     * cmd_DeviceInitFlash is not a wire round-trip. The 4-way interface
+     * first has to connect to the ESC on its one-wire side - betaflight
+     * serial_4way.c probes the bootloader several times before it answers -
+     * so the ack legitimately arrives about a second after the request.
+     * Measured against a Betaflight passthrough: 1020ms.
+     *
+     * The 200ms default therefore never covered a single attempt, and the
+     * command only ever succeeded because some caller passed enough retries
+     * for a late reply to land inside a later attempt's window. getInfo()'s
+     * connect path passes 2, a 650ms budget, so it gave up before the first
+     * ack could arrive: that is the "max retries reached" the Read button
+     * reports on a perfectly healthy ESC.
+     */
+    initFlash (target: number, retries = 10, timeout = 2000) {
         // The target is carried only in the parameter. Betaflight replies to
         // InitFlash with address 0, so putting the target in the otherwise
         // unused address field makes every target after ESC 1 look stale.
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries, timeout);
     }
 
     reset (target: number) {
@@ -222,7 +248,7 @@ export class FourWay {
             // forwards it once complete; a heavily loaded emulator host can
             // stretch that a lot, and 128k parts have no fallback if v3
             // detection fails, so be generous
-            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 3, 500, 50);
+            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 3, 500, 50, { probe: true });
             const v3 = magicRead?.params ? parseDevinfoBlock(magicRead.params) : null;
             if (v3) {
                 info.v3 = v3;
@@ -291,14 +317,15 @@ export class FourWay {
         return info;
     }
 
-    readAddress (address: number, bytes: number, retries = 10, timeout = 200, retryDelay = 250) {
+    readAddress (address: number, bytes: number, retries = 10, timeout = 200, retryDelay = 250, options: FourWaySendOptions = {}) {
         return this.sendWithPromise(
             FOUR_WAY_COMMANDS.cmd_DeviceRead,
             [bytes === 256 ? 0 : bytes],
             address,
             retries,
             timeout,
-            retryDelay
+            retryDelay,
+            options
         );
     }
 
@@ -336,8 +363,11 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200, retryDelay = 250): Promise<FourWayResponse | null> {
+    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200, retryDelay = 250, options: FourWaySendOptions = {}): Promise<FourWayResponse | null> {
         let currentTry = 0;
+        // a probe asks a question the ESC may legitimately answer with "no",
+        // so running out of tries is information, not a fault to shout about
+        const reportExhausted = options.probe ? this.log : this.logError;
 
         const callback: (resolve: PromiseFn<any>, reject: PromiseFn<any>) => void = async (resolve, reject) => {
             while (currentTry++ < retries) {
@@ -366,6 +396,13 @@ export class FourWay {
                         } else if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;
+                        } else if (options.probe) {
+                            // the device answered and refused. Retrying cannot
+                            // change a decided answer - retries are there for
+                            // silence and corruption, not for a clean nack.
+                            this.log(`  ${enumToString(response.data.ack, FOUR_WAY_ACK)}, not supported by this bootloader`);
+                            resolve(null);
+                            return;
                         } else {
                             this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                         }
@@ -379,8 +416,8 @@ export class FourWay {
             }
 
             if (currentTry > retries) {
+                reportExhausted('max retries reached');
                 reject(new Error('max retries reached'));
-                this.logError('max retries reached');
             }
         };
         return new Promise(callback) as Promise<FourWayResponse | null>;
