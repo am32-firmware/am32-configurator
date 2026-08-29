@@ -52,10 +52,11 @@ class Serial {
     }
 
     // MSP replies from a real FC are normally quick, but Web Serial scheduling
-    // and a loaded/emulated FC can easily exceed 50ms.  The transport already
-    // documents 250ms as its normal exchange budget; use that for callers
-    // (notably MspClient) which do not provide an explicit timeout.
-    public write (data: ArrayBuffer, ms = 250, probe?: SerialPacketProbe) {
+    // and a loaded/emulated FC can exceed 250ms, particularly for the first
+    // MSP request after leaving synchronous 4-way mode.  Successful replies
+    // still resolve immediately, so the larger value only changes the failure
+    // bound while giving recovery and passthrough enough headroom.
+    public write (data: ArrayBuffer, ms = 1000, probe?: SerialPacketProbe) {
         return this.writeWithResponse(data, ms, probe);
     }
 

@@ -247,14 +247,7 @@ async function fourwaySuite (tty, hexPath, discoverOnly = false) {
             serialStore.isFourWay = true;
             await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
             serialStore.isFourWay = false;
-            for (let attempt = 0; attempt < 30; attempt++) {
-                await delay(attempt === 0 ? 1000 : 500);
-                const recovered = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => null);
-                if (recovered) {
-                    return recovered;
-                }
-            }
-            return null;
+            return Msp.getInstance().sendWithRetries(MSP_COMMANDS.MSP_API_VERSION);
         });
     if (!apiVersion) {
         throw new Error('MSP_API_VERSION failed');

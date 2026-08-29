@@ -610,17 +610,9 @@ const connectToDevice = async () => {
                         serialStore.isFourWay = true;
                         await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
                         serialStore.isFourWay = false;
-                        // A timed-out long ESC read may still be occupying
-                        // Betaflight's synchronous 4-way loop. InterfaceExit
-                        // is already queued on USB, but MSP cannot answer until
-                        // that read drains. Poll rather than declaring the FC
-                        // dead after one second.
-                        for (let attempt = 0; attempt < 30; attempt++) {
-                            await delay(attempt === 0 ? 1000 : 500);
-                            const recovered = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => null);
-                            if (recovered) {
-                                return recovered;
-                            }
+                        const recovered = await Msp.getInstance().sendWithRetries(MSP_COMMANDS.MSP_API_VERSION);
+                        if (recovered) {
+                            return recovered;
                         }
                         logError('Could not leave four way mode. Restart and replug the device and try again.');
                         return null;
