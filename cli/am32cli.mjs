@@ -4,6 +4,7 @@
 //
 //   node cli/am32cli.mjs direct-suite  <tty> <firmware.hex>
 //   node cli/am32cli.mjs fourway-suite <tty> <firmware.hex>
+//   node cli/am32cli.mjs fourway-discover <tty>
 //
 // This is NOT a reimplementation: it loads the same four_way.ts,
 // direct.ts, serial.ts, mcu.ts, flash.ts and eeprom.ts the deployed app
@@ -232,7 +233,7 @@ async function directSuite (tty, hexPath) {
     console.log('DIRECT SUITE PASSED');
 }
 
-async function fourwaySuite (tty, hexPath) {
+async function fourwaySuite (tty, hexPath, discoverOnly = false) {
     const port = openNodeSerialPort(tty);
     Serial.init(log, logError, logWarning, serialStore.deviceHandles.serial, port);
 
@@ -245,9 +246,15 @@ async function fourwaySuite (tty, hexPath) {
             logError('MSP_API_VERSION failed, trying to exit fourway and try again.');
             serialStore.isFourWay = true;
             await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
-            await delay(1000);
             serialStore.isFourWay = false;
-            return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => null);
+            for (let attempt = 0; attempt < 30; attempt++) {
+                await delay(attempt === 0 ? 1000 : 500);
+                const recovered = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => null);
+                if (recovered) {
+                    return recovered;
+                }
+            }
+            return null;
         });
     if (!apiVersion) {
         throw new Error('MSP_API_VERSION failed');
@@ -282,6 +289,12 @@ async function fourwaySuite (tty, hexPath) {
         escStore.escData.push({ isError: false, data: targetInfo });
         console.log('  ESC %d discovered', target + 1);
         summarize(targetInfo);
+    }
+    if (discoverOnly) {
+        await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
+        await delay(1000);
+        console.log('FOURWAY DISCOVERY PASSED');
+        return;
     }
     const info = escStore.escData[0].data;
 
@@ -320,8 +333,10 @@ try {
         await directSuite(tty, hexPath);
     } else if (cmd === 'fourway-suite') {
         await fourwaySuite(tty, hexPath);
+    } else if (cmd === 'fourway-discover') {
+        await fourwaySuite(tty, undefined, true);
     } else {
-        console.error('usage: am32cli.mjs direct-suite|fourway-suite <tty> <firmware.hex>');
+        console.error('usage: am32cli.mjs direct-suite|fourway-suite <tty> <firmware.hex> | fourway-discover <tty>');
         process.exit(2);
     }
     process.exit(0);
