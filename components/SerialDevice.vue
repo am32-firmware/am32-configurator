@@ -643,11 +643,15 @@ const connectToDevice = async () => {
 
                     const passthroughResult = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
+                    if (!passthroughResult || passthroughResult.data.byteLength === 0) {
+                        logError('No ESC passthrough response - update FC firmware if outdated.');
+                    }
+
                     await delay(2000);
 
                     serialStore.isFourWay = true;
 
-                    escStore.expectedCount = passthroughResult?.data.getUint8(0) ?? 0;
+                    escStore.expectedCount = passthroughResult ? safeGetUint8(passthroughResult.data, 0) : 0;
                 }
 
                 serialStore.hasConnection = true;
@@ -687,11 +691,15 @@ const connectToEsc = async () => {
         if (!serialStore.isFourWay) {
             const result = await Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_SET_PASSTHROUGH);
 
+            if (!result || result.data.byteLength === 0) {
+                logError('No ESC passthrough response - update FC firmware if outdated.');
+            }
+
             await delay(2000);
 
             serialStore.isFourWay = true;
 
-            escStore.expectedCount = result?.data.getUint8(0) ?? 0;
+            escStore.expectedCount = result ? safeGetUint8(result.data, 0) : 0;
         }
 
         escData.value = [];
