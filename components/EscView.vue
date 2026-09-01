@@ -87,15 +87,15 @@
       </div>
       <div v-else-if="mcu" class="">
         <div v-if="mcu?.settingsBuffer[0] === 0x01">
-          <div>
+          <div @click.stop>
             <UCheckbox v-model="isReversed" label="Reversed" />
           </div>
-          <div>
+          <div @click.stop>
             <UCheckbox v-model="is3DMode" label="3D mode" />
           </div>
         </div>
         <div v-if="mcu?.settingsBuffer[0] === 0x00" class="flex items-center justify-center gap-4">
-          <UIcon name="i-heroicons-exclamation-triangle-16-solid" class="w-10 h-10 text-red-700" /> 
+          <UIcon name="i-heroicons-exclamation-triangle-16-solid" class="w-10 h-10 text-red-700" />
           <div class="text-red-700 font-bold">
             <p>Flash was unsuccessful.</p>
             <p>Reflash firmware to fix</p>

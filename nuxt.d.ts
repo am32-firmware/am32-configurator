@@ -43,6 +43,7 @@ interface Hex {
 interface BlobFolderFile {
     name: string;
     url: string;
+    downloadUrl?: string;
 }
 
 interface BlobFolder {
@@ -64,6 +65,27 @@ type CacheEntry = {
     name: string,
     url: string
 };
+
+interface Sponsor {
+    id: string;
+    name: string;
+    image: string;
+    url: string;
+    class: string;
+    hideAfter: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface User {
+    id: string;
+    username: string;
+    email: string | null;
+    role: string;
+    active: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+}
 
 declare module 'bluejay-rtttl-parse' {
     // biome-ignore lint/complexity/noStaticOnlyClass: <explanation>

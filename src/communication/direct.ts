@@ -1,6 +1,7 @@
 import Flash from '../flash';
 import Mcu from '../mcu';
 import serial from './serial';
+import { ADDRESS_MAGIC, DEVINFO_V3_MAX, parseDevinfoBlock } from './four_way';
 
 export enum DIRECT_COMMANDS {
     cmd_SetAddress = 0xFF,
@@ -41,6 +42,15 @@ export class Direct {
         private readonly logError: ((s: string) => void),
         private readonly logWarning: ((s: string) => void)
     ) {
+    }
+
+    // the connected ESC's Mcu, kept so the read/write helpers can apply
+    // its v3 address_shift; byte offsets are the public currency and the
+    // wire conversion happens in one place
+    private mcu: Mcu | null = null;
+
+    private toWire (byteOffset: number) {
+        return this.mcu ? this.mcu.toWireAddress(byteOffset) : byteOffset;
     }
 
     makeCRC (pBuff: number[]) {
@@ -94,7 +104,8 @@ export class Direct {
         const init = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0x0D, 'B'.charCodeAt(0), 'L'.charCodeAt(0), 'H'.charCodeAt(0), 'e'.charCodeAt(0), 'l'.charCodeAt(0), 'i'.charCodeAt(0), 0xF4, 0x7D
         ]);
-        const result = await serial.write(init.buffer, 2000);
+        const result = await serial.write(init.buffer, 2000,
+            (response: Uint8Array) => response.length >= init.length + 9);
         if (result) {
             const infoBuffer = result.subarray(init.length);
             const message: FourWayResponse = {
@@ -110,11 +121,48 @@ export class Direct {
 
             const mcu = new Mcu(info.meta.signature);
             mcu.setInfo(info);
+            this.mcu = mcu;
 
-            const eepromOffset = mcu.getEepromOffset();
+            // v3 detection, as getInfo() does over 4-way: the same magic
+            // works on the raw wire (decodeInput() serves both
+            // transports). A pre-v3 bootloader either rejects the magic
+            // (addresses below 1024 are reserved) or returns flash bytes
+            // that fail the magic-word check.
+            try {
+                const magicAck = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, ADDRESS_MAGIC.DEVINFO);
+                if (magicAck?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
+                    const reply = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([DEVINFO_V3_MAX]));
+                    // the reply is data + crc16 (lo, hi) + ack. The block
+                    // redirects every later eeprom and firmware write, so a
+                    // bit error that leaves the magic words intact must not
+                    // be trusted: require the ack and the wire CRC too.
+                    const n = DEVINFO_V3_MAX;
+                    const v3 = (reply && reply.length === n + 3 &&
+                        reply[n + 2] === DIRECT_RESPONSES.GOOD_ACK &&
+                        this.makeCRC(Array.from(reply.subarray(0, n))) === ((reply[n + 1] << 8) | reply[n]))
+                        ? parseDevinfoBlock(reply.subarray(0, n))
+                        : null;
+                    if (v3) {
+                        info.v3 = v3;
+                        this.log(`v3 devinfo: address_shift=${v3.address_shift} firmware_start=0x${v3.firmware_start.toString(16)} eeprom_start=0x${v3.eeprom_start.toString(16)}`);
+                    }
+                }
+            } catch (e) {
+                // pre-v3 bootloader; the magic read can fail, that's fine
+            }
+
+            // parts whose flash exceeds the 16-bit wire-address space need
+            // a v3 address_shift that actually spans them; without that,
+            // fail before any write instead of truncating offsets into
+            // firmware flash
+            if (mcu.getFlashSize() > 0x10000 &&
+                !(info.v3 && (0x10000 << info.v3.address_shift) >= mcu.getFlashSize())) {
+                this.logError(`${mcu.getName()} (${mcu.getFlashSize() / 1024}k flash) needs a v3 bootloader for direct-connect mode`);
+                throw new Error(`${mcu.getName()} needs a v3 bootloader for direct-connect mode`);
+            }
 
             try {
-                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, eepromOffset - 32);
+                const fileNameAddress = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, mcu.getFileNameWireAddress());
                 if (fileNameAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
                     await delay(200);
 
@@ -134,7 +182,7 @@ export class Direct {
 
                     info.layoutSize = Mcu.LAYOUT_SIZE;
 
-                    const settingsArray = await this.readChunked(eepromOffset, info.layoutSize);
+                    const settingsArray = await this.readChunked(mcu.getEepromStartByte(), info.layoutSize);
                     info.settings = bufferToSettings(settingsArray!, info.settings.LAYOUT_REVISION as number);
                     info.settingsBuffer = settingsArray!;
 
@@ -162,6 +210,11 @@ export class Direct {
 
         switch (command) {
         case DIRECT_COMMANDS.cmd_SetAddress:
+            // the wire address is 16-bit; truncating a larger offset would
+            // silently address the wrong flash location
+            if (address > 0xFFFF) {
+                throw new Error(`cmd_SetAddress 0x${address.toString(16)} exceeds 16-bit wire range`);
+            }
             buffer.push(0x00);
             buffer.push((address >> 8) & 0xFF);
             buffer.push(address & 0xFF);
@@ -192,28 +245,50 @@ export class Direct {
         const crc = this.makeCRC(buffer);
         buffer.push(crc & 0xFF);
         buffer.push(crc >> 8 & 0xFF);
-        return serial.write(new Uint8Array(buffer).buffer).then(result => result?.subarray(buffer.length));
+        // How many reply bytes follow the adapter's echo of the command:
+        // one ACK for the write-side commands, data + CRC16 + ACK for a
+        // read, nothing at all for SetBufferSize. With the length known
+        // the exchange can complete on the last expected byte instead of
+        // waiting out an inactivity timeout - which at 19200 baud fires
+        // mid-command and truncates the response.
+        let replyLength = 1;
+        if (command === DIRECT_COMMANDS.cmd_SetBufferSize) {
+            replyLength = 0;
+        } else if (command === DIRECT_COMMANDS.cmd_ReadFlash) {
+            replyLength = payload![0] + 3;
+        }
+        const expected = buffer.length + replyLength;
+        return serial.write(
+            new Uint8Array(buffer).buffer,
+            2000,
+            (response: Uint8Array) => response.length >= expected
+        ).then(result => result?.subarray(buffer.length));
     }
 
     async readChunked (address: number, expected: number, chunkSize = 64) {
         let response: Uint8Array = new Uint8Array();
-        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+        let eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address));
         if (eeprom?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
             if (expected > chunkSize) {
                 let currentLayoutSize = 0;
-                while (currentLayoutSize < chunkSize) {
-                    const clampedLayoutSize = Math.min(chunkSize, chunkSize - currentLayoutSize);
+                while (currentLayoutSize < expected) {
+                    const clampedLayoutSize = Math.min(chunkSize, expected - currentLayoutSize);
                     const settingsPart = await this.writeCommand(DIRECT_COMMANDS.cmd_ReadFlash, 0, new Uint8Array([clampedLayoutSize]));
 
                     if (!settingsPart) {
                         this.logError('Failed to read settings part');
                         throw new Error('Failed to read settings part');
                     }
-                    response = mergeUint8Arrays(response, settingsPart);
+                    // strip the trailing CRC16 + ACK; only the data bytes
+                    // belong in the reassembled block
+                    response = mergeUint8Arrays(response, settingsPart.subarray(0, clampedLayoutSize));
 
-                    currentLayoutSize += chunkSize;
+                    currentLayoutSize += clampedLayoutSize;
+                    if (currentLayoutSize >= expected) {
+                        break;
+                    }
 
-                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address + currentLayoutSize);
+                    eeprom = await this.writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address + currentLayoutSize));
                     if (eeprom?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                         this.logError('Failed to set address');
                         throw new Error('Failed to set address');
@@ -229,37 +304,18 @@ export class Direct {
     }
 
     async writeChunked (address: number, payload: Uint8Array, chunkSize = 64) {
-        const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
-        await delay(200);
-        if (setAddress?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-            if (payload.length > chunkSize) {
-                let currentLayoutSize = 0;
-                while (currentLayoutSize < chunkSize) {
-                    const clampedLayoutSize = Math.min(chunkSize, chunkSize - currentLayoutSize);
-                    await this.writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([clampedLayoutSize]));
-                    const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload.subarray(currentLayoutSize, clampedLayoutSize));
-                    if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                        await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                    } else {
-                        this.logError('Failed to send buffer');
-                        throw new Error('Failed to send buffer');
-                    }
-                    currentLayoutSize += chunkSize;
-                }
-            } else {
-                await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
-                const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload);
-                if (sendBuffer?.at(0) === DIRECT_RESPONSES.GOOD_ACK) {
-                    await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_WriteFlash, 0);
-                }
-            }
+        // one setAddress + buffered write per chunk: cmd_WriteFlash
+        // programs at the last set address, it does not advance it
+        for (let offset = 0; offset < payload.length; offset += chunkSize) {
+            const chunk = payload.subarray(offset, Math.min(offset + chunkSize, payload.length));
+            await this.writeBufferToAddress(address + offset, chunk);
         }
     }
 
     async writeBufferToAddress (address: number, payload: Uint8Array, retries = 10) {
         let currentTry = 0;
         while (true) {
-            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, address);
+            const setAddress = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetAddress, this.toWire(address));
             if (setAddress?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                 if (currentTry++ === retries) {
                     throw new Error('setAddress failed');
@@ -269,8 +325,11 @@ export class Direct {
             }
         }
         currentTry = 0;
-        await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
         while (true) {
+            // SetBufferSize is part of the retry unit: a failed payload
+            // leaves the ESC back in command mode, where a bare
+            // re-sent payload is just a long garbage command
+            await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SetBufferSize, 0, new Uint8Array([payload.length]));
             const sendBuffer = await Direct.getInstance().writeCommand(DIRECT_COMMANDS.cmd_SendBuffer, 0, payload);
             if (sendBuffer?.at(0) !== DIRECT_RESPONSES.GOOD_ACK) {
                 if (currentTry++ === retries) {

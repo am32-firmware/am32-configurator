@@ -37,7 +37,7 @@
           </div>
         </div>
         <div class="text-center min-w-[200px]">
-          v0.1.2
+          v0.1.3<span v-if="gitHash" class="text-gray-400"> ({{ gitHash }})</span>
         </div>
       </div>
     </div>
@@ -51,4 +51,5 @@
 import logo from '~/assets/icons/am32-logo.svg';
 const serialStore = useSerialStore();
 const logStore = useLogStore();
+const gitHash = useRuntimeConfig().public.gitHash;
 </script>

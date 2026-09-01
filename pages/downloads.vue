@@ -32,7 +32,7 @@
                   <div class="grid grid-cols-4">
                     <div v-for="file of item.files" :key="file" class="py-1">
                       <ULink
-                        :to="file.url"
+                        :to="getFileLink(file)"
                         external
                         :download="file.name"
                         class="transition-all hover:text-red-500"
@@ -52,12 +52,61 @@
               No releases
             </div>
           </template>
+          <template #kiss-ultra-releases_data>
+            <div v-if="getFolder('kiss-ultra-releases').value" class="p-4">
+              <div v-if="getFolder('kiss-ultra-releases').value?.files?.length" class="grid grid-cols-4 mb-4">
+                <div v-for="file of getFolder('kiss-ultra-releases').value?.files ?? []" :key="file.url" class="py-1">
+                  <ULink
+                    :to="getFileLink(file)"
+                    external
+                    :download="file.name"
+                    class="transition-all hover:text-red-500"
+                    :class="{
+                      'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
+                      'text-red-500': filter && file.name.toLowerCase().includes(filter.toLowerCase())
+                    }"
+                  >
+                    {{ file.name }}
+                  </ULink>
+                </div>
+              </div>
+              <UAccordion
+                v-if="getChildrenFolder(getFolder('kiss-ultra-releases').value).length"
+                color="teal"
+                :items="getChildrenFolder(getFolder('kiss-ultra-releases').value)"
+                variant="outline"
+                size="sm"
+              >
+                <template #files="{ item }">
+                  <div class="grid grid-cols-4">
+                    <div v-for="file of item.files" :key="file" class="py-1">
+                      <ULink
+                        :to="getFileLink(file)"
+                        external
+                        :download="file.name"
+                        class="transition-all hover:text-red-500"
+                        :class="{
+                          'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
+                          'text-red-500': filter && file.name.toLowerCase().includes(filter.toLowerCase())
+                        }"
+                      >
+                        {{ file.name }}
+                      </ULink>
+                    </div>
+                  </div>
+                </template>
+              </UAccordion>
+            </div>
+            <div v-else>
+              No KISS Ultra firmware
+            </div>
+          </template>
           <template #tools_data>
             <div v-if="getFolder('tools').value" class="p-4">
               <div class="grid grid-cols-4">
                 <div v-for="file of getFolder('tools').value?.files ?? []" :key="file.url" class="py-1">
                   <ULink
-                    :to="`${file.url}`"
+                    :to="getFileLink(file)"
                     external
                     :download="file.name"
                     class="transition-all hover:text-green-500"
@@ -79,7 +128,31 @@
                   <div class="grid grid-cols-4">
                     <div v-for="file of item.files" :key="file" class="py-1">
                       <ULink
-                        :to="file.url"
+                        :to="getFileLink(file)"
+                        external
+                        :download="file.name"
+                        class="transition-all hover:text-red-500"
+                        :class="{
+                          'text-gray-500/20': filter && !file.name.toLowerCase().includes(filter.toLowerCase()),
+                          'text-red-500': filter && file.name.toLowerCase().includes(filter.toLowerCase())
+                        }"
+                      >
+                        {{ file.name }}
+                      </ULink>
+                    </div>
+                  </div>
+                </template>
+              </UAccordion>
+            </div>
+          </template>
+          <template #unlocker_data>
+            <div v-if="getFolder('unlocker').value" class="p-4">
+              <UAccordion color="teal" :items="getChildrenFolder(getFolder('unlocker').value)" variant="outline" size="sm">
+                <template #files="{ item }">
+                  <div class="grid grid-cols-4">
+                    <div v-for="file of item.files" :key="file" class="py-1">
+                      <ULink
+                        :to="getFileLink(file)"
                         external
                         :download="file.name"
                         class="transition-all hover:text-red-500"
@@ -101,18 +174,27 @@
     </div>
   </div>
 </template>
+
 <script setup lang="ts">
 const { data, status } = await useLazyFetch('/api/files?prereleases');
 
 const filter = ref('');
 
+const sectionLabels: Record<string, string> = {
+    releases: 'RELEASES',
+    'kiss-ultra-releases': 'KISS ULTRA RELEASES',
+    bootloader: 'BOOTLOADER',
+    tools: 'TOOLS',
+    unlocker: 'UNLOCKER'
+};
+
 watchEffect(() => {
     if (status.value !== 'pending' && data.value) {
         links.value = data.value.data;
-        rootFolders.value = data.value.data.map((f) => {
+        rootFolders.value = data.value.data.map((folder) => {
             return {
-                label: f.name?.toUpperCase() ?? 'ERROR',
-                slot: `${f.name}_data`
+                label: sectionLabels[folder.name ?? ''] ?? folder.name?.toUpperCase() ?? 'ERROR',
+                slot: `${folder.name}_data`
             };
         });
     }
@@ -133,8 +215,12 @@ const getChildrenFolder = (folder?: BlobFolder | null) => {
         .map(f => ({
             label: f.name,
             slot: 'files',
-            files: f.files.filter(f => f.name.toLowerCase().endsWith('.hex'))
+            files: f.files.filter(f => f.name.toLowerCase())
         }))
         .sort((a, b) => b.label.localeCompare(a.label)) ?? [];
+};
+
+const getFileLink = (file: BlobFolderFile) => {
+    return file.downloadUrl ?? file.url;
 };
 </script>

@@ -13,3 +13,7 @@ helm-charts
 .editorconfig
 .idea
 coverage*
+.output
+public/uploads
+.nuxt
+storage

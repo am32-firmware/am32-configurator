@@ -1,3 +1,15 @@
+import { execSync } from 'node:child_process';
+
+// short git hash for display; docker builds have no .git in the context,
+// so they pass it in via NUXT_PUBLIC_GIT_HASH (from the GIT_SHA build arg)
+const gitShortHash = () => {
+    try {
+        return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+        return '';
+    }
+};
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     devtools: {
@@ -9,17 +21,42 @@ export default defineNuxtConfig({
     },
 
     typescript: {
+        // the cli harness is plain Node JS gluing the app modules
+        // together; letting the typecheck ingest its globalThis
+        // assignments turns the auto-imported store types into any
+        tsConfig: {
+            exclude: ['../cli']
+        },
         shim: false,
         typeCheck: true
+    },
+
+    nitro: {
+        storage: {
+            uploads: {
+                driver: 'fs',
+                base: './public/uploads'
+            }
+        }
     },
 
     ssr: false,
 
     runtimeConfig: {
+        public: {
+            gitHash: process.env.NUXT_PUBLIC_GIT_HASH || gitShortHash()
+        },
         redis: { // Default values
             host: process.env.REDIS_HOST,
             port: 6379
             /* other redis connector options */
+        },
+        mariadb: {
+            host: process.env.MYSQL_HOST || 'mariadb',
+            port: parseInt(process.env.MYSQL_PORT || '3306'),
+            user: process.env.MYSQL_USER || 'am32',
+            password: process.env.MYSQL_PASSWORD || 'am32password',
+            database: process.env.MYSQL_DATABASE || 'am32'
         }
     },
 

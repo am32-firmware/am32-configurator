@@ -8,6 +8,24 @@ export interface McuVariant {
     flash_offset: string;
     firmware_start: string;
     eeprom_offset: string;
+    // direct-mode write chunk (and alignment) the part requires; most
+    // accept any 8-byte-aligned length, so the default is 64
+    direct_write_size?: number;
+}
+
+/*
+  v3 deviceInfo block read via ADDRESS_MAGIC_DEVINFO (0x23).
+  All *_start values are CMD_SET_ADDRESS values (already >> address_shift);
+  the bootloader reconstructs the real flash address with
+  (addr << address_shift) + flash_offset, matching its decodeInput().
+ */
+export interface DevinfoV3 {
+    length: number;
+    address_shift: number;
+    firmware_start: number;
+    filename_start: number;
+    eeprom_start: number;
+    tune_start: number;
 }
 
 export interface McuInfo {
@@ -30,6 +48,13 @@ export interface McuInfo {
         pin: string;
         version: number;
     },
+    /*
+      Bootloader protocol features the configurator detected on this ESC.
+      v3 != null means the bootloader responded to the ADDRESS_MAGIC_DEVINFO
+      read with valid magic, so its address_shift / *_start values are
+      authoritative and override the per-MCU defaults.
+     */
+    v3: DevinfoV3 | null;
     layoutSize: number;
     settingsDirty: boolean;
     settings: McuSettings;
@@ -64,6 +89,31 @@ class Mcu {
                 flash_offset: '0x08000000',
                 firmware_start: '0x1000',
                 eeprom_offset: '0xF800'
+            },
+            1506: {
+                name: 'NXP ESC_8KB_PAGE',
+                signature: '0x1506',
+                page_size: 1024,
+                flash_size: 65536,
+                // the MCXA153 flash really is at address 0
+                flash_offset: '0x0',
+                firmware_start: '0x4000',
+                eeprom_offset: '0xE000',
+                // its flash driver refuses writes whose address is not
+                // 128-byte aligned, so direct-mode chunks must be 128
+                direct_write_size: 128
+            },
+            '2B06': {
+                // STM32G431/G491 (128k AM32 CAN ESCs). The firmware_start /
+                // eeprom_offset here are pre-v3 defaults; v3 bootloaders override
+                // them via the magic devinfo block (see McuInfo.v3).
+                name: 'STM32G431',
+                signature: '0x2b06',
+                page_size: 2048,
+                flash_size: 131072,
+                flash_offset: '0x08000000',
+                firmware_start: '0x4000',
+                eeprom_offset: '0x1f800'
             }
         };
 
@@ -149,6 +199,10 @@ class Mcu {
      *
      * @returns {number}
      */
+    getDirectWriteChunk () {
+        return this.mcu.direct_write_size ?? 64;
+    }
+
     getPageSize () {
         return this.mcu.page_size;
     }
@@ -164,6 +218,101 @@ class Mcu {
         }
 
         throw new Error('MCU does not have firmware start address');
+    }
+
+    /**
+     * Bootloader CMD_SET_ADDRESS shift. 0 by default; for 128k parts the v3
+     * devinfo block reports 2 (so the 16-bit wire address can reach above
+     * 0xFFFF). Pre-v3 ESCs default to 0 — the configurator only had 64k MCU
+     * variants in that era, so no scaling was needed.
+     */
+    getAddressShift (): number {
+        return this.info?.v3?.address_shift ?? 0;
+    }
+
+    /**
+     * Convert a physical byte offset (from flash_offset) to the CMD_SET_ADDRESS
+     * value the bootloader expects. The bootloader reconstructs the real flash
+     * address with (wire << address_shift) + flash_offset.
+     */
+    toWireAddress (byteOffset: number): number {
+        const shift = this.getAddressShift();
+        if (shift > 0) {
+            const align = (1 << shift) - 1;
+            if ((byteOffset & align) !== 0) {
+                // address_shift loses these low bits; the caller should be
+                // stepping in aligned chunks.
+                throw new Error(`toWireAddress: 0x${byteOffset.toString(16)} not aligned to ${1 << shift}`);
+            }
+        }
+        const wire = byteOffset >>> shift;
+        if (wire > 0xFFFF) {
+            // the bootloader wire address is 16-bit. If the byte offset
+            // doesn't fit after shifting, masking to 0xFFFF would silently
+            // wrap (e.g. on a 128k part without v3, 0x1f800 -> 0xf800), so
+            // hard-fail instead of corrupting flash addressing.
+            throw new Error(`toWireAddress: 0x${byteOffset.toString(16)} exceeds 16-bit wire range with shift ${shift}; v3 devinfo needed for this MCU`);
+        }
+        return wire;
+    }
+
+    /**
+     * Byte offset (from flash_offset) of the application entry. With v3 this
+     * comes from the bootloader; otherwise from the per-MCU variant default.
+     */
+    getFirmwareStartByte (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.firmware_start << v3.address_shift;
+        }
+        return this.getFirmwareStart();
+    }
+
+    /**
+     * Byte offset (from flash_offset) of the EEPROM region. With v3 this comes
+     * from the bootloader; otherwise from the per-MCU variant default.
+     */
+    getEepromStartByte (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.eeprom_start << v3.address_shift;
+        }
+        return this.getEepromOffset();
+    }
+
+    /**
+     * CMD_SET_ADDRESS value at which the EEPROM region starts.
+     */
+    getEepromWireAddress (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.eeprom_start;
+        }
+        return this.toWireAddress(this.getEepromOffset());
+    }
+
+    /**
+     * Byte offset (from flash_offset) of the 32-byte file-name block. With v3
+     * this comes from the bootloader (DroneCAN builds place it away from the
+     * EEPROM); otherwise it sits 32 bytes below the EEPROM region.
+     */
+    getFileNameStartByte (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.filename_start << v3.address_shift;
+        }
+        return this.getEepromOffset() - 32;
+    }
+
+    /**
+     * CMD_SET_ADDRESS value of the file-name region (EEPROM - 32 bytes).
+     */
+    getFileNameWireAddress (): number {
+        const v3 = this.info?.v3;
+        if (v3) {
+            return v3.filename_start;
+        }
+        return this.toWireAddress(this.getEepromOffset() - 32);
     }
 }
 

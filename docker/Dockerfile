@@ -1,22 +1,31 @@
-FROM node:lts AS base
+FROM node:20-alpine AS base
 WORKDIR /usr/src/app
 
 FROM base AS prerelease
 WORKDIR /usr/src/app
 COPY . .
 
+ARG DATABASE_URL
+# .git is excluded from the build context, so the caller passes the hash in
+ARG GIT_SHA=
+ENV NUXT_PUBLIC_GIT_HASH=${GIT_SHA}
+ENV CI='true'
+ENV YARN_ENABLE_INLINE_BUILDS='true'
 ENV NODE_ENV=production
 ENV REDIS_HOST=cache
-RUN corepack enable && yarn set version berry
-RUN yarn install
+ENV FILES_ROOT=/data/files
+ENV DATABASE_URL="${DATABASE_URL:-mysql://am32:am32password@mariadb:3306/am32}"
+RUN corepack enable
+RUN npm -g i tsx
+RUN yarn --immutable
+RUN yarn run prepare
+RUN yarn prisma:generate
 RUN yarn run build
-
-FROM base AS release
-COPY --chown=node:node --from=prerelease /usr/src/app/node_modules node_modules
-COPY --chown=node:node --from=prerelease /usr/src/app/.output .
 
 USER node
 ENV HOST=0.0.0.0
 ENV REDIS_HOST=cache
+ENV FILES_ROOT=/data/files
 EXPOSE 3000
-ENTRYPOINT [ "node", "server/index.mjs" ]
+
+ENTRYPOINT [ "node", ".output/server/index.mjs" ]

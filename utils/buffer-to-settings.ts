@@ -15,6 +15,13 @@ export default function (buffer: Uint8Array, eepromVersion: number) {
             continue;
         }
 
+        // a truncated source (e.g. a short default image) must leave the
+        // field absent - so callers keep their current value - rather than
+        // decoding undefined bytes to '' or [] and clobbering it
+        if (offset >= buffer.length) {
+            continue;
+        }
+
         if (size === 1) {
             object[prop] = buffer[offset];
         } else if (size === 2) {

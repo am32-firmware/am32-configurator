@@ -1,7 +1,81 @@
 import Flash from '../flash';
-import Mcu, { type McuInfo } from '../mcu';
+import Mcu, { type DevinfoV3, type McuInfo } from '../mcu';
 import CommandQueue from '~/src/communication/commands.queue';
 import Serial from '~/src/communication/serial';
+
+/*
+  Bootloader magic CMD_SET_ADDRESS values.
+
+  v2 added EEPROM and FILE_NAME magics so the configurator can address the
+  EEPROM region without per-MCU offsets. v3 adds DEVINFO: a read at 0x23
+  returns the bootloader's packed devinfo struct (magic1, magic2, 9-byte
+  deviceInfo, length, address_shift, and four CMD_SET_ADDRESS values for
+  firmware / filename / eeprom / tune).
+
+  See AM32-bootloader bootloader/main.c (ADDRESS_MAGIC_* + decodeInput) and
+  the desktop client am32-firmware/Offline-Configurator fourwayif.cpp
+  parseDevinfoBlock for the canonical reference.
+ */
+export enum ADDRESS_MAGIC {
+    EEPROM = 0x20,
+    FILE_NAME = 0x21,
+    CONTINUE = 0x22,
+    DEVINFO = 0x23,
+}
+
+const DEVINFO_MAGIC1 = 0x5925E3DA;
+const DEVINFO_MAGIC2 = 0x4EB863D9;
+/**
+ * Parse a response payload read from ADDRESS_MAGIC_DEVINFO. Returns the v3
+ * fields when the magic words match and the bootloader-reported length is
+ * sane; otherwise null (pre-v3 bootloader, truncated response, or junk).
+ */
+const DEVINFO_V3_MIN = 27; // smallest struct that contains every field we read
+export const DEVINFO_V3_MAX = 64; // sanity cap so a garbage byte can't be trusted as a length
+export function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
+    if (block.byteLength < 8 + 9 + 1) { // need at least magic + deviceInfo + length
+        return null;
+    }
+    const dv = new DataView(block.buffer, block.byteOffset, block.byteLength);
+    const m1 = dv.getUint32(0, true);
+    const m2 = dv.getUint32(4, true);
+    if (m1 !== DEVINFO_MAGIC1 || m2 !== DEVINFO_MAGIC2) {
+        return null;
+    }
+    // packed layout: magic1[0..3] magic2[4..7] deviceInfo[8..16]
+    // length[17] address_shift[18] firmware_start[19..20]
+    // filename_start[21..22] eeprom_start[23..24] tune_start[25..26]
+    const length = dv.getUint8(17);
+    if (length < DEVINFO_V3_MIN || length > DEVINFO_V3_MAX || block.byteLength < length) {
+        return null;
+    }
+    const v3: DevinfoV3 = {
+        length,
+        address_shift: dv.getUint8(18),
+        firmware_start: dv.getUint16(19, true),
+        filename_start: dv.getUint16(21, true),
+        eeprom_start: dv.getUint16(23, true),
+        tune_start: dv.getUint16(25, true)
+    };
+    if (v3.address_shift > 8) {
+        // every field below redirects flash writes; a shift no real part
+        // needs (8 covers 16MB) marks the block as junk, not v3
+        return null;
+    }
+    return v3;
+}
+
+/**
+ * Extra behaviour for one sendWithPromise exchange.
+ *
+ * `probe` marks a feature-detection read: a command the ESC is allowed to
+ * refuse. A refusal then resolves to null instead of being retried and
+ * logged as a fault - a pre-v3 bootloader nacking the devinfo magic is the
+ * protocol working, not an error the user should see in red.
+ */
+export interface FourWaySendOptions {
+    probe?: boolean;
+}
 
 export enum FOUR_WAY_COMMANDS {
     cmd_InterfaceTestAlive = 0x30,
@@ -108,8 +182,25 @@ export class FourWay {
         return crc & 0xFFFF;
     }
 
-    initFlash (target: number, retries = 10) {
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries);
+    /**
+     * cmd_DeviceInitFlash is not a wire round-trip. The 4-way interface
+     * first has to connect to the ESC on its one-wire side - betaflight
+     * serial_4way.c probes the bootloader several times before it answers -
+     * so the ack legitimately arrives about a second after the request.
+     * Measured against a Betaflight passthrough: 1020ms.
+     *
+     * The 200ms default therefore never covered a single attempt, and the
+     * command only ever succeeded because some caller passed enough retries
+     * for a late reply to land inside a later attempt's window. getInfo()'s
+     * connect path passes 2, a 650ms budget, so it gave up before the first
+     * ack could arrive: that is the "max retries reached" the Read button
+     * reports on a perfectly healthy ESC.
+     */
+    initFlash (target: number, retries = 10, timeout = 2000) {
+        // The target is carried only in the parameter. Betaflight replies to
+        // InitFlash with address 0, so putting the target in the otherwise
+        // unused address field makes every target after ESC 1 look stale.
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target], 0, retries, timeout);
     }
 
     reset (target: number) {
@@ -143,10 +234,44 @@ export class FourWay {
         const mcu = new Mcu(info.meta.signature);
         mcu.setInfo(info);
 
-        const eepromOffset = mcu.getEepromOffset();
+        // v3 detection: try the magic-devinfo read. v3+ bootloaders return a
+        // packed struct beginning with two magic words; pre-v3 bootloaders
+        // either reject the read (address < 1024 is reserved) or return junk
+        // that fails the magic check. Fail fast so pre-v3 boards aren't slowed.
+        try {
+            // read the max so a forward-compatible block with length>27 still
+            // satisfies the length check in parseDevinfoBlock; we only decode
+            // the first 27 bytes regardless.
+            // These timeouts are failure bounds, not latencies: they only
+            // cost time when something is actually wrong. The 64-byte reply
+            // is ~35ms of 19200-baud wire time and a passthrough FC only
+            // forwards it once complete; a heavily loaded emulator host can
+            // stretch that a lot, and 128k parts have no fallback if v3
+            // detection fails, so be generous
+            const magicRead = await this.readAddress(ADDRESS_MAGIC.DEVINFO, DEVINFO_V3_MAX, 3, 500, 50, { probe: true });
+            const v3 = magicRead?.params ? parseDevinfoBlock(magicRead.params) : null;
+            if (v3) {
+                info.v3 = v3;
+                this.log(`v3 devinfo: address_shift=${v3.address_shift} firmware_start=0x${v3.firmware_start.toString(16)} eeprom_start=0x${v3.eeprom_start.toString(16)}`);
+            }
+        } catch (e) {
+            // pre-v3 bootloader; the magic read can fail, that's fine
+        }
+
+        // Parts whose flash exceeds the 16-bit wire-address space (e.g. 128k
+        // STM32G431/G491, signature 2B06) MUST report a non-zero address_shift
+        // via v3 devinfo. Without it, getFileNameWireAddress() would mask the
+        // EEPROM offset to 16 bits and silently miscompute the address. The
+        // configurator never supported such parts pre-v3 anyway, so a missing
+        // v3 here is an unsupported/transient-failure condition; fail clearly
+        // rather than corrupting flash.
+        if (mcu.getFlashSize() > 0x10000 && !info.v3) {
+            const sig = info.meta.signature.toString(16).toUpperCase();
+            throw new Error(`MCU 0x${sig} requires v3 bootloader devinfo (address_shift) but the magic-devinfo read failed. Try reconnecting; if this persists the ESC is running a pre-v3 bootloader that this configurator can't drive correctly.`);
+        }
 
         try {
-            const fileNameRead = await this.readAddress(eepromOffset - 32, 32);
+            const fileNameRead = await this.readAddress(mcu.getFileNameWireAddress(), 32, 10, 1000);
             const fileName = new TextDecoder().decode(fileNameRead!.params.slice(0, fileNameRead?.params.indexOf(0x0)));
 
             if (/[A-Z0-9_]+/.test(fileName)) {
@@ -161,7 +286,11 @@ export class FourWay {
 
             mcu.getInfo().layoutSize = Mcu!.LAYOUT_SIZE;
 
-            const settingsArray = (await this.readAddress(eepromOffset, mcu.getInfo().layoutSize))!.params;
+            // the settings block is ~184 bytes = ~100ms of 19200-baud wire
+            // time, and a passthrough FC forwards the reply only once it is
+            // complete, so the default 200ms timeout barely fits; give the
+            // transfer real headroom (emulated ESCs can be slower still)
+            const settingsArray = (await this.readAddress(mcu.getEepromWireAddress(), mcu.getInfo().layoutSize, 10, 1500))!.params;
             mcu.getInfo().settings = bufferToSettings(settingsArray, info.settings.LAYOUT_REVISION as number);
             mcu.getInfo().settingsBuffer = settingsArray;
 
@@ -188,13 +317,15 @@ export class FourWay {
         return info;
     }
 
-    readAddress (address: number, bytes: number, retries = 10, timeout = 200) {
+    readAddress (address: number, bytes: number, retries = 10, timeout = 200, retryDelay = 250, options: FourWaySendOptions = {}) {
         return this.sendWithPromise(
             FOUR_WAY_COMMANDS.cmd_DeviceRead,
             [bytes === 256 ? 0 : bytes],
             address,
             retries,
-            timeout
+            timeout,
+            retryDelay,
+            options
         );
     }
 
@@ -232,8 +363,11 @@ export class FourWay {
         return this.send(command, params, address);
     }
 
-    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200): Promise<FourWayResponse | null> {
+    sendWithPromise (command: FOUR_WAY_COMMANDS, params: number[] = [0], address = 0, retries = 10, timeout = 200, retryDelay = 250, options: FourWaySendOptions = {}): Promise<FourWayResponse | null> {
         let currentTry = 0;
+        // a probe asks a question the ESC may legitimately answer with "no",
+        // so running out of tries is information, not a fault to shout about
+        const reportExhausted = options.probe ? this.log : this.logError;
 
         const callback: (resolve: PromiseFn<any>, reject: PromiseFn<any>) => void = async (resolve, reject) => {
             while (currentTry++ < retries) {
@@ -250,21 +384,40 @@ export class FourWay {
                 if (result) {
                     try {
                         const response = this.parseMessage(result.buffer);
-                        if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
+                        // A reply echoes the command and address it answers.
+                        // A late reply to a timed-out request can land here
+                        // instead - without this check it gets accepted as
+                        // the answer to the current request and every later
+                        // exchange pairs with the wrong reply (a devinfo
+                        // block read as the firmware name, for example).
+                        if (response.data.command !== command ||
+                            response.data.address !== address) {
+                            this.logError(`  stale reply for ${enumToString(response.data.command, FOUR_WAY_COMMANDS)} @0x${response.data.address.toString(16)}, discarded`);
+                        } else if (response.data.ack === FOUR_WAY_ACK.ACK_OK) {
                             resolve(response.data);
                             break;
+                        } else if (options.probe) {
+                            // the device answered and refused. Retrying cannot
+                            // change a decided answer - retries are there for
+                            // silence and corruption, not for a clean nack.
+                            this.log(`  ${enumToString(response.data.ack, FOUR_WAY_ACK)}, not supported by this bootloader`);
+                            resolve(null);
+                            return;
+                        } else {
+                            this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                         }
-                        this.logError(`  error: ${enumToString(response.data.ack, FOUR_WAY_ACK)}`);
                     } catch (e) {
                         console.error(e);
                     }
                 }
-                await delay(250);
+                if (currentTry < retries) {
+                    await delay(retryDelay);
+                }
             }
 
             if (currentTry > retries) {
+                reportExhausted('max retries reached');
                 reject(new Error('max retries reached'));
-                this.logError('max retries reached');
             }
         };
         return new Promise(callback) as Promise<FourWayResponse | null>;
@@ -346,32 +499,41 @@ export class FourWay {
     }
 
     /**
-   * Write data to multiple pages up to (but not including) end page
-   *
-   * @param {number} begin
-   * @param {number} end
-   * @param {number} pageSize
-   * @param {Uint8Array} data
-   */
-    async writePages (begin: number, end: number, pageSize: number, data: Uint8Array, timeout: number) {
-        const beginAddress = begin * pageSize;
-        const endAddress = end * pageSize;
+     * Write firmware to flash, in 256-byte chunks, between two physical byte
+     * offsets (from flash_offset). The wire CMD_SET_ADDRESS for each chunk is
+     * computed via mcu.toWireAddress(), so 128k parts that report an
+     * address_shift in the v3 devinfo get the right addresses.
+     */
+    async writePages (beginByte: number, endByte: number, data: Uint8Array, timeout: number, mcu: Mcu) {
         const step = 0x100;
         const escStore = useEscStore();
 
-        for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
-            await this.write(
-                address,
-                data.subarray(address, Math.min(address + step, data.length)),
-                timeout
-            );
+        for (let off = beginByte; off < endByte && off < data.length; off += step) {
+            const chunkEnd = Math.min(off + step, data.length);
+            let chunk: Uint8Array = data.subarray(off, chunkEnd);
+            // STM32 G4 (and similar) flash programs in 8-byte doublewords, so
+            // the bootloader rejects a last chunk whose size isn't a multiple
+            // of 8 (ACK_D_GENERAL_ERROR). Pad with 0xFF up to the next 8-byte
+            // boundary — matches what the desktop client does.
+            if (chunk.byteLength % 8 !== 0) {
+                const padded = new Uint8Array((chunk.byteLength + 7) & ~7);
+                padded.fill(0xFF);
+                padded.set(chunk);
+                chunk = padded;
+            }
+            // a 256-byte chunk is ~140ms of 19200-baud wire time and the
+            // FC forwards the ack only after the whole set-address /
+            // set-buffer / program sequence, so the caller's timeout (the
+            // UI passes 200ms) cannot cover it; retrying early just queues
+            // duplicate transfers behind the one still running
+            await this.write(mcu.toWireAddress(off), chunk, Math.max(timeout, 3000));
 
-            escStore.bytesWritten += step;
+            escStore.bytesWritten += chunkEnd - off;
         }
     }
 
     async writeSettings (target: number, esc: McuInfo) {
-        const flash = await this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceInitFlash, [target]);
+        const flash = await this.initFlash(target);
 
         if (flash) {
             const newSettingsArray = objectToSettingsArray(esc.settings, esc.settings.LAYOUT_REVISION as number);
@@ -384,11 +546,15 @@ export class FourWay {
             } else {
                 const info = Flash.getInfo(flash!);
                 const mcu = new Mcu(info.meta.signature);
+                // attach the McuInfo from the previous getInfo() so v3 devinfo
+                // (address_shift / eeprom_start) drives the wire address
+                mcu.setInfo(esc);
 
                 let readbackSettings = null;
+                const eepromWireAddr = mcu.getEepromWireAddress();
 
-                await this.write(mcu.getEepromOffset(), newSettingsArray);
-                readbackSettings = (await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE));
+                await this.write(eepromWireAddr, newSettingsArray, 1500);
+                readbackSettings = (await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE, 10, 1500));
 
                 if (readbackSettings) {
                     /*
@@ -407,90 +573,40 @@ export class FourWay {
         throw new Error('EscInitError');
     }
 
-    async writeHex (target: number, hex: string, timeout: number) { // }, force: boolean, migrate: boolean) {
+    async writeHex (target: number, esc: McuInfo, hex: string, timeout: number) {
         const escStore = useEscStore();
         const parsed = Flash.parseHex(hex);
         if (parsed) {
             const initFlash = await this.initFlash(target, 3);
             const info = Flash.getInfo(initFlash!);
             const mcu = new Mcu(info.meta.signature);
+            // re-use the McuInfo from the previous getInfo() so v3 devinfo
+            // (address_shift, firmware_start, eeprom_start, ...) is honoured
+            // by the wire-address helpers below.
+            mcu.setInfo(esc);
             const endAddress = parsed.data[parsed.data.length - 1].address + parsed.data[parsed.data.length - 1].bytes;
             const flash = Flash.fillImage(parsed, endAddress - mcu.getFlashOffset(), mcu.getFlashOffset());
             if (flash) {
-                const eepromOffset = mcu.getEepromOffset();
-                const pageSize = mcu.getPageSize();
-                const firmwareStart = mcu.getFirmwareStart();
+                const eepromWireAddr = mcu.getEepromWireAddress();
+                const firmwareStartByte = mcu.getFirmwareStartByte();
+                const endByte = flash.byteLength;
 
-                escStore.totalBytes = flash.byteLength - firmwareStart;
+                escStore.totalBytes = endByte - firmwareStartByte;
                 escStore.bytesWritten = 0;
                 escStore.step = 'Writing';
 
-                const message = await this.readAddress(mcu.getEepromOffset(), Mcu.LAYOUT_SIZE);
+                const message = await this.readAddress(eepromWireAddr, Mcu.LAYOUT_SIZE, 10, 1500);
                 if (message) {
                     const originalSettings = message.params;
 
-                    // boot bit
+                    // boot bit: clear before flashing, set after success
                     originalSettings[0] = 0x00;
-                    /*
-                    originalSettings[0] = 0x00;
-                    originalSettings.fill(0x00, 3, 5);
-                    originalSettings.set(asciiToBuffer('FLASH FAIL  '), 5);
-                    */
-                    await this.write(eepromOffset, originalSettings, timeout);
+                    await this.write(eepromWireAddr, originalSettings, Math.max(timeout, 1500));
 
-                    await this.writePages(0x04, 0x40, pageSize, flash, timeout);
-                    /* try {
-                        escStore.step = 'Verifying';
-                        await delay(200);
-                        // await this.verifyPages(0x04, 0x40, pageSize, flash);
-                    } catch (error) {
-                        try {
-                            escStore.step = 'Verifying';
-                            await delay(200);
-                            await this.verifyPages(0x04, 0x40, pageSize, flash);
-                        } catch (error) {
-                            this.logError('flashingVerificationFailed');
-                        }
-                    }
+                    await this.writePages(firmwareStartByte, endByte, flash, timeout, mcu);
+
                     originalSettings[0] = 0x01;
-                    originalSettings.fill(0x00, 3, 5);
-                    originalSettings.set(asciiToBuffer('NOT READY   '), 5);
-                    */
-
-                    // boot bit
-                    originalSettings[0] = 0x01;
-                    await this.write(eepromOffset, originalSettings);
-                }
-            }
-        }
-    }
-
-    /**
-   * Verify multiple pages up to (but not including) end page
-   *
-   * @param {number} begin
-   * @param {number} end
-   * @param {number} pageSize
-   * @param {Uint8Array} data
-   */
-    async verifyPages (begin: number, end: number, pageSize: number, data: Uint8Array) {
-        const beginAddress = begin * pageSize;
-        const endAddress = end * pageSize;
-        const step = 0x80;
-
-        const escStore = useEscStore();
-
-        for (let address = beginAddress; address < endAddress && address < data.length; address += step) {
-            const message = await this.readAddress(address, Math.min(step, data.length - address), 10, 100);
-            if (message) {
-                const reference = data.subarray(message.address, message.address + message.params.byteLength);
-
-                if (!compare(message.params, reference)) {
-                    console.debug('Verification failed - retry');
-                    this.logError(`failed to verify write at address 0x${message.address.toString(0x10)}`);
-                    throw new Error(`failed to verify write at address 0x${message.address.toString(0x10)}`);
-                } else {
-                    escStore.bytesWritten += step;
+                    await this.write(eepromWireAddr, originalSettings, Math.max(timeout, 1500));
                 }
             }
         }

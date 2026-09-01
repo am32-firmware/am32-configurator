@@ -1,33 +1,17 @@
-import { useMinio } from '~/composables/useMinio';
+import { readFile } from 'node:fs/promises';
+import { resolveStorageFile } from '~/server/utils/fileStorage';
 
-export default defineEventHandler(async () => {
-    const minioClient = useMinio();
+export default defineEventHandler(async (event) => {
+    const schemaPath = await resolveStorageFile('schemas/eeprom.json');
 
-    const binariesCache = useStorage('schema');
-
-    if (!(await binariesCache.hasItem('schema:eeprom'))) {
-        try {
-            const schemasStream = minioClient.listObjects('schemas', 'eeprom.json', true);
-            const schemas = await schemasStream.toArray();
-
-            if (schemas.length === 0) {
-                throw createError({
-                    statusCode: 404
-                });
-            }
-            const url = await minioClient.presignedUrl('get', 'schemas', 'eeprom.json', 60);
-            await binariesCache.setItem('schema:eeprom', `${url}`, {
-                ttl: 60 - 1
-            });
-        } catch (e) {
-            throw createError({
-                statusCode: 404,
-                statusMessage: 'schema not found'
-            });
-        }
+    if (!schemaPath) {
+        throw createError({
+            statusCode: 404,
+            statusMessage: 'schema not found'
+        });
     }
 
-    const url = await binariesCache.getItem('schema:eeprom');
+    setResponseHeader(event, 'Content-Type', 'application/json; charset=utf-8');
 
-    return fetch(url as string);
+    return await readFile(schemaPath, 'utf8');
 });
