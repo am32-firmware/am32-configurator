@@ -282,7 +282,7 @@ export class FourWay {
 
             if (/[A-Z0-9_]+/.test(fileName)) {
                 mcu.getInfo().meta.am32.fileName = fileName;
-                mcu.getInfo().meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
+                mcu.getInfo().meta.am32.mcuType = Mcu.mcuTypeFromFileName(fileName);
             }
 
             if (mcu.getInfo().meta.input) {
