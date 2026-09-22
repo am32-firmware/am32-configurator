@@ -928,26 +928,42 @@ const startModalFlash = async () => {
             const fileFlash = Flash.parseHex(amj.hex);
             const tmp = escStore.firstValidEscData.data;
             const escFileName = tmp.meta?.am32?.fileName;
-            if (fileFlash && escFileName) {
-                // an amj carries a bootloader, so one for the wrong MCU
-                // takes a debugger to undo. A handful of boards name no MCU
-                // family, leaving nothing to check the file against; refuse
-                // those rather than let the pin stand in for the MCU
-                if (!tmp.meta.am32.mcuType) {
-                    logStore.logError(`Cannot tell the MCU type from the ESC name ${escFileName}! Aborting flash!`);
-                    throw new Error('Cannot tell the MCU type of the ESC.');
+            if (fileFlash) {
+                // An updater is entered at the address the installed
+                // bootloader starts the application from: a from4k updater
+                // begins at 0x1000, one for a 16k CAN bootloader at 0x4000.
+                // The wrong pairing writes an image the bootloader can never
+                // enter, over a working application.
+                const mcu = new Mcu(tmp.meta.signature);
+                mcu.setInfo(tmp);
+                const origin = fileFlash.data[0].address - mcu.getFlashOffset();
+                const appStart = mcu.getFirmwareStartByte();
+                if (origin !== appStart) {
+                    logStore.logError(`Updater starts at 0x${origin.toString(16)}, this bootloader starts the application at 0x${appStart.toString(16)}! Aborting flash!`);
+                    throw new Error('Updater does not match the installed bootloader.');
                 }
 
-                if (amj.mcuType !== tmp.meta.am32.mcuType) {
-                    logStore.logError('Invalid MCU type in amj file.');
-                    throw new Error('Invalid MCU type in amj file.');
-                }
+                if (escFileName) {
+                    // an amj carries a bootloader, so one for the wrong MCU
+                    // takes a debugger to undo. A handful of boards name no
+                    // MCU family, leaving nothing to check the file against;
+                    // refuse those rather than let the pin stand in for the MCU
+                    if (!tmp.meta.am32.mcuType) {
+                        logStore.logError(`Cannot tell the MCU type from the ESC name ${escFileName}! Aborting flash!`);
+                        throw new Error('Cannot tell the MCU type of the ESC.');
+                    }
 
-                // bootloader.pin is '' when the reported pin code made no
-                // sense, which no amj matches
-                if (amj.pin !== tmp.bootloader.pin) {
-                    logStore.logError('Pin does not match! Aborting flash!');
-                    throw new Error('Pin does not match! Aborting flash!');
+                    if (amj.mcuType !== tmp.meta.am32.mcuType) {
+                        logStore.logError('Invalid MCU type in amj file.');
+                        throw new Error('Invalid MCU type in amj file.');
+                    }
+
+                    // bootloader.pin is '' when the reported pin code made no
+                    // sense, which no amj matches
+                    if (amj.pin !== tmp.bootloader.pin) {
+                        logStore.logError('Pin does not match! Aborting flash!');
+                        throw new Error('Pin does not match! Aborting flash!');
+                    }
                 }
             }
             startFlash(amj.hex);
