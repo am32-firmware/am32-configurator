@@ -56,6 +56,27 @@ class Flash {
         return image;
     }
 
+    static getFileName (hex: Hex, address: number): string | null {
+        // HEX records can merge the name with preceding code or split it
+        // across blocks. Read at its absolute flash address, bounded by the
+        // 32-byte name region, rather than decoding a whole parsed block.
+        const bytes: number[] = [];
+        for (let i = 0; i < 32; i++) {
+            const currentAddress = address + i;
+            const block = hex.data.find(d => currentAddress >= d.address &&
+                currentAddress < d.address + d.bytes);
+            if (!block) {
+                return null;
+            }
+            const byte = block.data[currentAddress - block.address];
+            if (byte === 0) {
+                return new TextDecoder().decode(new Uint8Array(bytes));
+            }
+            bytes.push(byte);
+        }
+        return null;
+    }
+
     static parseHex (hexString: string): Hex | null {
         let string = hexString.split('\n');
         string = string.map(e => e.endsWith('\r') ? e.substring(0, e.length - 1) : e);

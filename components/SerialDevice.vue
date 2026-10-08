@@ -882,22 +882,17 @@ const startModalFlash = async () => {
                 // bootloader-reported filename address (DroneCAN builds link
                 // it away from the EEPROM), not the static-table default.
                 mcu.setInfo(escStore.firstValidEscData.data);
-                const offset = mcu.getFlashOffset();
-                // a point 2 bytes inside the 32-byte file-name block
-                const fileNameProbe = mcu.getFileNameStartByte() + 2;
+                const fileNameAddress = mcu.getFlashOffset() + mcu.getFileNameStartByte();
 
                 const fileFlash = Flash.parseHex(await fileInput.value.text());
                 const tmp = escStore.firstValidEscData.data.meta.am32;
                 if (fileFlash && tmp.fileName) {
-                    const findFileNameBlock = fileFlash.data.find(d =>
-                        fileNameProbe > (d.address - offset) && fileNameProbe < (d.address - offset + d.bytes)
-                    );
-                    if (!findFileNameBlock) {
+                    const hexFileName = Flash.getFileName(fileFlash, fileNameAddress);
+                    if (hexFileName === null) {
                         logStore.logError('File name not found in hex, probably too old!');
                         throw new Error('File name not found in hex file.');
                     }
 
-                    const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
                     if (tmp.mcuType && Mcu.mcuTypeFromFileName(hexFileName) !== tmp.mcuType) {
                         logStore.logError('Invalid MCU type in hex file.');
                         throw new Error('Invalid MCU type in hex file.');
