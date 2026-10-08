@@ -90,6 +90,27 @@ export class Msp {
         return this.client.sendWithPromise(command, data);
     }
 
+    /**
+     * Send until the FC answers, resolving null once the attempts run out.
+     *
+     * Betaflight's four-way handler is synchronous, so a timed-out long ESC
+     * read keeps MSP silent until that read drains - well past the point the
+     * FC has taken the InterfaceExit that ends the session. Callers leaving
+     * four-way mode have to wait that out rather than declare the FC dead on
+     * the first silent second.
+     */
+    async sendWithRetries (command: MSP_COMMANDS, data?: Uint8Array,
+        attempts = 30, firstDelay = 1000, retryDelay = 500) {
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            await delay(attempt === 0 ? firstDelay : retryDelay);
+            const response = await this.sendWithPromise(command, data).catch(() => null);
+            if (response) {
+                return response;
+            }
+        }
+        return null;
+    }
+
     read (): Promise<void> {
         return this.client.read();
     }

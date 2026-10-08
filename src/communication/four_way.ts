@@ -32,6 +32,12 @@ const DEVINFO_MAGIC2 = 0x4EB863D9;
  */
 const DEVINFO_V3_MIN = 27; // smallest struct that contains every field we read
 export const DEVINFO_V3_MAX = 64; // sanity cap so a garbage byte can't be trusted as a length
+
+// A 4-way read is serialized at 19200 baud on the ESC wire. Real FCs are much
+// faster than this ceiling, but cycle-accurate FC emulation can run near 0.01x
+// while Betaflight bit-bangs a long reply. A length-aware deadline prevents a
+// late response from being mistaken for the following request's response.
+const fourWayReadTimeout = (bytes: number) => Math.max(2000, bytes * 120);
 export function parseDevinfoBlock (block: Uint8Array): DevinfoV3 | null {
     if (block.byteLength < 8 + 9 + 1) { // need at least magic + deviceInfo + length
         return null;
@@ -276,7 +282,7 @@ export class FourWay {
 
             if (/[A-Z0-9_]+/.test(fileName)) {
                 mcu.getInfo().meta.am32.fileName = fileName;
-                mcu.getInfo().meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
+                mcu.getInfo().meta.am32.mcuType = Mcu.mcuTypeFromFileName(fileName);
             }
 
             if (mcu.getInfo().meta.input) {
@@ -318,12 +324,13 @@ export class FourWay {
     }
 
     readAddress (address: number, bytes: number, retries = 10, timeout = 200, retryDelay = 250, options: FourWaySendOptions = {}) {
+        const effectiveTimeout = Math.max(timeout, fourWayReadTimeout(bytes));
         return this.sendWithPromise(
             FOUR_WAY_COMMANDS.cmd_DeviceRead,
             [bytes === 256 ? 0 : bytes],
             address,
             retries,
-            timeout,
+            effectiveTimeout,
             retryDelay,
             options
         );
@@ -484,7 +491,8 @@ export class FourWay {
  * @returns {Promise<Response>}
  */
     write (address: number, data: number[] | Uint8Array, timeout = 200) {
-        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceWrite, Array.from(data), address, 10, timeout);
+        const effectiveTimeout = Math.max(timeout, fourWayReadTimeout(data.length));
+        return this.sendWithPromise(FOUR_WAY_COMMANDS.cmd_DeviceWrite, Array.from(data), address, 10, effectiveTimeout);
     }
 
     /**
