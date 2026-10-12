@@ -439,7 +439,8 @@ class FourWayFC(object):
     transactions against the selected EscModel, mirroring what a real FC
     does on each motor's one-wire side.'''
 
-    def __init__(self, escs, log, init_delay=1.0):
+    def __init__(self, escs, log, init_delay=1.0, msp_delay=0.1,
+                 read_byte_delay=0.01):
         self.escs = list(escs)
         self.selected_esc = 0
         # how long the interface takes to answer cmd_DeviceInitFlash. It is
@@ -448,6 +449,11 @@ class FourWayFC(object):
         # a Betaflight passthrough: ~1.0s. Replying instantly would let the
         # app's timeouts pass here and still fail on real hardware.
         self.init_delay = init_delay
+        # the other two latency boundaries the browser UI must survive:
+        # FC/Web Serial scheduling for MSP, and the per-byte cost of a long
+        # bit-banged 4-way read reply
+        self.msp_delay = msp_delay
+        self.read_byte_delay = read_byte_delay
         self.log = log
         self.ep = PtyEndpoint()
         self.in_fourway = False
@@ -467,6 +473,7 @@ class FourWayFC(object):
     # -- MSP -----------------------------------------------------------
 
     def _msp_reply(self, cmd, payload=b''):
+        time.sleep(self.msp_delay)
         hdr = bytes([len(payload), cmd])
         ck = 0
         for b in hdr + payload:
@@ -605,6 +612,9 @@ class FourWayFC(object):
             data = esc.read_mem(rd_size)
             if data is None:
                 return self._reply(cmd, address, [0], ACK_D_GENERAL_ERROR)
+            # A slow cycle-accurate FC can take tens of host milliseconds per
+            # byte while Betaflight bit-bangs the 19200-baud return path.
+            time.sleep(self.read_byte_delay * rd_size)
             return self._reply(cmd, address, data, ACK_OK)
         if cmd in (0x3B, 0x3E):      # cmd_DeviceWrite / WriteEEprom
             if esc.running or not params:
@@ -644,6 +654,10 @@ def main():
                         help='seconds the 4-way interface takes to answer '
                              'cmd_DeviceInitFlash, as a real FC does while '
                              'it connects to the ESC (0 disables)')
+    parser.add_argument('--msp-delay', type=float, default=0.1,
+                        help='seconds before each FC MSP reply')
+    parser.add_argument('--read-byte-delay', type=float, default=0.01,
+                        help='host seconds per byte in a 4-way read reply')
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
 
@@ -659,7 +673,9 @@ def main():
         escs = [EscModel(args.generation, args.flash_size,
                          run_seconds=args.run_seconds, log=log)
                 for _ in range(args.esc_count)]
-        server = FourWayFC(escs, log, init_delay=args.init_delay)
+        server = FourWayFC(escs, log, init_delay=args.init_delay,
+                           msp_delay=args.msp_delay,
+                           read_byte_delay=args.read_byte_delay)
     print(server.ep.path, flush=True)
     try:
         server.serve_forever()

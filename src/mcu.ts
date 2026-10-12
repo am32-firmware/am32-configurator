@@ -126,6 +126,22 @@ class Mcu {
     static PORT_CHARACTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
     static PIN_CHARACTERS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
 
+    /*
+      AM32 MCU families as they appear in a FILE_NAME. The family is not
+      always the last token: a DroneCAN build's name ends in _CAN, and some
+      boards add their own suffix, as in STELLAR_G071_V1.
+     */
+    static MCU_FAMILIES = ['A153', 'E230', 'F031', 'F051', 'F415', 'F421',
+        'G031', 'G071', 'G431', 'L431', 'V203'];
+
+    /*
+      the MCU family named in an AM32 FILE_NAME, or null for the boards whose
+      name does not carry one
+     */
+    static mcuTypeFromFileName (fileName: string): string | null {
+        return fileName.split('_').find(t => Mcu.MCU_FAMILIES.includes(t)) ?? null;
+    }
+
     static parseBootLoaderPin (pin: number): [boolean, string] {
         const port = pin >> 4;
         const pinNumber = pin & 0xF;

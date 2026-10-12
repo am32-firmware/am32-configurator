@@ -609,12 +609,13 @@ const connectToDevice = async () => {
                         logError(`${err.message}, trying to exit fourway and try again.`);
                         serialStore.isFourWay = true;
                         await FourWay.getInstance().sendWithPromise(FOUR_WAY_COMMANDS.cmd_InterfaceExit);
-                        await delay(1000);
                         serialStore.isFourWay = false;
-                        return Msp.getInstance().sendWithPromise(MSP_COMMANDS.MSP_API_VERSION).catch(() => {
-                            logError('Not in four way mode? Cant automatically resolve issue! Restart and replug device and try again.');
-                            return null;
-                        });
+                        const recovered = await Msp.getInstance().sendWithRetries(MSP_COMMANDS.MSP_API_VERSION);
+                        if (recovered) {
+                            return recovered;
+                        }
+                        logError('Could not leave four way mode. Restart and replug the device and try again.');
+                        return null;
                     });
 
                     if (result === null) {
@@ -881,32 +882,27 @@ const startModalFlash = async () => {
                 // bootloader-reported filename address (DroneCAN builds link
                 // it away from the EEPROM), not the static-table default.
                 mcu.setInfo(escStore.firstValidEscData.data);
-                const offset = mcu.getFlashOffset();
-                // a point 2 bytes inside the 32-byte file-name block
-                const fileNameProbe = mcu.getFileNameStartByte() + 2;
+                const fileNameAddress = mcu.getFlashOffset() + mcu.getFileNameStartByte();
 
                 const fileFlash = Flash.parseHex(await fileInput.value.text());
                 const tmp = escStore.firstValidEscData.data.meta.am32;
-                if (fileFlash && tmp.mcuType && tmp.fileName) {
-                    const findFileNameBlock = fileFlash.data.find(d =>
-                        fileNameProbe > (d.address - offset) && fileNameProbe < (d.address - offset + d.bytes)
-                    );
-                    if (!findFileNameBlock) {
+                if (fileFlash && tmp.fileName) {
+                    const hexFileName = Flash.getFileName(fileFlash, fileNameAddress);
+                    if (hexFileName === null) {
                         logStore.logError('File name not found in hex, probably too old!');
                         throw new Error('File name not found in hex file.');
                     }
 
-                    const hexFileName = new TextDecoder().decode(new Uint8Array(findFileNameBlock.data).slice(0, findFileNameBlock.data.indexOf(0x00)));
-                    if (!hexFileName.endsWith(tmp.mcuType)) {
+                    if (tmp.mcuType && Mcu.mcuTypeFromFileName(hexFileName) !== tmp.mcuType) {
                         logStore.logError('Invalid MCU type in hex file.');
                         throw new Error('Invalid MCU type in hex file.');
                     }
 
-                    const currentFileName = hexFileName.slice(0, hexFileName.lastIndexOf('_'));
-                    const expectedFileName = tmp.fileName.slice(0, tmp.fileName.lastIndexOf('_'));
-                    if (currentFileName !== expectedFileName) {
+                    // the name covers the board and whether it is a DroneCAN
+                    // build, so the hex is for this ESC only if it matches
+                    if (hexFileName !== tmp.fileName) {
                         logStore.logError('Layout does not match! Aborting flash!');
-                        logStore.logError(`Expected: ${expectedFileName}, given: ${currentFileName}`);
+                        logStore.logError(`Expected: ${tmp.fileName}, given: ${hexFileName}`);
                         throw new Error('Layout does not match! Aborting flash!');
                     }
                 }
@@ -926,15 +922,43 @@ const startModalFlash = async () => {
 
             const fileFlash = Flash.parseHex(amj.hex);
             const tmp = escStore.firstValidEscData.data;
-            if (fileFlash && tmp.meta?.am32?.mcuType && tmp.meta?.am32?.fileName) {
-                if (amj.mcuType !== tmp.meta.am32.mcuType) {
-                    logStore.logError('Invalid MCU type in amj file.');
-                    throw new Error('Invalid MCU type in amj file.');
+            const escFileName = tmp.meta?.am32?.fileName;
+            if (fileFlash) {
+                // An updater is entered at the address the installed
+                // bootloader starts the application from: a from4k updater
+                // begins at 0x1000, one for a 16k CAN bootloader at 0x4000.
+                // The wrong pairing writes an image the bootloader can never
+                // enter, over a working application.
+                const mcu = new Mcu(tmp.meta.signature);
+                mcu.setInfo(tmp);
+                const origin = fileFlash.data[0].address - mcu.getFlashOffset();
+                const appStart = mcu.getFirmwareStartByte();
+                if (origin !== appStart) {
+                    logStore.logError(`Updater starts at 0x${origin.toString(16)}, this bootloader starts the application at 0x${appStart.toString(16)}! Aborting flash!`);
+                    throw new Error('Updater does not match the installed bootloader.');
                 }
 
-                if (amj.pin !== tmp.bootloader.pin) {
-                    logStore.logError('Pin does not match! Aborting flash!');
-                    throw new Error('Pin does not match! Aborting flash!');
+                if (escFileName) {
+                    // an amj carries a bootloader, so one for the wrong MCU
+                    // takes a debugger to undo. A handful of boards name no
+                    // MCU family, leaving nothing to check the file against;
+                    // refuse those rather than let the pin stand in for the MCU
+                    if (!tmp.meta.am32.mcuType) {
+                        logStore.logError(`Cannot tell the MCU type from the ESC name ${escFileName}! Aborting flash!`);
+                        throw new Error('Cannot tell the MCU type of the ESC.');
+                    }
+
+                    if (amj.mcuType !== tmp.meta.am32.mcuType) {
+                        logStore.logError('Invalid MCU type in amj file.');
+                        throw new Error('Invalid MCU type in amj file.');
+                    }
+
+                    // bootloader.pin is '' when the reported pin code made no
+                    // sense, which no amj matches
+                    if (amj.pin !== tmp.bootloader.pin) {
+                        logStore.logError('Pin does not match! Aborting flash!');
+                        throw new Error('Pin does not match! Aborting flash!');
+                    }
                 }
             }
             startFlash(amj.hex);

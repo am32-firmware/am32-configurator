@@ -172,7 +172,7 @@ export class Direct {
 
                     if (/[A-Z0-9_]+/.test(fileName)) {
                         info.meta.am32.fileName = fileName;
-                        info.meta.am32.mcuType = fileName.slice(fileName.lastIndexOf('_') + 1);
+                        info.meta.am32.mcuType = Mcu.mcuTypeFromFileName(fileName);
                     }
 
                     if (info.meta.input) {

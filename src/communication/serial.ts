@@ -51,7 +51,12 @@ class Serial {
         });
     }
 
-    public write (data: ArrayBuffer, ms = 50, probe?: SerialPacketProbe) {
+    // MSP replies from a real FC are normally quick, but Web Serial scheduling
+    // and a loaded/emulated FC can exceed 250ms, particularly for the first
+    // MSP request after leaving synchronous 4-way mode.  Successful replies
+    // still resolve immediately, so the larger value only changes the failure
+    // bound while giving recovery and passthrough enough headroom.
+    public write (data: ArrayBuffer, ms = 1000, probe?: SerialPacketProbe) {
         return this.writeWithResponse(data, ms, probe);
     }
 
