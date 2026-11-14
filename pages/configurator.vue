@@ -204,6 +204,7 @@
                       type="number"
                       :min="2"
                       :max="36"
+                      :step="2"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -238,6 +239,16 @@
                         </div>
                       </template>
                     </SettingField>
+                    <SettingField
+                      v-if="supportsDemagCompensation"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="DEMAG_COMPENSATION"
+                      name="Missed ZC / demag compensation"
+                      type="select"
+                      :options="demagCompensationOptions"
+                      help="What the ESC does after a missed zero crossing or a long demagnetization. Coast only skips the power cut; the other levels reduce power after demag recovery."
+                      @change="onSettingsChange"
+                    />
                   </SettingFieldGroup>
                   <SettingFieldGroup
                     v-if="isInEEpromVersion(layoutVersion, 3)"
@@ -250,7 +261,7 @@
                       name="Ramp rate"
                       type="number"
                       :min=".1"
-                      :max="20"
+                      :max="25"
                       :step=".1"
                       unit="% duty cycle per ms"
                       :display-factor=".1"
@@ -314,11 +325,12 @@
                       field="CURRENT_LIMIT"
                       name="Current limit"
                       type="number"
-                      :min="0"
+                      :min="2"
                       :max="202"
                       :step="2"
                       :display-factor="2"
                       :disabled-value="202"
+                      :disabled-below="2"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -334,9 +346,12 @@
                       :offset="250"
                       :display-factor="1"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF === 0"
-                      show-value
                       @change="onSettingsChange"
-                    />
+                    >
+                      <template #unit="{ value }">
+                        {{ ((value as number) / 100).toFixed(2) }} V per cell
+                      </template>
+                    </SettingField>
                     <SettingField
                       v-if="isInEEpromVersion(layoutVersion, 3)
                         && (escStore.firstValidEscData?.data.settings.LOW_VOLTAGE_CUTOFF as number) === 2"
@@ -359,7 +374,7 @@
                     title="Current control"
                     :cols="3"
                     :class="{
-                      'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': (escStore.firstValidEscData?.data.settings.CURRENT_LIMIT as number) > 100
+                      'before:content-[\'\'] before:absolute before:inset-0 blur-[2px]': !isCurrentLimitActive
                     }"
                   >
                     <SettingField
@@ -368,7 +383,9 @@
                       name="Current P"
                       type="number"
                       :min="0"
-                      :max="255"
+                      :max="510"
+                      :step="2"
+                      :display-factor="2"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -388,7 +405,9 @@
                       name="Current D"
                       type="number"
                       :min="0"
-                      :max="255"
+                      :max="510"
+                      :step="2"
+                      :display-factor="2"
                       show-value
                       @change="onSettingsChange"
                     />
@@ -456,6 +475,16 @@
                     @change="onSettingsChange"
                   >
                     <SettingField
+                      v-if="isInEEpromVersion(layoutVersion, 4)"
+                      :esc-info="escStore.selectedEscInfo"
+                      field="BRAKE_ON_ZERO_THROTTLE"
+                      name="Brake on zero throttle"
+                      type="select"
+                      :options="brakeOnZeroThrottleOptions"
+                      help="What the ESC does when throttle drops to zero while the motor is still spinning. The delayed options behave like Default, then switch to the brake on stop setting."
+                      @change="onSettingsChange"
+                    />
+                    <SettingField
                       :esc-info="escStore.selectedEscInfo"
                       name="Brake strength"
                       type="number"
@@ -486,7 +515,8 @@
                       type="number"
                       :min="0"
                       :max="5"
-                      :step="1"
+                      :step=".5"
+                      :display-factor=".5"
                       unit="%"
                       :disabled="(value: number) => escStore.firstValidEscData?.data.settings.BRAKE_ON_STOP !== 2"
                       @change="onSettingsChange"
@@ -506,7 +536,8 @@
                       type="number"
                       field="SERVO_LOW_THRESHOLD"
                       :min="750"
-                      :max="1250"
+                      :max="1260"
+                      :step="2"
                       :display-factor="2"
                       :offset="750"
                       show-value
@@ -519,7 +550,8 @@
                       type="number"
                       field="SERVO_HIGH_THRESHOLD"
                       :min="1750"
-                      :max="2250"
+                      :max="2260"
+                      :step="2"
                       :display-factor="2"
                       :offset="1750"
                       show-value
@@ -532,7 +564,7 @@
                       type="number"
                       field="SERVO_NEUTRAL"
                       :min="1374"
-                      :max="1630"
+                      :max="1629"
                       :display-factor="1"
                       :offset="1374"
                       show-value
@@ -613,8 +645,72 @@ const protocolOptions = [
     {
         value: 4,
         label: 'EDT ARM'
+    },
+    {
+        value: 5,
+        label: 'DroneCAN (CAN ESCs only)'
     }
 ];
+
+// firmware brake_on_zero_throttle: 0 default, 1 coast, 2 brake,
+// 3-9 brake on stop after (value - 2) seconds
+const brakeOnZeroThrottleOptions = [
+    {
+        value: 0,
+        label: 'Default (follows complementary PWM)'
+    },
+    {
+        value: 1,
+        label: 'Coast'
+    },
+    {
+        value: 2,
+        label: 'Brake'
+    },
+    ...[1, 2, 3, 4, 5, 6, 7].map(seconds => ({
+        value: seconds + 2,
+        label: `Brake on stop after ${seconds} s`
+    }))
+];
+
+// firmware demag_comp (byte 14): power cut is duty >> (7 - value) for 2-4
+const demagCompensationOptions = [
+    {
+        value: 0,
+        label: 'Off'
+    },
+    {
+        value: 1,
+        label: 'Coast only'
+    },
+    {
+        value: 2,
+        label: '1/32 power cut'
+    },
+    {
+        value: 3,
+        label: '1/16 power cut'
+    },
+    {
+        value: 4,
+        label: '1/8 power cut'
+    }
+];
+
+// demag_comp arrived in firmware 2.22 on the unchanged eeprom layout 4, so
+// the layout version alone cannot tell whether the ESC knows the byte
+const supportsDemagCompensation = computed(() => {
+    const settings = escStore.firstValidEscData?.data.settings;
+    const major = Number(settings?.MAIN_REVISION ?? 0);
+    const minor = Number(settings?.SUB_REVISION ?? 0);
+    return isInEEpromVersion(layoutVersion.value, 4) && (major > 2 || (major === 2 && minor >= 22));
+});
+
+// firmware enables the current limit for raw 1-100 only; 0 and >100 are off
+const isCurrentLimitActive = computed(() => {
+    const limit = escStore.firstValidEscData?.data.settings.CURRENT_LIMIT as number;
+    return limit > 0 && limit <= 100;
+});
 
 const onSettingsChange = ({ field, value, individual }: { field: EepromLayoutKeys, value: number | number[], individual?: number }) => {
     if (individual !== undefined) {

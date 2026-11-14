@@ -17,21 +17,24 @@ export default function (settingsObject: McuSettings, eepromVersion: number) {
             continue;
         }
 
-        const value: number | number[] | string = settingsObject[prop] as number;
+        // a field that was never read (truncated source) keeps the erased value
+        if (settingsObject[prop] === undefined) {
+            continue;
+        }
 
         if (size === 1) {
-            array[offset] = value;
+            array[offset] = Number(settingsObject[prop]);
         } else if (size === 2) {
+            const value = Number(settingsObject[prop]);
             array[offset] = (value >> 8) & 0xFF;
             array[offset + 1] = value & 0xFF;
         } else if (size > 2) {
-            const { length } = settingsObject[prop] as any[];
+            // tune and CAN block are raw byte blocks; a short tune is padded
+            // with 0 (end of melody), anything else with the erased value
+            const bytes = settingsObject[prop] as ArrayLike<number>;
+            const pad = prop === 'STARTUP_MELODY' ? 0x00 : 0xFF;
             for (let i = 0; i < size; i += 1) {
-                if (prop === 'STARTUP_MELODY') {
-                    array[offset + i] = i < length ? (value as unknown as any[])[i] % 256 : 0;
-                } else {
-                    array[offset + i] = i < length ? (value as unknown as string).charCodeAt(i) : ' '.charCodeAt(0);
-                }
+                array[offset + i] = i < bytes.length ? bytes[i] & 0xFF : pad;
             }
         } else {
             throw new Error('ConversionError');

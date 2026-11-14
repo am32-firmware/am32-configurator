@@ -1,8 +1,15 @@
+// Mirrors the AM32 firmware EEprom_t (Inc/eeprom.h): 48 setting bytes, a
+// 128 byte startup tune and a 16 byte CAN block - 192 bytes in total.
+// Fields wider than two bytes are raw byte blocks, never text.
 export interface EepromField {
     offset: number;
     size: number;
     minEepromVersion?: number;
     maxEepromVersion?: number;
+    // Replaces an out-of-range value the same way the firmware's
+    // loadEEpromSettings() rewrites it on boot, so the UI shows what the ESC
+    // actually runs with instead of garbage the controls cannot represent.
+    sanitize?: (value: number) => number;
 }
 
 export type EepromLayoutField = {
@@ -69,6 +76,23 @@ export const EepromLayout = {
         offset: 0x0C,
         size: 1,
         minEepromVersion: 3
+    },
+    // added with eeprom layout 4 / firmware 2.21; before that byte 13 held
+    // part of the firmware name
+    BRAKE_ON_ZERO_THROTTLE: {
+        offset: 0x0D,
+        size: 1,
+        minEepromVersion: 4,
+        sanitize: (value: number) => (value > 9 ? 0 : value)
+    },
+    // added with firmware 2.22 without a layout bump (still layout 4), so
+    // the UI gates it on the firmware version. 0 off, 1 coast only,
+    // 2/3/4 = 1/32, 1/16, 1/8 power cut after demag recovery
+    DEMAG_COMPENSATION: {
+        offset: 0x0E,
+        size: 1,
+        minEepromVersion: 4,
+        sanitize: (value: number) => (value > 4 ? 0 : value)
     },
     MOTOR_DIRECTION: {
         offset: 0x11,
@@ -164,19 +188,23 @@ export const EepromLayout = {
     },
     SINE_MODE_RANGE: {
         offset: 0x28,
-        size: 1
+        size: 1,
+        sanitize: (value: number) => (value < 5 || value > 25 ? 5 : value)
     },
     BRAKE_STRENGTH: {
         offset: 0x29,
-        size: 1
+        size: 1,
+        sanitize: (value: number) => (value === 0 || value > 10 ? 10 : value)
     },
     RUNNING_BRAKE_LEVEL: {
         offset: 0x2A,
-        size: 1
+        size: 1,
+        sanitize: (value: number) => (value === 0 || value > 9 ? 10 : value)
     },
     TEMPERATURE_LIMIT: {
         offset: 0x2B,
-        size: 1
+        size: 1,
+        sanitize: (value: number) => (value < 70 || value > 140 ? 255 : value)
     },
     CURRENT_LIMIT: {
         offset: 0x2C,
@@ -184,7 +212,8 @@ export const EepromLayout = {
     },
     SINE_MODE_POWER: {
         offset: 0x2D,
-        size: 1
+        size: 1,
+        sanitize: (value: number) => (value === 0 || value > 10 ? 5 : value)
     },
     ESC_PROTOCOL: {
         offset: 0x2E,
@@ -198,6 +227,8 @@ export const EepromLayout = {
         offset: 0x30,
         size: 128
     },
+    // can_node, esc_index, require_arming, telem_rate, require_zero_throttle,
+    // filter_hz, debug_rate, term_enable, 8 reserved - passed through untouched
     CAN_SETTINGS: {
         offset: 0xB0,
         size: 16

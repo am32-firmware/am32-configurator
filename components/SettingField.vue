@@ -11,7 +11,13 @@
           <div v-if="name">
             {{ name }}
           </div>
-          <UTooltip v-if="help" :text="help" :popper="{ placement: 'right' }">
+          <!-- default tooltip is one fixed-height truncated line; let help text wrap -->
+          <UTooltip
+            v-if="help"
+            :text="help"
+            :popper="{ placement: 'right' }"
+            :ui="{ base: '[@media(pointer:coarse)]:hidden h-auto px-2 py-1 text-xs font-normal whitespace-normal relative' }"
+          >
             <UIcon name="i-material-symbols-help-outline" class="text-blue-500 text-lg" />
           </UTooltip>
         </div>
@@ -27,7 +33,7 @@
           :min="min"
           :max="max"
           :step="step"
-          :color="disabledValue && value >= disabledValue ? 'orange' : 'primary'"
+          :color="isOffValue ? 'orange' : 'primary'"
         />
       </div>
       <div v-else-if="type === 'rtttl'">
@@ -35,13 +41,13 @@
       </div>
       <slot name="unit" :unit="unit" :value="value">
         <div v-if="unit || showValue" class="flex">
-          <div v-if="disabledValue && value >= disabledValue">
+          <div v-if="isOffValue">
             DISABLED
           </div>
           <div v-else>
             {{ (min || 0).toString().includes('.') ? (value * onlyDisplayFactor).toFixed(1) : value * onlyDisplayFactor }}
           </div>
-          <div v-if="unit && (!disabledValue || value < disabledValue)">
+          <div v-if="unit && !isOffValue">
             {{ unit }}
           </div>
         </div>
@@ -83,7 +89,10 @@ interface SettingFieldProps {
     unit?: string;
     showValue?: boolean;
     disabled?: boolean | ((value: number) => boolean),
+    // display value at/above which the firmware treats the setting as off
     disabledValue?: number,
+    // display value below which the firmware treats the setting as off
+    disabledBelow?: number,
     individual?: number
 }
 
@@ -103,7 +112,8 @@ const props = withDefaults(defineProps<SettingFieldProps>(), {
     showValue: false,
     disabled: false,
     individual: undefined,
-    disabledValue: undefined
+    disabledValue: undefined,
+    disabledBelow: undefined
 });
 
 const emits = defineEmits<{(e: 'change', value: { field: EepromLayoutKeys, value: number | number[], individual?: number }): void}>();
@@ -121,7 +131,8 @@ const isDisabled = computed(() => {
 const value = computed({
     get: () => {
         let value = props.escInfo[props.individual ?? 0].settings[props.field] as number;
-        if (value && props.type === 'number') {
+        // raw 0 is a real value for offset fields (servo low 0 = 750us)
+        if (typeof value === 'number' && props.type === 'number') {
             value = (value * props.displayFactor) + props.offset;
         }
         return value;
@@ -130,6 +141,9 @@ const value = computed({
         let value = val;
         if (props.type === 'number') {
             value = (value - props.offset) / props.displayFactor;
+        } else if (props.type === 'select') {
+            // native <select> hands back strings; settings hold numbers
+            value = Number(value);
         }
         emits('change', {
             field: props.field,
@@ -138,6 +152,9 @@ const value = computed({
         });
     }
 });
+
+const isOffValue = computed(() => (props.disabledValue !== undefined && value.value >= props.disabledValue) ||
+    (props.disabledBelow !== undefined && value.value < props.disabledBelow));
 
 const boolValue = computed({
     get: () => {

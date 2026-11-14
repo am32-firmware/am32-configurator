@@ -23,16 +23,13 @@ export default function (buffer: Uint8Array, eepromVersion: number) {
         }
 
         if (size === 1) {
-            object[prop] = buffer[offset];
+            object[prop] = setting.sanitize ? setting.sanitize(buffer[offset]) : buffer[offset];
         } else if (size === 2) {
             object[prop] = (buffer[offset] << 8) | buffer[offset + 1];
         } else if (size > 2) {
-            if (prop === 'STARTUP_MELODY') {
-                object[prop] = buffer.subarray(offset, offset + size);
-                object[prop] = Array.from(object[prop] as Uint8Array);
-            } else {
-                object[prop] = new TextDecoder().decode(buffer.subarray(offset, offset + size)).trim();
-            }
+            // tune and CAN block are binary; decoding them as text turned
+            // every byte >= 0x80 into U+FFFD and wrote it back as 0xFD
+            object[prop] = Array.from(buffer.subarray(offset, offset + size));
         } else {
             throw new Error('conversion error');
         }
