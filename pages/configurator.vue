@@ -203,7 +203,7 @@
                       name="Motor poles"
                       type="number"
                       :min="2"
-                      :max="36"
+                      :max="64"
                       :step="2"
                       show-value
                       @change="onSettingsChange"
